@@ -22,6 +22,7 @@ class Student extends Model
         'course',          // Direct course name (no program_id FK)
         'contact_number',
         'address',
+        'rfid_code',
     ];
 
     protected $casts = [

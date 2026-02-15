@@ -70,6 +70,7 @@ class UserController extends Controller
                     'year_level' => 'required|string',
                     'department_id' => 'required|exists:departments,id',
                     'contact_number' => 'nullable|string|max:20',
+                    'course' => 'required|string', // ✅ ADDED course validation
                 ]);
 
                 // Create the student record first
@@ -80,23 +81,24 @@ class UserController extends Controller
                     'last_name' => $studentData['last_name'],
                     'year_level' => $studentData['year_level'],
                     'department_id' => $studentData['department_id'],
-                    'course' => $request->course ?? null,
+                    'course' => $studentData['course'], // ✅ Save course
                     'contact_number' => $studentData['contact_number'] ?? null,
                 ]);
 
-                // Create user with student FK
+                // ✅ FIXED: Use password_hash column
                 $user = User::create([
                     'email' => $userData['email'],
-                    'password' => Hash::make($userData['password']),
+                    'password_hash' => Hash::make($userData['password']), // ✅ password_hash, not password
                     'user_type_id' => $userData['user_type_id'],
-                    'student_id' => $student->id, // FK to students.id
+                    'student_id' => $student->id,
                     'is_active' => $userData['is_active'] ?? true,
                 ]);
             } else {
                 // Admin or Officer - no student record needed
+                // ✅ FIXED: Use password_hash column
                 $user = User::create([
                     'email' => $userData['email'],
-                    'password' => Hash::make($userData['password']),
+                    'password_hash' => Hash::make($userData['password']), // ✅ password_hash, not password
                     'user_type_id' => $userData['user_type_id'],
                     'is_active' => $userData['is_active'] ?? true,
                 ]);
@@ -140,9 +142,12 @@ class UserController extends Controller
 
             // Update user fields
             $user->email = $userData['email'];
+            
+            // ✅ FIXED: Use password_hash column
             if (!empty($userData['password'])) {
-                $user->password = Hash::make($userData['password']);
+                $user->password_hash = Hash::make($userData['password']); // ✅ password_hash, not password
             }
+            
             $user->user_type_id = $userData['user_type_id'];
             $user->is_active = $userData['is_active'] ?? $user->is_active;
 
@@ -156,6 +161,7 @@ class UserController extends Controller
                     'year_level' => 'required|string',
                     'department_id' => 'required|exists:departments,id',
                     'contact_number' => 'nullable|string|max:20',
+                    'course' => 'required|string', // ✅ ADDED course validation
                 ]);
 
                 if ($user->student) {
@@ -167,7 +173,7 @@ class UserController extends Controller
                         'last_name' => $studentData['last_name'],
                         'year_level' => $studentData['year_level'],
                         'department_id' => $studentData['department_id'],
-                        'course' => $request->course ?? $user->student->course,
+                        'course' => $studentData['course'], // ✅ Update course
                         'contact_number' => $studentData['contact_number'] ?? null,
                     ]);
                 } else {
@@ -179,14 +185,11 @@ class UserController extends Controller
                         'last_name' => $studentData['last_name'],
                         'year_level' => $studentData['year_level'],
                         'department_id' => $studentData['department_id'],
-                        'course' => $request->course ?? null,
+                        'course' => $studentData['course'], // ✅ Save course
                         'contact_number' => $studentData['contact_number'] ?? null,
                     ]);
                     $user->student_id = $student->id;
                 }
-            } else {
-                // If changing from student to admin/officer, keep student data but note the role change
-                // You could optionally set student_id to null here if you want to break the link
             }
 
             $user->save();

@@ -11,24 +11,41 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    // ✅ FIXED: Use password_hash, not password
     protected $fillable = [
         'email',
-        'password',
-        'student_id',        // bigint FK → students.id (PK)
+        'password_hash',  // ✅ This is the actual column name in your database
+        'student_id',
         'user_type_id',
         'is_active',
     ];
 
     protected $hidden = [
-        'password',
+        'password_hash',
         'remember_token',
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
         'is_active' => 'boolean',
     ];
+
+    // ✅ CRITICAL: Password accessors for Laravel Auth compatibility
+    // These allow you to use $user->password while storing in password_hash column
+    
+    public function getAuthPassword()
+    {
+        return $this->password_hash;
+    }
+
+    public function getPasswordAttribute()
+    {
+        return $this->password_hash;
+    }
+
+    public function setPasswordAttribute($value)
+    {
+        $this->attributes['password_hash'] = $value;
+    }
 
     // ── Relationships ──────────────────────────────────────────────────────
 
@@ -64,7 +81,7 @@ class User extends Authenticatable
      */
     public function scopeStudents($query)
     {
-        return $query->where('user_type_id', 3) // Assuming 3 = Member/Student
+        return $query->where('user_type_id', 3)
                      ->whereNotNull('student_id');
     }
 

@@ -6,14 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
+            'email'    => 'required|email',
             'password' => 'required',
         ]);
 
@@ -27,14 +26,17 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // 3. Create Token
+        // 3. Load student profile if user has one
+        $user->load('student');
+
+        // 4. Create token
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // 4. Return user and token
+        // 5. Return user and token
         return response()->json([
             'message' => 'Login successful',
-            'token' => $token,
-            'user' => $user // Full user object
+            'token'   => $token,
+            'user'    => $user,
         ], 200);
     }
 }

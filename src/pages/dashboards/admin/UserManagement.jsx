@@ -5,7 +5,7 @@ import {
   UserCircle, Phone, GraduationCap, Search, X,
   Pencil, Users, Shield, Star, CheckCircle2,
   Eye, EyeOff, RefreshCw, Building2, AlertTriangle,
-  Lock, ChevronRight, Activity, MoreHorizontal, BookOpen
+  Lock, ChevronRight, Activity, MoreHorizontal, BookOpen, Filter
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -36,22 +36,20 @@ import { toast } from "sonner";
 // ── Constants ──────────────────────────────────────────────────────────────
 const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year"];
 
-// ✅ Course offerings by department (Update IDs to match your database!)
-// ✅ Course offerings by department - MATCHED TO YOUR DATABASE
 const COURSES_BY_DEPARTMENT = {
-  "1": [ // College of Sciences (COS)
+  "1": [
     "Bachelor of Science in Computer Science",
     "Bachelor of Science in Environmental Science major in Coastal Resource Management"
   ],
-  "2": [ // College of Fisheries and Marine Sciences (CFMS)
+  "2": [
     "Bachelor of Science in Fisheries",
     "Bachelor of Science in Marine Biology"
   ],
-  "3": [ // College of Teacher Education (CTE)
+  "3": [
     "Bachelor of Elementary Education",
     "Bachelor of Secondary Education (BSEd)"
   ],
-  "4": [ // College of Business and Management (CBM)
+  "4": [
     "Bachelor of Science in Hospitality Management",
     "Bachelor of Science in Office Administration"
   ]
@@ -67,7 +65,7 @@ const EMPTY_FORM = {
   email: "", password: "", user_type_id: "", is_active: "1",
   student_number: "", first_name: "", middle_name: "",
   last_name: "", department_id: "", year_level: "", contact_number: "",
-  course: "", // ✅ ADDED
+  course: "",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -163,7 +161,7 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
       department_id:  String(editUser.student?.department_id ?? ""),
       year_level:     editUser.student?.year_level ?? "",
       contact_number: editUser.student?.contact_number ?? "",
-      course:         editUser.student?.course ?? "", // ✅ ADDED
+      course:         editUser.student?.course ?? "",
     } : EMPTY_FORM);
   }, [open, editUser]);
 
@@ -338,7 +336,7 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
                     <Select
                       value={form.department_id}
                       onValueChange={(val) => {
-                        setForm(p => ({ ...p, department_id: val, course: "" })); // Reset course when dept changes
+                        setForm(p => ({ ...p, department_id: val, course: "" }));
                       }}
                       required
                     >
@@ -370,7 +368,7 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
                   </div>
                 </div>
 
-                {/* ✅ COURSE SELECTION */}
+                {/* Course Selection */}
                 <div className="space-y-1">
                   <Label className="text-slate-700 font-semibold text-xs">
                     Course / Program <span className="text-red-500">*</span>
@@ -534,17 +532,33 @@ function DeleteDialog({ open, onClose, onConfirm, userName }) {
 export default function UserManagement() {
   const [users, setUsers]               = useState([]);
   const [departments, setDepartments]   = useState([]);
+  const [organizations, setOrganizations] = useState([]); // ✅ ADDED
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState("");
   const [filterRole, setFilterRole]     = useState("all");
+  
+  // ✅ NEW FILTERS
+  const [filterYear, setFilterYear]       = useState("all");
+  const [filterDept, setFilterDept]       = useState("all");
+  const [filterCourse, setFilterCourse]   = useState("all");
+  const [filterOrg, setFilterOrg]         = useState("all");
+  const [showFilters, setShowFilters]     = useState(false);
+  
   const [formOpen, setFormOpen]         = useState(false);
   const [editUser, setEditUser]         = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   useEffect(() => {
-    axios.get("/api/departments", authH())
-      .then(res => setDepartments(res.data))
-      .catch(() => toast.error("Could not load departments."));
+    // ✅ Fetch both departments and organizations
+    Promise.all([
+      axios.get("/api/departments", authH()),
+      axios.get("/api/organizations", authH())
+    ])
+      .then(([deptRes, orgRes]) => {
+        setDepartments(deptRes.data);
+        setOrganizations(orgRes.data);
+      })
+      .catch(() => toast.error("Could not load departments/organizations."));
   }, []);
 
   const fetchUsers = async () => {
@@ -579,14 +593,30 @@ export default function UserManagement() {
   const officers = users.filter(u => String(u.user_type_id) === "2").length;
   const members  = users.filter(u => String(u.user_type_id) === "3").length;
 
+  // ✅ ENHANCED FILTERING
   const filtered = users.filter(u => {
     const q     = search.toLowerCase();
-    const match = !search
+    const matchSearch = !search
       || getFullName(u).toLowerCase().includes(q)
       || u.email?.toLowerCase().includes(q)
       || u.student?.student_id?.toLowerCase().includes(q);
-    return match && (filterRole === "all" || String(u.user_type_id) === filterRole);
+    
+    const matchRole = filterRole === "all" || String(u.user_type_id) === filterRole;
+    const matchYear = filterYear === "all" || u.student?.year_level === filterYear;
+    const matchDept = filterDept === "all" || String(u.student?.department_id) === filterDept;
+    const matchCourse = filterCourse === "all" || u.student?.course === filterCourse;
+    // Note: organization filtering would require organization data on user/student model
+    const matchOrg = filterOrg === "all"; // Implement if organization field exists
+    
+    return matchSearch && matchRole && matchYear && matchDept && matchCourse && matchOrg;
   });
+
+  // ✅ Extract unique values for filter dropdowns
+  const availableYears = [...new Set(users.map(u => u.student?.year_level).filter(Boolean))].sort();
+  const availableCourses = [...new Set(users.map(u => u.student?.course).filter(Boolean))].sort();
+  
+  // ✅ Count active filters
+  const activeFiltersCount = [filterYear, filterDept, filterCourse, filterOrg].filter(f => f !== "all").length;
 
   return (
     <TooltipProvider>
@@ -632,36 +662,157 @@ export default function UserManagement() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
 
           {/* Toolbar */}
-          <div className="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder="Name, email, student no…"
-                  className="pl-9 pr-8 h-8 border-slate-200 bg-slate-50 focus:bg-white focus:border-[#1e4db7] text-sm rounded-xl" />
-                {search && (
-                  <button onClick={() => setSearch("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+          <div className="px-5 py-3.5 border-b border-slate-100 space-y-3">
+            {/* Main search row */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder="Name, email, student no…"
+                    className="pl-9 pr-8 h-8 border-slate-200 bg-slate-50 focus:bg-white focus:border-[#1e4db7] text-sm rounded-xl" />
+                  {search && (
+                    <button onClick={() => setSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <Select value={filterRole} onValueChange={setFilterRole}>
+                  <SelectTrigger className="w-32 h-8 border-slate-200 bg-slate-50 text-sm rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="1">Admin</SelectItem>
+                    <SelectItem value="2">Officer</SelectItem>
+                    <SelectItem value="3">Member</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {/* ✅ FILTER TOGGLE BUTTON */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`h-8 border-slate-200 text-slate-600 hover:bg-slate-100 ${
+                    activeFiltersCount > 0 ? "border-[#1e4db7] text-[#1e4db7] bg-blue-50" : ""
+                  }`}>
+                  <Filter className="w-3.5 h-3.5 mr-1.5" />
+                  Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+                </Button>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <Activity className="w-3.5 h-3.5" />
+                <span><strong className="text-slate-600">{filtered.length}</strong> result{filtered.length !== 1 ? "s" : ""}</span>
+              </div>
+            </div>
+
+            {/* ✅ ADVANCED FILTERS (collapsible) */}
+            {showFilters && (
+              <div className="grid grid-cols-4 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                {/* Year Level Filter */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide flex items-center gap-1">
+                    <GraduationCap className="w-3 h-3" />
+                    Year Level
+                  </Label>
+                  <Select value={filterYear} onValueChange={setFilterYear}>
+                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg">
+                      <SelectItem value="all" className="text-xs">All Years</SelectItem>
+                      {availableYears.map(year => (
+                        <SelectItem key={year} value={year} className="text-xs">{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Department Filter */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide flex items-center gap-1">
+                    <Building2 className="w-3 h-3" />
+                    Department
+                  </Label>
+                  <Select value={filterDept} onValueChange={setFilterDept}>
+                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg max-h-52">
+                      <SelectItem value="all" className="text-xs">All Departments</SelectItem>
+                      {departments.map(dept => (
+                        <SelectItem key={dept.id} value={String(dept.id)} className="text-xs">
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Course Filter */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide flex items-center gap-1">
+                    <BookOpen className="w-3 h-3" />
+                    Course
+                  </Label>
+                  <Select value={filterCourse} onValueChange={setFilterCourse}>
+                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg max-h-52">
+                      <SelectItem value="all" className="text-xs">All Courses</SelectItem>
+                      {availableCourses.map(course => (
+                        <SelectItem key={course} value={course} className="text-xs truncate">
+                          {course}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Organization Filter */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide flex items-center gap-1">
+                    <Users className="w-3 h-3" />
+                    Organization
+                  </Label>
+                  <Select value={filterOrg} onValueChange={setFilterOrg}>
+                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg max-h-52">
+                      <SelectItem value="all" className="text-xs">All Organizations</SelectItem>
+                      {organizations.map(org => (
+                        <SelectItem key={org.id} value={String(org.id)} className="text-xs">
+                          {org.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Clear Filters Button */}
+                {activeFiltersCount > 0 && (
+                  <div className="col-span-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFilterYear("all");
+                        setFilterDept("all");
+                        setFilterCourse("all");
+                        setFilterOrg("all");
+                      }}
+                      className="w-full h-7 text-xs border-slate-200 text-slate-600 hover:bg-slate-100">
+                      <X className="w-3 h-3 mr-1.5" />
+                      Clear all filters
+                    </Button>
+                  </div>
                 )}
               </div>
-              <Select value={filterRole} onValueChange={setFilterRole}>
-                <SelectTrigger className="w-32 h-8 border-slate-200 bg-slate-50 text-sm rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="1">Admin</SelectItem>
-                  <SelectItem value="2">Officer</SelectItem>
-                  <SelectItem value="3">Member</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Activity className="w-3.5 h-3.5" />
-              <span><strong className="text-slate-600">{filtered.length}</strong> result{filtered.length !== 1 ? "s" : ""}</span>
-            </div>
+            )}
           </div>
 
           {/* Table */}
@@ -669,7 +820,7 @@ export default function UserManagement() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60">
-                  {["User", "Student No.", "Department", "Role", "Year Level", "Status", ""].map(h => (
+                  {["User", "Student No.", "Department", "Course", "Role", "Year", "Status", ""].map(h => (
                     <th key={h} className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -677,7 +828,7 @@ export default function UserManagement() {
               <tbody className="divide-y divide-slate-50">
                 {loading ? (
                   <tr>
-                    <td colSpan="7" className="py-24 text-center">
+                    <td colSpan="8" className="py-24 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl bg-[#0f2d5e]/5 flex items-center justify-center">
                           <Loader2 className="w-6 h-6 animate-spin text-[#1e4db7]" />
@@ -688,7 +839,7 @@ export default function UserManagement() {
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="py-24 text-center">
+                    <td colSpan="8" className="py-24 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
                           <UserCircle className="w-7 h-7 text-slate-300" />
@@ -698,7 +849,14 @@ export default function UserManagement() {
                           <p className="text-xs text-slate-400 mt-0.5">Try adjusting your search or filters</p>
                         </div>
                         <Button variant="outline" size="sm"
-                          onClick={() => { setSearch(""); setFilterRole("all"); }}
+                          onClick={() => { 
+                            setSearch(""); 
+                            setFilterRole("all");
+                            setFilterYear("all");
+                            setFilterDept("all");
+                            setFilterCourse("all");
+                            setFilterOrg("all");
+                          }}
                           className="rounded-xl border-slate-200 text-slate-600 text-xs h-8">
                           Clear filters
                         </Button>
@@ -742,11 +900,25 @@ export default function UserManagement() {
                         </span>
                       </td>
 
-                      <td className="px-5 py-3.5 max-w-[140px]">
+                      <td className="px-5 py-3.5 max-w-[120px]">
                         {deptName ? (
                           <div className="flex items-center gap-1.5">
                             <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <span className="text-sm text-slate-600 truncate">{deptName}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
+
+                      {/* ✅ COURSE COLUMN */}
+                      <td className="px-5 py-3.5 max-w-[160px]">
+                        {user.student?.course ? (
+                          <div className="flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="text-sm text-slate-600 truncate" title={user.student.course}>
+                              {user.student.course}
+                            </span>
                           </div>
                         ) : (
                           <span className="text-slate-300 text-xs">—</span>
@@ -811,7 +983,7 @@ export default function UserManagement() {
             <span>
               Showing <strong className="text-slate-600">{filtered.length}</strong> of{" "}
               <strong className="text-slate-600">{total}</strong> accounts
-              {filterRole !== "all" && ` · ${ROLE_META[filterRole]?.label}s only`}
+              {(filterRole !== "all" || activeFiltersCount > 0) && " (filtered)"}
               {search && ` · "${search}"`}
             </span>
             <span>
