@@ -19,11 +19,9 @@ class MemberOrganization extends Model
         'joined_date',
         'status',
     ];
-
+        
     protected $casts = [
         'joined_date' => 'date',
-        'role' => 'string',
-        'status' => 'string',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────
@@ -36,5 +34,22 @@ class MemberOrganization extends Model
     public function student()
     {
         return $this->belongsTo(Student::class, 'student_id');
+    }
+
+    // ── Scopes ─────────────────────────────────────────────────────────────
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+
+    public function scopeOfficers($query)
+    {
+        return $query->whereIn('role', ['officer', 'adviser']);
+    }
+
+    public function scopeMembers($query)
+    {
+        return $query->where('role', 'member');
     }
 }

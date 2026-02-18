@@ -11,10 +11,13 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Models\Student;
 
-
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
+
+    // Auth
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
 
     // User Management
     Route::get('/users', [UserController::class, 'index']);
@@ -23,17 +26,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/users/{id}', [UserController::class, 'update']);
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
 
-    // ✅ Students endpoint WITHOUT program table (uses course column instead)
+    // Students
     Route::get('/students', function () {
         try {
-            // Build the query with only department relationship
             $query = Student::with([
                 'department:id,name,code',
                 'user:id,email,is_active'
             ])->select('id', 'student_id', 'first_name', 'last_name', 'year_level', 'department_id', 'course');
-
-            // If you have a 'course' column in students table, include it
-            // Otherwise, remove 'course' from the select
 
             return $query
                 ->orderBy('last_name')
@@ -49,14 +48,13 @@ Route::middleware('auth:sanctum')->group(function () {
                         'email'         => $student->user->email ?? null,
                         'year_level'    => $student->year_level,
                         'department_id' => $student->department_id,
-                        'course'        => $student->course ?? null, // Direct course name
+                        'course'        => $student->course ?? null,
                         'is_active'     => $student->user->is_active ?? true,
                         'department'    => $student->department ? [
                             'id'   => $student->department->id,
                             'name' => $student->department->name,
                             'code' => $student->department->code ?? null,
                         ] : null,
-                        // Program is just the course name for now
                         'program'       => $student->course ? [
                             'id'   => null,
                             'name' => $student->course,
@@ -67,7 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
         } catch (\Exception $e) {
             \Log::error('Students API error: ' . $e->getMessage());
             return response()->json([
-                'error' => 'Failed to load students',
+                'error'   => 'Failed to load students',
                 'message' => $e->getMessage()
             ], 500);
         }
@@ -90,26 +88,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/organizations/{id}', [OrganizationController::class, 'update']);
     Route::delete('/organizations/{id}', [OrganizationController::class, 'destroy']);
 
-    // Event Management
-    Route::get('/events', [EventController::class, 'index']);
-    Route::post('/events', [EventController::class, 'store']);
-    Route::get('/events/{id}', [EventController::class, 'show']);
-    Route::put('/events/{id}', [EventController::class, 'update']);
-    Route::delete('/events/{id}', [EventController::class, 'destroy']);
-    Route::get('/events/{id}/qr', [EventController::class, 'getQRCode']);
-    Route::get('/events/filter/upcoming', [EventController::class, 'upcoming']);
+    // ── Event Management ───────────────────────────────────────────────────
+    // ✅ Static routes BEFORE {id} wildcard
+    Route::get('/events',                  [EventController::class, 'index']);
+    Route::post('/events',                 [EventController::class, 'store']);
+    Route::get('/events/upcoming',  [EventController::class, 'upcoming']);  // ← before {id}
+    Route::get('/events/{id}',             [EventController::class, 'show']);
+    Route::put('/events/{id}',             [EventController::class, 'update']);
+    Route::delete('/events/{id}',          [EventController::class, 'destroy']);
+    Route::get('/events/{id}/qr',          [EventController::class, 'getQRCode']);
 
-    // Attendance — Student-facing
-    Route::post('attendance/checkin',         [AttendanceController::class, 'checkIn']);
-    Route::post('attendance/checkout',        [AttendanceController::class, 'checkOut']);
-    Route::get('attendance/my',               [AttendanceController::class, 'getMyAttendance']);
-    Route::get('attendance/status/{eventId}', [AttendanceController::class, 'getCurrentStatus']);
-
-    // Attendance — Admin
-    Route::get('attendance/event/{eventId}',  [AttendanceController::class, 'getEventAttendance']);
-    Route::post('attendance/manual-checkin',  [AttendanceController::class, 'manualCheckIn']);
-    Route::post('attendance/manual-checkout', [AttendanceController::class, 'manualCheckOut']);
-    Route::delete('attendance/{id}',          function ($id) {
+    // ── Attendance ─────────────────────────────────────────────────────────
+    // ✅ Static/named routes BEFORE wildcard {id}
+    Route::post('attendance/checkin',          [AttendanceController::class, 'checkIn']);
+    Route::post('attendance/checkout',         [AttendanceController::class, 'checkOut']);
+    Route::get('attendance/my',                [AttendanceController::class, 'getMyAttendance']);
+    Route::get('attendance/status/{eventId}',  [AttendanceController::class, 'getCurrentStatus']);
+    Route::get('attendance/event/{eventId}',   [AttendanceController::class, 'getEventAttendance']);
+    Route::post('attendance/manual-checkin',   [AttendanceController::class, 'manualCheckIn']);
+    Route::post('attendance/manual-checkout',  [AttendanceController::class, 'manualCheckOut']);
+    Route::delete('attendance/{id}', function ($id) {
         \App\Models\Attendance::findOrFail($id)->delete();
         return response()->json(['message' => 'Record deleted.']);
     });

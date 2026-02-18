@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Student;
+use App\Models\MemberOrganization;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
@@ -17,15 +18,29 @@ class UserController extends Controller
     {
         try {
             $users = User::with(['student.department', 'userType'])
-                ->orderBy('email')
+                ->orderBy('created_at', 'desc')
                 ->get();
 
+            $users->each(function ($user) {
+                if ($user->student_id) {
+                    $membership = MemberOrganization::with('organization')
+                        ->where('student_id', $user->student_id)
+                        ->whereIn('role', ['officer', 'adviser'])
+                        ->where('status', 'active')
+                        ->first();
+                    $user->setAttribute('officer_membership', $membership);
+                } else {
+                    $user->setAttribute('officer_membership', null);
+                }
+            });
+
             return response()->json($users);
+
         } catch (\Exception $e) {
-            Log::error('User index error: ' . $e->getMessage());
+            Log::error('User index error: ' . $e->getMessage() . ' | ' . $e->getFile() . ':' . $e->getLine());
             return response()->json([
                 'message' => 'Error fetching users',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
@@ -34,215 +49,273 @@ class UserController extends Controller
     public function show($id)
     {
         try {
-            $user = User::with(['student.department', 'userType'])
-                ->findOrFail($id);
+            $user = User::with(['student.department', 'userType'])->findOrFail($id);
+
+            if ($user->student_id) {
+                $membership = MemberOrganization::with('organization')
+                    ->where('student_id', $user->student_id)
+                    ->whereIn('role', ['officer', 'adviser'])
+                    ->where('status', 'active')
+                    ->first();
+                $user->setAttribute('officer_membership', $membership);
+            }
 
             return response()->json($user);
         } catch (\Exception $e) {
             Log::error('User show error: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'User not found',
-                'error' => $e->getMessage()
-            ], 404);
+            return response()->json(['message' => 'User not found', 'error' => $e->getMessage()], 404);
         }
     }
 
     // ── POST /api/users ────────────────────────────────────────────────────
     public function store(Request $request)
-    {
-        try {
-            // Validate base user fields
-            $userData = $request->validate([
-                'email' => 'required|email|unique:users,email',
-                'password' => 'required|string|min:6',
-                'user_type_id' => 'required|exists:user_types,id',
-                'is_active' => 'nullable|boolean',
+{
+    $needsStudent = in_array($request->user_type_id, ['2', 2, '3', 3]);
+    $isOfficer    = in_array($request->user_type_id, ['2', 2]);
+
+    $rules = [
+        'email'        => 'required|email|unique:users,email',
+        'password'     => 'required|string|min:8',
+        'user_type_id' => 'required|exists:user_types,id',
+        'is_active'    => 'nullable|in:0,1',
+    ];
+
+    if ($needsStudent) {
+        $rules += [
+            'first_name'     => 'required|string|max:100',
+            'middle_name'    => 'nullable|string|max:100',
+            'last_name'      => 'required|string|max:100',
+            'student_number' => 'required|string|max:50|unique:students,student_number',
+            'department_id'  => 'required|exists:departments,id',
+            'year_level'     => 'required|string|max:20',
+            'contact_number' => 'nullable|string|max:20',
+            'course'         => 'required|string|max:255',
+        ];
+    }
+
+    if ($isOfficer) {
+        $rules += [
+            'organization_id' => 'required|exists:organizations,id',
+            'org_role'        => 'required|in:officer,adviser',
+            'position'        => 'nullable|string|max:100',
+        ];
+    }
+
+    try {
+        $data = $request->validate($rules);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => 'Validation error',
+            'errors'  => $e->errors(),
+        ], 422);
+    }
+
+    DB::beginTransaction();
+    try {
+        $student = null;
+
+        if ($needsStudent) {
+            $student = Student::create([
+                'student_number' => $data['student_number'],
+                'first_name'     => $data['first_name'],
+                'middle_name'    => $data['middle_name'] ?? null,
+                'last_name'      => $data['last_name'],
+                'department_id'  => $data['department_id'],
+                'year_level'     => $data['year_level'],
+                'contact_number' => $data['contact_number'] ?? null,
+                'course'         => $data['course'],
             ]);
+        }
 
-            // If creating a student/member account
-            if ($request->user_type_id == 3) {
-                // Validate student fields
-                $studentData = $request->validate([
-                    'student_number' => 'required|string|unique:students,student_id',
-                    'first_name' => 'required|string|max:255',
-                    'middle_name' => 'nullable|string|max:255',
-                    'last_name' => 'required|string|max:255',
-                    'year_level' => 'required|string',
-                    'department_id' => 'required|exists:departments,id',
-                    'contact_number' => 'nullable|string|max:20',
-                    'course' => 'required|string', // ✅ ADDED course validation
-                ]);
+        $user = User::create([
+            'email'         => $data['email'],
+            'password_hash' => Hash::make($data['password']),
+            'user_type_id'  => $data['user_type_id'],
+            'student_id'    => $student?->id,
+            'is_active'     => ($data['is_active'] ?? '1') == '1',
+        ]);
 
-                // Create the student record first
-                $student = Student::create([
-                    'student_id' => $studentData['student_number'],
-                    'first_name' => $studentData['first_name'],
-                    'middle_name' => $studentData['middle_name'] ?? null,
-                    'last_name' => $studentData['last_name'],
-                    'year_level' => $studentData['year_level'],
-                    'department_id' => $studentData['department_id'],
-                    'course' => $studentData['course'], // ✅ Save course
-                    'contact_number' => $studentData['contact_number'] ?? null,
-                ]);
+        if ($isOfficer && $student) {
+            MemberOrganization::create([
+                'organization_id' => $data['organization_id'],
+                'student_id'      => $student->id,
+                'role'            => $data['org_role'],
+                'position'        => $data['position'] ?? null,
+                'status'          => 'active',
+                'joined_date'     => now()->toDateString(),
+            ]);
+        }
 
-                // ✅ FIXED: Use password_hash column
-                $user = User::create([
-                    'email' => $userData['email'],
-                    'password_hash' => Hash::make($userData['password']), // ✅ password_hash, not password
-                    'user_type_id' => $userData['user_type_id'],
-                    'student_id' => $student->id,
-                    'is_active' => $userData['is_active'] ?? true,
-                ]);
+        DB::commit();
+
+        $user->load(['student.department', 'userType']);
+
+        return response()->json([
+            'message' => 'Account has been created successfully!',
+            'user'    => $user,
+        ], 201);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('User store error: ' . $e->getMessage());
+        return response()->json([
+            'message' => 'Error creating account',
+            'error'   => $e->getMessage(),
+        ], 500);
+    }
+}
+
+public function update(Request $request, $id)
+{
+    $user         = User::with('student')->findOrFail($id);
+    $needsStudent = in_array($request->user_type_id, ['2', 2, '3', 3]);
+    $isOfficer    = in_array($request->user_type_id, ['2', 2]);
+    $studentRowId = $user->student?->id;
+
+    $rules = [
+        'email'        => "required|email|unique:users,email,{$user->id}",
+        'password'     => 'nullable|string|min:8',
+        'user_type_id' => 'required|exists:user_types,id',
+        'is_active'    => 'nullable|in:0,1',
+    ];
+
+    if ($needsStudent) {
+        $uniqueRule = $studentRowId
+            ? "required|string|max:50|unique:students,student_number,{$studentRowId},id"
+            : 'required|string|max:50|unique:students,student_number';
+
+        $rules += [
+            'first_name'     => 'required|string|max:100',
+            'middle_name'    => 'nullable|string|max:100',
+            'last_name'      => 'required|string|max:100',
+            'student_number' => $uniqueRule,
+            'department_id'  => 'required|exists:departments,id',
+            'year_level'     => 'required|string|max:20',
+            'contact_number' => 'nullable|string|max:20',
+            'course'         => 'required|string|max:255',
+        ];
+    }
+
+    if ($isOfficer) {
+        $rules += [
+            'organization_id' => 'required|exists:organizations,id',
+            'org_role'        => 'required|in:officer,adviser',
+            'position'        => 'nullable|string|max:100',
+        ];
+    }
+
+    try {
+        $data = $request->validate($rules);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => 'Validation error',
+            'errors'  => $e->errors(),
+        ], 422);
+    }
+
+    DB::beginTransaction();
+    try {
+        $student = $user->student;
+
+        if ($needsStudent) {
+            $studentData = [
+                'student_number' => $data['student_number'],
+                'first_name'     => $data['first_name'],
+                'middle_name'    => $data['middle_name'] ?? null,
+                'last_name'      => $data['last_name'],
+                'department_id'  => $data['department_id'],
+                'year_level'     => $data['year_level'],
+                'contact_number' => $data['contact_number'] ?? null,
+                'course'         => $data['course'],
+            ];
+
+            if ($student) {
+                $student->update($studentData);
             } else {
-                // Admin or Officer - no student record needed
-                // ✅ FIXED: Use password_hash column
-                $user = User::create([
-                    'email' => $userData['email'],
-                    'password_hash' => Hash::make($userData['password']), // ✅ password_hash, not password
-                    'user_type_id' => $userData['user_type_id'],
-                    'is_active' => $userData['is_active'] ?? true,
-                ]);
+                $student = Student::create($studentData);
             }
-
-            // Load relationships
-            $user->load(['student.department', 'userType']);
-
-            return response()->json([
-                'message' => 'User created successfully',
-                'user' => $user
-            ], 201);
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation error',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('User store error: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error creating user',
-                'error' => $e->getMessage()
-            ], 500);
         }
-    }
 
-    // ── PUT /api/users/{id} ────────────────────────────────────────────────
-    public function update(Request $request, $id)
-    {
-        try {
-            $user = User::with('student')->findOrFail($id);
+        $userUpdate = [
+            'email'        => $data['email'],
+            'user_type_id' => $data['user_type_id'],
+            'is_active'    => isset($data['is_active']) ? $data['is_active'] == '1' : $user->is_active,
+            'student_id'   => $student?->id ?? $user->student_id,
+        ];
 
-            // Validate base user fields
-            $userData = $request->validate([
-                'email' => 'required|email|unique:users,email,' . $id,
-                'password' => 'nullable|string|min:6',
-                'user_type_id' => 'required|exists:user_types,id',
-                'is_active' => 'nullable|boolean',
-            ]);
-
-            // Update user fields
-            $user->email = $userData['email'];
-            
-            // ✅ FIXED: Use password_hash column
-            if (!empty($userData['password'])) {
-                $user->password_hash = Hash::make($userData['password']); // ✅ password_hash, not password
-            }
-            
-            $user->user_type_id = $userData['user_type_id'];
-            $user->is_active = $userData['is_active'] ?? $user->is_active;
-
-            // If this is a student/member account
-            if ($request->user_type_id == 3) {
-                $studentData = $request->validate([
-                    'student_number' => 'required|string|unique:students,student_id,' . ($user->student_id ?? 'NULL') . ',id',
-                    'first_name' => 'required|string|max:255',
-                    'middle_name' => 'nullable|string|max:255',
-                    'last_name' => 'required|string|max:255',
-                    'year_level' => 'required|string',
-                    'department_id' => 'required|exists:departments,id',
-                    'contact_number' => 'nullable|string|max:20',
-                    'course' => 'required|string', // ✅ ADDED course validation
-                ]);
-
-                if ($user->student) {
-                    // Update existing student
-                    $user->student->update([
-                        'student_id' => $studentData['student_number'],
-                        'first_name' => $studentData['first_name'],
-                        'middle_name' => $studentData['middle_name'] ?? null,
-                        'last_name' => $studentData['last_name'],
-                        'year_level' => $studentData['year_level'],
-                        'department_id' => $studentData['department_id'],
-                        'course' => $studentData['course'], // ✅ Update course
-                        'contact_number' => $studentData['contact_number'] ?? null,
-                    ]);
-                } else {
-                    // Create new student record
-                    $student = Student::create([
-                        'student_id' => $studentData['student_number'],
-                        'first_name' => $studentData['first_name'],
-                        'middle_name' => $studentData['middle_name'] ?? null,
-                        'last_name' => $studentData['last_name'],
-                        'year_level' => $studentData['year_level'],
-                        'department_id' => $studentData['department_id'],
-                        'course' => $studentData['course'], // ✅ Save course
-                        'contact_number' => $studentData['contact_number'] ?? null,
-                    ]);
-                    $user->student_id = $student->id;
-                }
-            }
-
-            $user->save();
-            $user->load(['student.department', 'userType']);
-
-            return response()->json([
-                'message' => 'User updated successfully',
-                'user' => $user
-            ]);
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation error',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('User update error: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error updating user',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!empty($data['password'])) {
+            $userUpdate['password_hash'] = Hash::make($data['password']);
         }
+
+        $user->update($userUpdate);
+
+        if ($isOfficer && $student) {
+            MemberOrganization::where('student_id', $student->id)
+                ->where('organization_id', '!=', $data['organization_id'])
+                ->whereIn('role', ['officer', 'adviser'])
+                ->update(['status' => 'inactive']);
+
+            MemberOrganization::updateOrCreate(
+                [
+                    'student_id'      => $student->id,
+                    'organization_id' => $data['organization_id'],
+                ],
+                [
+                    'role'        => $data['org_role'],
+                    'position'    => $data['position'] ?? null,
+                    'status'      => 'active',
+                    'joined_date' => now()->toDateString(),
+                ]
+            );
+        }
+
+        DB::commit();
+
+        $user->load(['student.department', 'userType']);
+
+        return response()->json([
+            'message' => 'Account has been updated successfully!',
+            'user'    => $user,
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('User update error: ' . $e->getMessage());
+        return response()->json([
+            'message' => 'Error updating account',
+            'error'   => $e->getMessage(),
+        ], 500);
     }
+}
 
     // ── DELETE /api/users/{id} ─────────────────────────────────────────────
     public function destroy($id)
     {
+        DB::beginTransaction();
         try {
-            $user = User::with('student')->findOrFail($id);
+            $user    = User::with('student')->findOrFail($id);
+            $student = $user->student;
 
-            // Optionally delete associated student record
-            if ($user->student) {
-                // Check if student has attendance records
-                if ($user->student->attendances()->count() > 0) {
-                    return response()->json([
-                        'message' => 'Cannot delete user with existing attendance records',
-                    ], 422);
-                }
-                // Delete student record
-                $user->student->delete();
+            if ($student) {
+                MemberOrganization::where('student_id', $student->id)->delete();
             }
 
+            $user->tokens()->delete();
             $user->delete();
 
-            return response()->json([
-                'message' => 'User deleted successfully'
-            ]);
+            if ($student) {
+                $student->delete();
+            }
+
+            DB::commit();
+            return response()->json(['message' => 'Account deleted successfully.']);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('User delete error: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Error deleting user',
-                'error' => $e->getMessage()
+                'message' => 'Error deleting account',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }

@@ -21,7 +21,7 @@ const ACTIVITIES = [
     id: 1, title: "Intramurals 2025",
     category: "Sports Event", date: "February 10–14, 2025",
     desc: "Campus-wide sports festival bringing together all colleges in friendly athletic competition.",
-    img: img1,
+    img: img2,
     badge: "#f59e0b",
   },
   {

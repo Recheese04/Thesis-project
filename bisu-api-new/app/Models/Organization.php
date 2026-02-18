@@ -15,16 +15,16 @@ class Organization extends Model
         'department_id',
         'name',
         'type',
-        'scope',        // NEW: department, location, or independent
-        'location',     // NEW: for location-based organizations
+        'scope',
+        'location',
         'description',
         'status',
     ];
 
     protected $casts = [
         'status' => 'string',
-        'type' => 'string',
-        'scope' => 'string',
+        'type'   => 'string',
+        'scope'  => 'string',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────
@@ -34,6 +34,8 @@ class Organization extends Model
         return $this->belongsTo(Department::class, 'department_id');
     }
 
+    /**
+     */
     public function members()
     {
         return $this->hasMany(MemberOrganization::class, 'organization_id');
@@ -61,25 +63,21 @@ class Organization extends Model
 
     // ── Scopes ─────────────────────────────────────────────────────────────
 
-    /**
-     * Scope to get only department-based organizations
-     */
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+
     public function scopeDepartmentBased($query)
     {
         return $query->where('scope', 'department');
     }
 
-    /**
-     * Scope to get only location-based organizations
-     */
     public function scopeLocationBased($query)
     {
         return $query->where('scope', 'location');
     }
 
-    /**
-     * Scope to get only independent organizations
-     */
     public function scopeIndependent($query)
     {
         return $query->where('scope', 'independent');

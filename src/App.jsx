@@ -115,23 +115,32 @@ function App() {
         </Route>
 
         {/* ── Officer Routes ──────────────────────────────────────────── */}
-        <Route
-          path="/officer"
-          element={
-            <ProtectedRoute allowedRoles={['officer']}>
-              <OfficerLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="/officer/dashboard" replace />} />
-          <Route path="dashboard" element={<OfficerDashboard />} />
-          <Route path="members" element={<OfficerMembers />} />
-          <Route path="events" element={<OfficerEvents />} />
-          <Route path="attendance" element={<OfficerAttendance />} />
-          <Route path="tasks" element={<OfficerTasks />} />
-          <Route path="announcements" element={<OfficerAnnouncements />} />
-          <Route path="messages" element={<OfficerMessages />} />
-        </Route>
+       // ── Officer Routes ──────────────────────────────────────────────────────
+<Route
+  path="/officer"
+  element={
+    <ProtectedRoute allowedRoles={['officer']}>
+      <OfficerLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route index element={<Navigate to="/officer/dashboard" replace />} />
+  <Route path="dashboard" element={<OfficerDashboard />} />
+  <Route path="members" element={<OfficerMembers />} />
+  <Route path="events" element={<OfficerEvents />} />
+  <Route path="attendance" element={<OfficerAttendance />} />
+  <Route path="tasks" element={<OfficerTasks />} />
+  <Route path="announcements" element={<OfficerAnnouncements />} />
+  <Route path="messages" element={<OfficerMessages />} />
+
+  {/* ── Merged student routes for officers ── */}
+  <Route path="checkin" element={<StudentCheckIn />} />
+  <Route path="my-events" element={<StudentEvents />} />
+  <Route path="my-attendance" element={<StudentAttendance />} />
+  <Route path="clearance" element={<StudentClearance />} />
+  <Route path="documents" element={<StudentDocuments />} />
+  <Route path="obligations" element={<StudentObligations />} />
+</Route>
 
         {/* ── Student/Member Routes ───────────────────────────────────── */}
         <Route
@@ -159,6 +168,6 @@ function App() {
       </Routes>
     </Router>
   );
-}
+} 
 
 export default App;

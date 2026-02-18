@@ -12,7 +12,6 @@ use Illuminate\Validation\ValidationException;
 
 class AttendanceController extends Controller
 {
-    // ── Check In via QR Code ───────────────────────────────────────────────
     public function checkIn(Request $request)
     {
         try {
@@ -29,9 +28,8 @@ class AttendanceController extends Controller
                 return response()->json(['message' => 'Invalid QR code for this event'], 400);
             }
 
-            // Get the student_id (students.id) from the authenticated user
-            $user = auth()->user();
-            $studentId = $user->student_id; // This is students.id (bigint FK)
+            $user      = auth()->user();
+            $studentId = $user->student_id;
 
             if (!$studentId) {
                 return response()->json(['message' => 'User is not linked to a student record'], 400);
@@ -70,7 +68,6 @@ class AttendanceController extends Controller
         }
     }
 
-    // ── Check Out via QR Code ──────────────────────────────────────────────
     public function checkOut(Request $request)
     {
         try {
@@ -87,7 +84,7 @@ class AttendanceController extends Controller
                 return response()->json(['message' => 'Invalid QR code for this event'], 400);
             }
 
-            $user = auth()->user();
+            $user      = auth()->user();
             $studentId = $user->student_id;
 
             if (!$studentId) {
@@ -121,39 +118,38 @@ class AttendanceController extends Controller
         }
     }
 
-    // ── Get Event Attendance (Admin) ───────────────────────────────────────
     public function getEventAttendance($eventId)
     {
         try {
-            $attendance = Attendance::with(['student.department', 'student.program'])
+            $attendance = Attendance::with(['student.department'])
                 ->where('event_id', $eventId)
                 ->orderBy('time_in', 'desc')
                 ->get()
                 ->map(function ($record) {
-                    // Format the data for the frontend
                     $student = $record->student;
                     return [
-                        'id'                => $record->id,
-                        'event_id'          => $record->event_id,
-                        'student_id'        => $record->student_id,
-                        'attendance_type'   => $record->attendance_type,
-                        'time_in'           => $record->time_in,
-                        'time_out'          => $record->time_out,
-                        'status'            => $record->status,
-                        'remarks'           => $record->remarks,
-                        'is_active'         => $record->is_active,
-                        'formatted_duration'=> $record->formatted_duration,
-                        'created_at'        => $record->created_at,
-                        'updated_at'        => $record->updated_at,
-                        'student'           => $student ? [
-                            'id'          => $student->id,
-                            'name'        => $student->name,
-                            'student_id'  => $student->student_id, // varchar like "2024-00001"
-                            'year_level'  => $student->year_level,
-                            'department'  => $student->department,
-                            'program'     => $student->program,
+                        'id'                 => $record->id,
+                        'event_id'           => $record->event_id,
+                        'attendance_type'    => $record->attendance_type,
+                        'time_in'            => $record->time_in,
+                        'time_out'           => $record->time_out,
+                        'status'             => $record->status,
+                        'remarks'            => $record->remarks,
+                        'is_active'          => $record->is_active,
+                        'formatted_duration' => $record->formatted_duration,
+                        'created_at'         => $record->created_at,
+                        'updated_at'         => $record->updated_at,
+                        'student'            => $student ? [
+                            'id'             => $student->id,
+                            'name'           => trim($student->first_name . ' ' . $student->last_name),
+                            'student_number' => $student->student_number, // ← correct column
+                            'year_level'     => $student->year_level,
+                            'course'         => $student->course ?? null,
+                            'department'     => $student->department ? [
+                                'id'   => $student->department->id,
+                                'name' => $student->department->name,
+                            ] : null,
                         ] : null,
-                        'event' => $record->event,
                     ];
                 });
 
@@ -171,11 +167,10 @@ class AttendanceController extends Controller
         }
     }
 
-    // ── Get My Attendance History ──────────────────────────────────────────
     public function getMyAttendance()
     {
         try {
-            $user = auth()->user();
+            $user      = auth()->user();
             $studentId = $user->student_id;
 
             if (!$studentId) {
@@ -195,11 +190,10 @@ class AttendanceController extends Controller
         }
     }
 
-    // ── Get Current Status for Event ───────────────────────────────────────
     public function getCurrentStatus($eventId)
     {
         try {
-            $user = auth()->user();
+            $user      = auth()->user();
             $studentId = $user->student_id;
 
             if (!$studentId) {
@@ -228,18 +222,16 @@ class AttendanceController extends Controller
         }
     }
 
-    // ── Manual Check In (Admin) ────────────────────────────────────────────
     public function manualCheckIn(Request $request)
     {
         try {
             $data = $request->validate([
                 'event_id'   => 'required|exists:events,id',
-                'student_id' => 'required|exists:students,id', // ✅ Now validates against students.id
+                'student_id' => 'required|exists:students,id',
                 'time_in'    => 'nullable|date',
                 'remarks'    => 'nullable|string',
             ]);
 
-            // Check if already checked in
             $existing = Attendance::where('event_id', $data['event_id'])
                                   ->where('student_id', $data['student_id'])
                                   ->whereDate('time_in', today())
@@ -255,7 +247,7 @@ class AttendanceController extends Controller
 
             $attendance = Attendance::create([
                 'event_id'        => $data['event_id'],
-                'student_id'      => $data['student_id'], // students.id
+                'student_id'      => $data['student_id'],
                 'attendance_type' => 'manual',
                 'time_in'         => $data['time_in'] ?? now(),
                 'status'          => 'checked_in',
@@ -268,17 +260,13 @@ class AttendanceController extends Controller
             ], 200);
 
         } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors'  => $e->errors(),
-            ], 422);
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             Log::error('Manual check-in error: ' . $e->getMessage());
             return response()->json(['message' => 'Error recording check-in', 'error' => $e->getMessage()], 500);
         }
     }
 
-    // ── Manual Check Out (Admin) ───────────────────────────────────────────
     public function manualCheckOut(Request $request)
     {
         try {

@@ -36,16 +36,23 @@ export default function Login() {
         password: formData.password,
       }, { withCredentials: true });
 
-      const user = response.data.user;
+      const { token, user, role, membership, organization_id } = response.data;
 
-      localStorage.setItem('token',     response.data.token);
-      localStorage.setItem('user',      JSON.stringify(user));
+      // Persist everything the app needs
+      localStorage.setItem('token',           token);
+      localStorage.setItem('user',            JSON.stringify(user));
+      localStorage.setItem('user_role',       role);                          // 'admin' | 'officer' | 'member'
+      localStorage.setItem('membership',      JSON.stringify(membership));    // OrganizationMember row or null
+      localStorage.setItem('organization_id', organization_id ?? '');        // org they manage, or ''
 
-      const roleMap = { 1: 'admin', 2: 'officer', 3: 'member' };
-      const role    = roleMap[user.user_type_id] || 'member';
-      localStorage.setItem('user_role', role);
-
-      navigate(role === 'admin' ? '/admin/dashboard' : '/student/dashboard');
+      // Route based on role returned by the server
+      if (role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (role === 'officer') {
+        navigate('/officer/dashboard');
+      } else {
+        navigate('/student/dashboard');
+      }
 
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
@@ -187,7 +194,6 @@ export default function Login() {
         <div className="hidden lg:flex lg:w-[56%] panel-clip relative overflow-hidden anim-panel"
           style={{ background: '#091832' }}>
 
-          {/* Backgrounds */}
           <div className="absolute inset-0 dot-bg" />
           <div className="absolute inset-0" style={{
             background: `
@@ -196,7 +202,6 @@ export default function Login() {
             `
           }} />
 
-          {/* Decorative rings */}
           <div className="absolute -bottom-56 -left-56 w-[560px] h-[560px] rounded-full"
             style={{ border: '1px solid rgba(255,255,255,0.05)' }} />
           <div className="absolute -bottom-36 -left-36 w-[380px] h-[380px] rounded-full"
@@ -204,15 +209,12 @@ export default function Login() {
           <div className="absolute -top-20 right-24 w-[220px] h-[220px] rounded-full"
             style={{ border: '1px solid rgba(255,255,255,0.04)' }} />
 
-          {/* Glow */}
           <div className="anim-glow absolute top-16 left-8 w-52 h-52 rounded-full pointer-events-none"
             style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.28) 0%, transparent 70%)' }} />
 
-          {/* Bottom accent line */}
           <div className="absolute bottom-0 left-0 right-0 h-[2px]"
             style={{ background: 'linear-gradient(90deg, #2563eb, #60a5fa 40%, transparent)' }} />
 
-          {/* Content */}
           <div className="relative z-10 flex flex-col h-full px-12 py-10 pr-20">
 
             {/* Logo */}

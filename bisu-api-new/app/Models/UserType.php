@@ -13,6 +13,7 @@ class UserType extends Model
 
     protected $fillable = [
         'name',
+        'description',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────

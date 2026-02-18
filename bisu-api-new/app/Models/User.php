@@ -11,10 +11,9 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    // ✅ FIXED: Use password_hash, not password
     protected $fillable = [
         'email',
-        'password_hash',  // ✅ This is the actual column name in your database
+        'password_hash',
         'student_id',
         'user_type_id',
         'is_active',
@@ -29,67 +28,58 @@ class User extends Authenticatable
         'is_active' => 'boolean',
     ];
 
-    // ✅ CRITICAL: Password accessors for Laravel Auth compatibility
-    // These allow you to use $user->password while storing in password_hash column
-    
     public function getAuthPassword()
     {
         return $this->password_hash;
     }
 
-    public function getPasswordAttribute()
-    {
-        return $this->password_hash;
-    }
-
-    public function setPasswordAttribute($value)
-    {
-        $this->attributes['password_hash'] = $value;
-    }
-
-    // ── Relationships ──────────────────────────────────────────────────────
-
-    /**
-     * The student profile associated with this user.
-     * users.student_id (FK) → students.id (PK)
-     */
     public function student()
     {
         return $this->belongsTo(Student::class, 'student_id', 'id');
     }
 
-    /**
-     * User type relationship (Admin/Officer/Member).
-     */
     public function userType()
     {
         return $this->belongsTo(UserType::class, 'user_type_id');
     }
 
-    /**
-     * Attendance records for this user.
-     */
     public function attendances()
     {
         return $this->hasMany(Attendance::class, 'student_id', 'student_id');
     }
 
-    // ── Scopes ─────────────────────────────────────────────────────────────
-
-    /**
-     * Scope to filter only students (members).
-     */
-    public function scopeStudents($query)
+    public function isAdmin(): bool
     {
-        return $query->where('user_type_id', 3)
-                     ->whereNotNull('student_id');
+        return is_null($this->student_id);
     }
 
-    /**
-     * Scope to filter active users.
-     */
+    public function getOfficerMembership(): ?MemberOrganization
+    {
+        if (!$this->student_id) return null;
+
+        return MemberOrganization::where('student_id', $this->student_id)
+            ->whereIn('role', ['officer', 'adviser'])
+            ->where('status', 'active')
+            ->first();
+    }
+
+    public function getOfficerOrganizationId(): ?int
+    {
+        return $this->getOfficerMembership()?->organization_id;
+    }
+
+    public function isOfficer(): bool
+    {
+        return $this->getOfficerOrganizationId() !== null;
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeStudents($query)
+    {
+        return $query->whereNotNull('student_id');
     }
 }

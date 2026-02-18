@@ -5,7 +5,7 @@ import App from './App';
 import './index.css';
 
 // 2. Configure Axios Defaults
-axios.defaults.baseURL = 'http://localhost:8000'; // Your Laravel URL
+axios.defaults.baseURL = '';
 axios.defaults.withCredentials = true; // Required for Sanctum session cookies
 
 ReactDOM.createRoot(document.getElementById('root')).render(

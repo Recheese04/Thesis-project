@@ -58,7 +58,7 @@ const COURSES_BY_DEPARTMENT = {
 const ROLE_META = {
   "1": { label: "Admin",   icon: Shield, badge: "bg-[#0f2d5e] text-white border-[#0f2d5e]",  grad: "from-[#0f2d5e] to-[#1a4a8a]" },
   "2": { label: "Officer", icon: Star,   badge: "bg-[#1e4db7] text-white border-[#1e4db7]",  grad: "from-[#1e4db7] to-[#3b6fd4]" },
-  "3": { label: "Member",  icon: Users,  badge: "bg-blue-50 text-blue-700 border-blue-200",  grad: "from-[#2563eb] to-[#5b9ef7]"  },
+  "3": { label: "Student", icon: GraduationCap, badge: "bg-blue-50 text-blue-700 border-blue-200", grad: "from-[#2563eb] to-[#5b9ef7]" },
 };
 
 const EMPTY_FORM = {
@@ -66,6 +66,7 @@ const EMPTY_FORM = {
   student_number: "", first_name: "", middle_name: "",
   last_name: "", department_id: "", year_level: "", contact_number: "",
   course: "",
+  organization_id: "", org_role: "officer", position: "",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -139,36 +140,67 @@ function PwdInput({ value, onChange, required, hint }) {
 }
 
 // ── User Form Modal ────────────────────────────────────────────────────────
-function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
+function UserFormModal({ open, onClose, onSaved, editUser, departments, organizations }) {
   const isEdit   = Boolean(editUser);
   const [form, setForm]     = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [step, setStep]     = useState(1);
-  const isMember            = form.user_type_id === "3";
+
+  const needsStudentProfile = form.user_type_id === "2" || form.user_type_id === "3";
+  const isOfficer           = form.user_type_id === "2";
+  const totalSteps = isOfficer ? 3 : needsStudentProfile ? 2 : 1;
+
+  const STEPS = isOfficer
+    ? [{ n: 1, label: "Account" }, { n: 2, label: "Student Profile" }, { n: 3, label: "Organization" }]
+    : needsStudentProfile
+    ? [{ n: 1, label: "Account" }, { n: 2, label: "Student Profile" }]
+    : [{ n: 1, label: "Account" }];
 
   useEffect(() => {
     if (!open) return;
-    setStep(1);
-    setForm(editUser ? {
-      email:          editUser.email ?? "",
-      password:       "",
-      user_type_id:   String(editUser.user_type_id ?? ""),
-      is_active:      editUser.is_active ? "1" : "0",
-      student_number: editUser.student?.student_id ?? "",
-      first_name:     editUser.student?.first_name ?? "",
-      middle_name:    editUser.student?.middle_name ?? "",
-      last_name:      editUser.student?.last_name ?? "",
-      department_id:  String(editUser.student?.department_id ?? ""),
-      year_level:     editUser.student?.year_level ?? "",
-      contact_number: editUser.student?.contact_number ?? "",
-      course:         editUser.student?.course ?? "",
-    } : EMPTY_FORM);
+
+    if (editUser) {
+      const membership = editUser.officer_membership ?? null;
+      const typeId = String(editUser.user_type_id ?? "");
+
+      setForm({
+        email:           editUser.email                   ?? "",
+        password:        "",
+        user_type_id:    typeId,
+        is_active:       editUser.is_active ? "1" : "0",
+        student_number:  editUser.student?.student_number ?? "",
+        first_name:      editUser.student?.first_name     ?? "",
+        middle_name:     editUser.student?.middle_name    ?? "",
+        last_name:       editUser.student?.last_name      ?? "",
+        department_id:   String(editUser.student?.department_id ?? ""),
+        year_level:      editUser.student?.year_level     ?? "",
+        contact_number:  editUser.student?.contact_number ?? "",
+        course:          editUser.student?.course         ?? "",
+        organization_id: String(membership?.organization_id ?? ""),
+        org_role:        membership?.role                 ?? "officer",
+        position:        membership?.position             ?? "",
+      });
+
+      if (typeId === "2") setStep(3);
+      else if (typeId === "3") setStep(2);
+      else setStep(1);
+
+    } else {
+      setForm(EMPTY_FORM);
+      setStep(1);
+    }
   }, [open, editUser]);
 
   const set = (f) => (e) => setForm(p => ({ ...p, [f]: e?.target?.value ?? e }));
 
   const resetRole = (val) =>
-    setForm(p => ({ ...EMPTY_FORM, email: p.email, password: p.password, is_active: p.is_active, user_type_id: val }));
+    setForm(p => ({
+      ...p,
+      user_type_id:    val,
+      organization_id: val === "2" ? p.organization_id : "",
+      org_role:        val === "2" ? p.org_role        : "officer",
+      position:        val === "2" ? p.position        : "",
+    }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -192,7 +224,7 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
     }
   };
 
-  const selectedDept = departments.find(d => String(d.id) === form.department_id);
+  const selectedDept     = departments.find(d => String(d.id) === form.department_id);
   const availableCourses = COURSES_BY_DEPARTMENT[form.department_id] || [];
 
   return (
@@ -215,9 +247,9 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
             </div>
           </div>
 
-          {isMember && (
-            <div className="flex items-center gap-2 mt-4">
-              {[{ n: 1, label: "Account" }, { n: 2, label: "Student Profile" }].map(({ n, label }, i, arr) => (
+          {needsStudentProfile && (
+            <div className="flex items-center gap-2 mt-4 flex-wrap">
+              {STEPS.map(({ n, label }, i, arr) => (
                 <div key={n} className="flex items-center gap-1.5">
                   <button type="button" onClick={() => setStep(n)}
                     className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
@@ -233,11 +265,18 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
               ))}
             </div>
           )}
+
+          {isEdit && needsStudentProfile && (
+            <p className="text-[11px] text-blue-200/70 mt-2">
+              Click any step above to jump directly to it
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-5 space-y-4">
 
+            {/* ── STEP 1 ── */}
             {step === 1 && (
               <>
                 <SLabel icon={Mail} text="Credentials" />
@@ -270,9 +309,15 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        <SelectItem value="1"><div className="flex items-center gap-2"><Shield className="w-3.5 h-3.5 text-[#0f2d5e]" />Admin</div></SelectItem>
-                        <SelectItem value="2"><div className="flex items-center gap-2"><Star className="w-3.5 h-3.5 text-[#1e4db7]" />Officer</div></SelectItem>
-                        <SelectItem value="3"><div className="flex items-center gap-2"><Users className="w-3.5 h-3.5 text-blue-500" />Member</div></SelectItem>
+                        <SelectItem value="1">
+                          <div className="flex items-center gap-2"><Shield className="w-3.5 h-3.5 text-[#0f2d5e]" />Admin</div>
+                        </SelectItem>
+                        <SelectItem value="2">
+                          <div className="flex items-center gap-2"><Star className="w-3.5 h-3.5 text-[#1e4db7]" />Officer</div>
+                        </SelectItem>
+                        <SelectItem value="3">
+                          <div className="flex items-center gap-2"><GraduationCap className="w-3.5 h-3.5 text-blue-500" />Student</div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -290,19 +335,43 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
                     </Select>
                   </div>
                 </div>
+
+                {form.user_type_id === "2" && (
+                  <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+                    <Star className="w-3.5 h-3.5 text-[#1e4db7] shrink-0 mt-0.5" />
+                    <p className="text-xs text-slate-600">
+                      Officers are students assigned to manage an organization. You'll set their student profile and organization assignment in the next steps.
+                    </p>
+                  </div>
+                )}
+                {form.user_type_id === "3" && (
+                  <div className="flex items-start gap-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                    <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-slate-600">
+                      Students are regular enrolled users. You'll fill in their student profile in the next step.
+                    </p>
+                  </div>
+                )}
               </>
             )}
 
-            {step === 2 && isMember && (
+            {/* ── STEP 2 ── */}
+            {step === 2 && needsStudentProfile && (
               <>
                 <SLabel icon={GraduationCap} text="Student Information" />
 
-                {/* Name row */}
+                {isEdit && (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-1">
+                    <Pencil className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <p className="text-xs text-slate-600">Fields are pre-filled — only update what needs changing.</p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { f: "first_name",  label: "First Name",  ph: "Juan",      req: true  },
-                    { f: "middle_name", label: "Middle",       ph: "Optional",  req: false },
-                    { f: "last_name",   label: "Last Name",   ph: "Dela Cruz", req: true  },
+                    { f: "first_name",  label: "First Name", ph: "Juan",      req: true  },
+                    { f: "middle_name", label: "Middle",      ph: "Optional",  req: false },
+                    { f: "last_name",   label: "Last Name",  ph: "Dela Cruz", req: true  },
                   ].map(({ f, label, ph, req }) => (
                     <div key={f} className="space-y-1">
                       <Label className="text-slate-700 font-semibold text-xs">
@@ -314,7 +383,6 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
                   ))}
                 </div>
 
-                {/* Student No. + Department */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-slate-700 font-semibold text-xs">
@@ -335,31 +403,19 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
                     </Label>
                     <Select
                       value={form.department_id}
-                      onValueChange={(val) => {
-                        setForm(p => ({ ...p, department_id: val, course: "" }));
-                      }}
+                      onValueChange={(val) => setForm(p => ({ ...p, department_id: val, course: "" }))}
                       required
                     >
                       <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                        <SelectValue placeholder={
-                          departments.length === 0 ? "No departments…" : "Select department"
-                        } />
+                        <SelectValue placeholder={departments.length === 0 ? "No departments…" : "Select department"} />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl max-h-52">
-                        {departments.length === 0 ? (
-                          <div className="px-3 py-4 text-center text-xs text-slate-400">
-                            No departments available
-                          </div>
-                        ) : departments.map(dept => (
+                        {departments.map(dept => (
                           <SelectItem key={dept.id} value={String(dept.id)}>
                             <div className="flex items-center gap-2">
                               <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                               <span className="truncate">{dept.name}</span>
-                              {dept.code && (
-                                <span className="text-slate-400 text-[10px] font-mono shrink-0">
-                                  {dept.code}
-                                </span>
-                              )}
+                              {dept.code && <span className="text-slate-400 text-[10px] font-mono shrink-0">{dept.code}</span>}
                             </div>
                           </SelectItem>
                         ))}
@@ -368,34 +424,16 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
                   </div>
                 </div>
 
-                {/* Course Selection */}
                 <div className="space-y-1">
                   <Label className="text-slate-700 font-semibold text-xs">
                     Course / Program <span className="text-red-500">*</span>
                   </Label>
-                  <Select
-                    value={form.course}
-                    onValueChange={set("course")}
-                    required
-                    disabled={!form.department_id}
-                  >
+                  <Select value={form.course} onValueChange={set("course")} required disabled={!form.department_id}>
                     <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                      <SelectValue placeholder={
-                        !form.department_id 
-                          ? "Select department first" 
-                          : "Select course"
-                      } />
+                      <SelectValue placeholder={!form.department_id ? "Select department first" : "Select course"} />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl max-h-60">
-                      {!form.department_id ? (
-                        <div className="px-3 py-4 text-center text-xs text-slate-400">
-                          Please select a department first
-                        </div>
-                      ) : availableCourses.length === 0 ? (
-                        <div className="px-3 py-4 text-center text-xs text-slate-400">
-                          No courses available for this department
-                        </div>
-                      ) : availableCourses.map(course => (
+                      {availableCourses.map(course => (
                         <SelectItem key={course} value={course}>
                           <div className="flex items-start gap-2 py-1">
                             <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
@@ -405,24 +443,14 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
                       ))}
                     </SelectContent>
                   </Select>
-                  {form.course && (
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Selected: <strong className="text-slate-600">{form.course}</strong>
-                    </p>
-                  )}
                 </div>
 
-                {/* Year Level + Contact */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-slate-700 font-semibold text-xs">
                       Year Level <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      value={form.year_level}
-                      onValueChange={set("year_level")}
-                      required
-                    >
+                    <Select value={form.year_level} onValueChange={set("year_level")} required>
                       <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
                         <SelectValue placeholder="Select year" />
                       </SelectTrigger>
@@ -450,16 +478,120 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
                   </div>
                 </div>
 
-                {/* Selected department preview */}
                 {selectedDept && (
                   <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
                     <Building2 className="w-3.5 h-3.5 text-[#1e4db7] shrink-0" />
                     <span className="text-xs text-slate-600">
                       Department: <strong className="text-[#0f2d5e]">{selectedDept.name}</strong>
-                      {selectedDept.code && (
-                        <span className="ml-1.5 font-mono text-slate-400">({selectedDept.code})</span>
-                      )}
+                      {selectedDept.code && <span className="ml-1.5 font-mono text-slate-400">({selectedDept.code})</span>}
                     </span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── STEP 3 ── */}
+            {step === 3 && isOfficer && (
+              <>
+                <SLabel icon={Users} text="Organization Assignment" />
+
+                {isEdit && (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-1">
+                    <Pencil className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <p className="text-xs text-slate-600">
+                      {form.organization_id
+                        ? "Current org assignment is pre-filled — update to reassign or promote."
+                        : "No org assigned yet — select one below to assign this officer."}
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <Label className="text-slate-700 font-semibold text-xs">
+                    Organization <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={form.organization_id} onValueChange={set("organization_id")} required>
+                    <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
+                      <SelectValue placeholder={
+                        organizations.length === 0 ? "No organizations available" : "Select organization"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl max-h-60">
+                      {organizations.length === 0 ? (
+                        <div className="px-3 py-4 text-center text-xs text-slate-400">
+                          No organizations found. Create one first.
+                        </div>
+                      ) : organizations.map(org => (
+                        <SelectItem key={org.id} value={String(org.id)}>
+                          <div className="flex items-center gap-2">
+                            <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>{org.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {organizations.length === 0 && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      Please create an organization before assigning an officer.
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-slate-700 font-semibold text-xs">
+                      Org Role <span className="text-red-500">*</span>
+                    </Label>
+                    <Select value={form.org_role} onValueChange={set("org_role")} required>
+                      <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="officer">
+                          <div className="flex items-center gap-2">
+                            <Star className="w-3.5 h-3.5 text-[#1e4db7]" />Officer
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="adviser">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />Adviser
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-slate-700 font-semibold text-xs">Position / Title</Label>
+                    <Input
+                      value={form.position}
+                      onChange={set("position")}
+                      placeholder="e.g. President, Secretary"
+                      className="border-slate-200 focus:border-[#1e4db7] bg-white h-9 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {form.organization_id && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 space-y-1.5">
+                    <p className="text-xs font-semibold text-[#0f2d5e]">Assignment Summary</p>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>
+                        <span className="text-slate-400">Organization: </span>
+                        <strong>{organizations.find(o => String(o.id) === form.organization_id)?.name ?? "—"}</strong>
+                      </p>
+                      <p>
+                        <span className="text-slate-400">Role: </span>
+                        <strong className="capitalize">{form.org_role}</strong>
+                        {form.position && <> · <strong>{form.position}</strong></>}
+                      </p>
+                      <p>
+                        <span className="text-slate-400">Name: </span>
+                        <strong>{[form.first_name, form.last_name].filter(Boolean).join(" ") || "—"}</strong>
+                      </p>
+                    </div>
                   </div>
                 )}
               </>
@@ -468,21 +600,33 @@ function UserFormModal({ open, onClose, onSaved, editUser, departments }) {
 
           {/* Footer */}
           <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 rounded-b-2xl flex items-center justify-between gap-3 sticky bottom-0">
-            <span className="text-xs text-slate-400">{isMember ? `Step ${step} of 2` : ""}</span>
+            <span className="text-xs text-slate-400">
+              {needsStudentProfile
+                ? isEdit
+                  ? `Step ${step} of ${totalSteps} · click steps to jump`
+                  : `Step ${step} of ${totalSteps}`
+                : ""}
+            </span>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={onClose}
-                className="border-slate-200 text-slate-600 hover:bg-slate-100 h-9">
-                Cancel
-              </Button>
-
-              {isMember && step === 1 && (
-                <Button type="button" onClick={() => setStep(2)}
+              {step > 1 && (
+                <Button type="button" variant="outline" onClick={() => setStep(s => s - 1)}
+                  className="border-slate-200 text-slate-600 hover:bg-slate-100 h-9">
+                  Back
+                </Button>
+              )}
+              {step === 1 && (
+                <Button type="button" variant="outline" onClick={onClose}
+                  className="border-slate-200 text-slate-600 hover:bg-slate-100 h-9">
+                  Cancel
+                </Button>
+              )}
+              {step < totalSteps && (
+                <Button type="button" onClick={() => setStep(s => s + 1)}
                   className="bg-[#0f2d5e] hover:bg-[#1e4db7] text-white h-9">
                   Next <ChevronRight className="ml-1 w-4 h-4" />
                 </Button>
               )}
-
-              {(!isMember || step === 2) && (
+              {step === totalSteps && (
                 <Button type="submit" disabled={saving}
                   className="bg-[#0f2d5e] hover:bg-[#1e4db7] text-white min-w-[130px] h-9">
                   {saving
@@ -532,27 +676,23 @@ function DeleteDialog({ open, onClose, onConfirm, userName }) {
 export default function UserManagement() {
   const [users, setUsers]               = useState([]);
   const [departments, setDepartments]   = useState([]);
-  const [organizations, setOrganizations] = useState([]); // ✅ ADDED
+  const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState("");
   const [filterRole, setFilterRole]     = useState("all");
-  
-  // ✅ NEW FILTERS
-  const [filterYear, setFilterYear]       = useState("all");
-  const [filterDept, setFilterDept]       = useState("all");
-  const [filterCourse, setFilterCourse]   = useState("all");
-  const [filterOrg, setFilterOrg]         = useState("all");
-  const [showFilters, setShowFilters]     = useState(false);
-  
+  const [filterYear, setFilterYear]     = useState("all");
+  const [filterDept, setFilterDept]     = useState("all");
+  const [filterCourse, setFilterCourse] = useState("all");
+  const [filterOrg, setFilterOrg]       = useState("all");
+  const [showFilters, setShowFilters]   = useState(false);
   const [formOpen, setFormOpen]         = useState(false);
   const [editUser, setEditUser]         = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   useEffect(() => {
-    // ✅ Fetch both departments and organizations
     Promise.all([
       axios.get("/api/departments", authH()),
-      axios.get("/api/organizations", authH())
+      axios.get("/api/organizations", authH()),
     ])
       .then(([deptRes, orgRes]) => {
         setDepartments(deptRes.data);
@@ -591,31 +731,24 @@ export default function UserManagement() {
   const active   = users.filter(u => u.is_active).length;
   const admins   = users.filter(u => String(u.user_type_id) === "1").length;
   const officers = users.filter(u => String(u.user_type_id) === "2").length;
-  const members  = users.filter(u => String(u.user_type_id) === "3").length;
+  const students = users.filter(u => String(u.user_type_id) === "3").length;
 
-  // ✅ ENHANCED FILTERING
   const filtered = users.filter(u => {
-    const q     = search.toLowerCase();
+    const q           = search.toLowerCase();
     const matchSearch = !search
       || getFullName(u).toLowerCase().includes(q)
       || u.email?.toLowerCase().includes(q)
-      || u.student?.student_id?.toLowerCase().includes(q);
-    
-    const matchRole = filterRole === "all" || String(u.user_type_id) === filterRole;
-    const matchYear = filterYear === "all" || u.student?.year_level === filterYear;
-    const matchDept = filterDept === "all" || String(u.student?.department_id) === filterDept;
+      || u.student?.student_number?.toLowerCase().includes(q);
+    const matchRole   = filterRole === "all"   || String(u.user_type_id) === filterRole;
+    const matchYear   = filterYear === "all"   || u.student?.year_level === filterYear;
+    const matchDept   = filterDept === "all"   || String(u.student?.department_id) === filterDept;
     const matchCourse = filterCourse === "all" || u.student?.course === filterCourse;
-    // Note: organization filtering would require organization data on user/student model
-    const matchOrg = filterOrg === "all"; // Implement if organization field exists
-    
+    const matchOrg    = filterOrg === "all";
     return matchSearch && matchRole && matchYear && matchDept && matchCourse && matchOrg;
   });
 
-  // ✅ Extract unique values for filter dropdowns
-  const availableYears = [...new Set(users.map(u => u.student?.year_level).filter(Boolean))].sort();
+  const availableYears   = [...new Set(users.map(u => u.student?.year_level).filter(Boolean))].sort();
   const availableCourses = [...new Set(users.map(u => u.student?.course).filter(Boolean))].sort();
-  
-  // ✅ Count active filters
   const activeFiltersCount = [filterYear, filterDept, filterCourse, filterOrg].filter(f => f !== "all").length;
 
   return (
@@ -652,10 +785,10 @@ export default function UserManagement() {
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatCard icon={Users}         label="Total Accounts" value={total}    sub={`${active} active`}       grad="from-[#0f2d5e] to-[#1a4a8a]" />
-          <StatCard icon={Shield}        label="Admins"         value={admins}   sub="Full access"              grad="from-[#1a3568] to-[#2d5ca8]" />
-          <StatCard icon={Star}          label="Officers"       value={officers} sub="Elevated privileges"      grad="from-[#1e4db7] to-[#3b6fd4]" />
-          <StatCard icon={GraduationCap} label="Members"        value={members}  sub="Student accounts"         grad="from-[#2563eb] to-[#5b9ef7]" />
+          <StatCard icon={Users}         label="Total Accounts" value={total}    sub={`${active} active`}  grad="from-[#0f2d5e] to-[#1a4a8a]" />
+          <StatCard icon={Shield}        label="Admins"         value={admins}   sub="Full access"         grad="from-[#1a3568] to-[#2d5ca8]" />
+          <StatCard icon={Star}          label="Officers"       value={officers} sub="Org managers"        grad="from-[#1e4db7] to-[#3b6fd4]" />
+          <StatCard icon={GraduationCap} label="Students"       value={students} sub="Enrolled accounts"   grad="from-[#2563eb] to-[#5b9ef7]" />
         </div>
 
         {/* Table card */}
@@ -663,7 +796,6 @@ export default function UserManagement() {
 
           {/* Toolbar */}
           <div className="px-5 py-3.5 border-b border-slate-100 space-y-3">
-            {/* Main search row */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <div className="relative w-64">
@@ -686,18 +818,11 @@ export default function UserManagement() {
                     <SelectItem value="all">All Roles</SelectItem>
                     <SelectItem value="1">Admin</SelectItem>
                     <SelectItem value="2">Officer</SelectItem>
-                    <SelectItem value="3">Member</SelectItem>
+                    <SelectItem value="3">Student</SelectItem>
                   </SelectContent>
                 </Select>
-                
-                {/* ✅ FILTER TOGGLE BUTTON */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`h-8 border-slate-200 text-slate-600 hover:bg-slate-100 ${
-                    activeFiltersCount > 0 ? "border-[#1e4db7] text-[#1e4db7] bg-blue-50" : ""
-                  }`}>
+                <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}
+                  className={`h-8 border-slate-200 text-slate-600 hover:bg-slate-100 ${activeFiltersCount > 0 ? "border-[#1e4db7] text-[#1e4db7] bg-blue-50" : ""}`}>
                   <Filter className="w-3.5 h-3.5 mr-1.5" />
                   Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
                 </Button>
@@ -708,106 +833,62 @@ export default function UserManagement() {
               </div>
             </div>
 
-            {/* ✅ ADVANCED FILTERS (collapsible) */}
             {showFilters && (
               <div className="grid grid-cols-4 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                {/* Year Level Filter */}
                 <div className="space-y-1.5">
                   <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide flex items-center gap-1">
-                    <GraduationCap className="w-3 h-3" />
-                    Year Level
+                    <GraduationCap className="w-3 h-3" />Year Level
                   </Label>
                   <Select value={filterYear} onValueChange={setFilterYear}>
-                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-lg">
                       <SelectItem value="all" className="text-xs">All Years</SelectItem>
-                      {availableYears.map(year => (
-                        <SelectItem key={year} value={year} className="text-xs">{year}</SelectItem>
-                      ))}
+                      {availableYears.map(y => <SelectItem key={y} value={y} className="text-xs">{y}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Department Filter */}
                 <div className="space-y-1.5">
                   <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide flex items-center gap-1">
-                    <Building2 className="w-3 h-3" />
-                    Department
+                    <Building2 className="w-3 h-3" />Department
                   </Label>
                   <Select value={filterDept} onValueChange={setFilterDept}>
-                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-lg max-h-52">
                       <SelectItem value="all" className="text-xs">All Departments</SelectItem>
-                      {departments.map(dept => (
-                        <SelectItem key={dept.id} value={String(dept.id)} className="text-xs">
-                          {dept.name}
-                        </SelectItem>
-                      ))}
+                      {departments.map(d => <SelectItem key={d.id} value={String(d.id)} className="text-xs">{d.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Course Filter */}
                 <div className="space-y-1.5">
                   <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide flex items-center gap-1">
-                    <BookOpen className="w-3 h-3" />
-                    Course
+                    <BookOpen className="w-3 h-3" />Course
                   </Label>
                   <Select value={filterCourse} onValueChange={setFilterCourse}>
-                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-lg max-h-52">
                       <SelectItem value="all" className="text-xs">All Courses</SelectItem>
-                      {availableCourses.map(course => (
-                        <SelectItem key={course} value={course} className="text-xs truncate">
-                          {course}
-                        </SelectItem>
-                      ))}
+                      {availableCourses.map(c => <SelectItem key={c} value={c} className="text-xs truncate">{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Organization Filter */}
                 <div className="space-y-1.5">
                   <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide flex items-center gap-1">
-                    <Users className="w-3 h-3" />
-                    Organization
+                    <Users className="w-3 h-3" />Organization
                   </Label>
                   <Select value={filterOrg} onValueChange={setFilterOrg}>
-                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-lg max-h-52">
                       <SelectItem value="all" className="text-xs">All Organizations</SelectItem>
-                      {organizations.map(org => (
-                        <SelectItem key={org.id} value={String(org.id)} className="text-xs">
-                          {org.name}
-                        </SelectItem>
-                      ))}
+                      {organizations.map(o => <SelectItem key={o.id} value={String(o.id)} className="text-xs">{o.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Clear Filters Button */}
                 {activeFiltersCount > 0 && (
                   <div className="col-span-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setFilterYear("all");
-                        setFilterDept("all");
-                        setFilterCourse("all");
-                        setFilterOrg("all");
-                      }}
+                    <Button variant="outline" size="sm"
+                      onClick={() => { setFilterYear("all"); setFilterDept("all"); setFilterCourse("all"); setFilterOrg("all"); }}
                       className="w-full h-7 text-xs border-slate-200 text-slate-600 hover:bg-slate-100">
-                      <X className="w-3 h-3 mr-1.5" />
-                      Clear all filters
+                      <X className="w-3 h-3 mr-1.5" />Clear all filters
                     </Button>
                   </div>
                 )}
@@ -849,14 +930,7 @@ export default function UserManagement() {
                           <p className="text-xs text-slate-400 mt-0.5">Try adjusting your search or filters</p>
                         </div>
                         <Button variant="outline" size="sm"
-                          onClick={() => { 
-                            setSearch(""); 
-                            setFilterRole("all");
-                            setFilterYear("all");
-                            setFilterDept("all");
-                            setFilterCourse("all");
-                            setFilterOrg("all");
-                          }}
+                          onClick={() => { setSearch(""); setFilterRole("all"); setFilterYear("all"); setFilterDept("all"); setFilterCourse("all"); setFilterOrg("all"); }}
                           className="rounded-xl border-slate-200 text-slate-600 text-xs h-8">
                           Clear filters
                         </Button>
@@ -874,7 +948,6 @@ export default function UserManagement() {
 
                   return (
                     <tr key={user.id} className="hover:bg-blue-50/30 transition-colors group">
-
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="relative shrink-0">
@@ -893,64 +966,37 @@ export default function UserManagement() {
                           </div>
                         </div>
                       </td>
-
                       <td className="px-5 py-3.5">
                         <span className="text-sm font-mono text-slate-500">
-                          {user.student?.student_id ?? <span className="text-slate-300 text-xs">—</span>}
+                          {user.student?.student_number ?? <span className="text-slate-300 text-xs">—</span>}
                         </span>
                       </td>
-
                       <td className="px-5 py-3.5 max-w-[120px]">
-                        {deptName ? (
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="text-sm text-slate-600 truncate">{deptName}</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 text-xs">—</span>
-                        )}
+                        {deptName
+                          ? <div className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" /><span className="text-sm text-slate-600 truncate">{deptName}</span></div>
+                          : <span className="text-slate-300 text-xs">—</span>}
                       </td>
-
-                      {/* ✅ COURSE COLUMN */}
                       <td className="px-5 py-3.5 max-w-[160px]">
-                        {user.student?.course ? (
-                          <div className="flex items-center gap-1.5">
-                            <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="text-sm text-slate-600 truncate" title={user.student.course}>
-                              {user.student.course}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 text-xs">—</span>
-                        )}
+                        {user.student?.course
+                          ? <div className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" /><span className="text-sm text-slate-600 truncate" title={user.student.course}>{user.student.course}</span></div>
+                          : <span className="text-slate-300 text-xs">—</span>}
                       </td>
-
                       <td className="px-5 py-3.5">
                         <Badge className={`${meta?.badge ?? "bg-slate-100 text-slate-600 border-slate-200"} border flex items-center gap-1 w-fit text-xs font-semibold px-2.5 py-0.5 rounded-full`}>
                           <Ico className="w-3 h-3" />{user.user_type?.name ?? "Unassigned"}
                         </Badge>
                       </td>
-
                       <td className="px-5 py-3.5 text-sm text-slate-500 whitespace-nowrap">
                         {user.student?.year_level
-                          ? <div className="flex items-center gap-1.5">
-                              <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              {user.student.year_level}
-                            </div>
+                          ? <div className="flex items-center gap-1.5"><GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />{user.student.year_level}</div>
                           : <span className="text-slate-300">—</span>}
                       </td>
-
                       <td className="px-5 py-3.5">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                          user.is_active
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-slate-100 text-slate-500 border-slate-200"
-                        }`}>
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${user.is_active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${user.is_active ? "bg-emerald-500" : "bg-slate-400"}`} />
                           {user.is_active ? "Active" : "Inactive"}
                         </span>
                       </td>
-
                       <td className="px-5 py-3.5 text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1000,6 +1046,7 @@ export default function UserManagement() {
         onSaved={fetchUsers}
         editUser={editUser}
         departments={departments}
+        organizations={organizations}
       />
       <DeleteDialog
         open={Boolean(deleteTarget)}
