@@ -15,7 +15,7 @@ import AttendanceManagement from './pages/dashboards/admin/AttendanceManagement'
 // Student Components
 import StudentLayout from './components/layout/StudentLayout';
 import StudentDashboard from './pages/dashboards/student/StudentDashboard';
-import StudentCheckIn from './pages/dashboards/student/StudentCheckIn';
+import StudentCheckIn from './pages/dashboards/student/StudentCheckin';
 import StudentEvents from './pages/dashboards/student/StudentEvents';
 import StudentAttendance from './pages/dashboards/student/StudentAttendance';
 import StudentClearance from './pages/dashboards/student/StudentClearance';
