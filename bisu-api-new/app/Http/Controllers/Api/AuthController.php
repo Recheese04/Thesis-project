@@ -17,55 +17,47 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        // 1. Find user
         $user = User::where('email', $request->email)->first();
 
-        // 2. Verify password
         if (!$user || !Hash::check($request->password, $user->password_hash)) {
             return response()->json(['message' => 'Invalid credentials.'], 401);
         }
 
-        // 3. Check account is active
         if (!$user->is_active) {
             return response()->json(['message' => 'Your account has been deactivated.'], 403);
         }
 
-        // 4. Load student profile
         $user->load(['student', 'userType']);
 
-        // 5. Determine role from organization_members table
-        //    - No student_id       → admin
-        //    - officer/adviser row → officer
-        //    - member row only     → member
         $role           = 'admin';
         $membership     = null;
         $organizationId = null;
 
         if ($user->student_id) {
-            $membership = MemberOrganization::where('student_id', $user->student_id)
+            // ✅ Load 'organization' so frontend can read membership.organization.name
+            $membership = MemberOrganization::with('organization')
+                ->where('student_id', $user->student_id)
                 ->where('status', 'active')
-                ->orderByRaw("FIELD(role, 'adviser', 'officer', 'member')") // prioritize officer roles
+                ->orderByRaw("FIELD(role, 'adviser', 'officer', 'member')")
                 ->first();
 
             if ($membership) {
                 $role           = in_array($membership->role, ['officer', 'adviser']) ? 'officer' : 'member';
                 $organizationId = $membership->organization_id;
             } else {
-                $role = 'member'; // has student_id but no membership yet
+                $role = 'member';
             }
         }
 
-        // 6. Create token
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // 7. Return everything the frontend needs
         return response()->json([
             'message'         => 'Login successful',
             'token'           => $token,
             'user'            => $user,
-            'role'            => $role,            // 'admin' | 'officer' | 'member'
-            'membership'      => $membership,      // full OrganizationMember record or null
-            'organization_id' => $organizationId,  // the org they manage, or null
+            'role'            => $role,
+            'membership'      => $membership,
+            'organization_id' => $organizationId,
         ], 200);
     }
 
@@ -85,7 +77,9 @@ class AuthController extends Controller
         $role           = 'admin';
 
         if ($user->student_id) {
-            $membership = MemberOrganization::where('student_id', $user->student_id)
+            // ✅ Load 'organization' so frontend can read membership.organization.name
+            $membership = MemberOrganization::with('organization')
+                ->where('student_id', $user->student_id)
                 ->where('status', 'active')
                 ->orderByRaw("FIELD(role, 'adviser', 'officer', 'member')")
                 ->first();
@@ -101,8 +95,8 @@ class AuthController extends Controller
         return response()->json([
             'user'            => $user,
             'role'            => $role,
-            'membership'      => $membership,
-            'organization_id' => $organizationId,
+            'membership'      => $membership,       // includes membership.organization.name
+            'organization_id' => $organizationId,   // ← this is what OfficerMembers reads
         ]);
     }
 }

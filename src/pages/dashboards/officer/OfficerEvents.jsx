@@ -3,7 +3,7 @@ import axios from "axios";
 import {
   Calendar, Plus, Loader2, Trash2, Pencil, Search, X,
   RefreshCw, MoreHorizontal, Users, Clock, AlertTriangle,
-  CheckCircle2, TrendingUp, MapPin, FileText, Activity, QrCode,
+  CheckCircle2, MapPin, FileText, Activity, QrCode, ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,10 +16,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import EvaluationModal from "../../modals/EvaluationModal";
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
-const EMPTY_FORM = { title: "", description: "", event_date: "", event_time: "", location: "", status: "upcoming" };
+const EMPTY_FORM = {
+  title: "", description: "", event_date: "",
+  event_time: "", end_time: "", location: "", status: "upcoming",
+};
 
 const STATUS_COLORS = {
   upcoming:  "bg-blue-50 text-blue-700 border-blue-200",
@@ -29,6 +33,29 @@ const STATUS_COLORS = {
 };
 
 const STATUS_ICONS = { upcoming: Clock, ongoing: Activity, completed: CheckCircle2, cancelled: X };
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const formatDate = (s) => {
+  if (!s) return "—";
+  return new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const formatTime = (s) => {
+  if (!s) return null;
+  try {
+    return new Date(`2000-01-01T${String(s).substring(0, 5)}`).toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: true,
+    });
+  } catch { return s; }
+};
+
+/** Shows "9:00 AM – 11:00 AM" or just "9:00 AM" when there is no end time */
+const formatTimeRange = (startTime, endTime) => {
+  const start = formatTime(startTime);
+  const end   = formatTime(endTime);
+  if (!start) return "—";
+  return end ? `${start} – ${end}` : start;
+};
 
 // ── Stat Card ──────────────────────────────────────────────────────────────
 function StatCard({ icon: Icon, label, value, sub, grad }) {
@@ -53,19 +80,20 @@ function StatCard({ icon: Icon, label, value, sub, grad }) {
 // ── Event Form Modal ───────────────────────────────────────────────────────
 function EventFormModal({ open, onClose, onSaved, editEvent }) {
   const isEdit = Boolean(editEvent);
-  const [form, setForm]   = useState(EMPTY_FORM);
+  const [form, setForm]     = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     if (editEvent) {
       setForm({
-        title:       editEvent.title       ?? "",
-        description: editEvent.description ?? "",
-        event_date:  editEvent.event_date  ? String(editEvent.event_date).substring(0, 10) : "",
-        event_time:  editEvent.event_time  ? String(editEvent.event_time).substring(0, 5)  : "",
-        location:    editEvent.location    ?? "",
-        status:      editEvent.status      ?? "upcoming",
+        title:       editEvent.title        ?? "",
+        description: editEvent.description  ?? "",
+        event_date:  editEvent.event_date   ? String(editEvent.event_date).substring(0, 10) : "",
+        event_time:  editEvent.event_time   ? String(editEvent.event_time).substring(0, 5)  : "",
+        end_time:    editEvent.end_time     ? String(editEvent.end_time).substring(0, 5)    : "",
+        location:    editEvent.location     ?? "",
+        status:      editEvent.status       ?? "upcoming",
       });
     } else {
       setForm(EMPTY_FORM);
@@ -75,29 +103,54 @@ function EventFormModal({ open, onClose, onSaved, editEvent }) {
   const set = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e?.target?.value ?? e }));
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); setSaving(true);
+    e.preventDefault();
+    // Client-side guard: end time must be after start time
+    if (form.event_time && form.end_time && form.end_time <= form.event_time) {
+      toast.error("Validation Error", { description: "End time must be after the start time." });
+      return;
+    }
+    setSaving(true);
     try {
       const response = isEdit
         ? await axios.put(`/api/events/${editEvent.id}`, form, authH())
         : await axios.post("/api/events", form, authH());
       toast.success(isEdit ? "Event Updated!" : "Event Created!", { description: response.data.message });
-      onSaved(); onClose();
+      onSaved();
+      onClose();
     } catch (err) {
       const errs = err.response?.data?.errors;
-      toast.error("Error", { description: errs ? Object.values(errs).flat().join("\n") : err.response?.data?.message ?? "An error occurred." });
+      toast.error("Error", {
+        description: errs
+          ? Object.values(errs).flat().join("\n")
+          : err.response?.data?.message ?? "An error occurred.",
+      });
     } finally { setSaving(false); }
   };
+
+  // Build the auto-schedule hint shown below the time fields
+  const scheduleHint = (() => {
+    const s = formatTime(form.event_time);
+    const e = formatTime(form.end_time);
+    if (!s && !e) return null;
+    if (s && e)  return <>Will auto-set to <strong>ongoing</strong> at {s} and <strong>completed</strong> at {e}.</>;
+    if (s)       return <>Will auto-set to <strong>ongoing</strong> at {s}. Add an end time for auto-completion.</>;
+    return          <>Will auto-set to <strong>completed</strong> at {e}.</>;
+  })();
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="bg-white border-0 shadow-2xl w-[calc(100vw-2rem)] sm:max-w-[560px] p-0 rounded-2xl gap-0 max-h-[90vh] overflow-y-auto mx-4">
+
+        {/* Header */}
         <div className="bg-gradient-to-br from-[#0f2d5e] via-[#153d80] to-[#1e4db7] px-5 py-4 rounded-t-2xl sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
               {isEdit ? <Pencil className="w-4 h-4 text-white" /> : <Calendar className="w-4 h-4 text-white" />}
             </div>
             <div>
-              <DialogTitle className="text-base font-bold text-white">{isEdit ? "Edit Event" : "Create New Event"}</DialogTitle>
+              <DialogTitle className="text-base font-bold text-white">
+                {isEdit ? "Edit Event" : "Create New Event"}
+              </DialogTitle>
               <DialogDescription className="text-blue-200 text-xs mt-0.5">
                 {isEdit ? "Update event information" : "Add a new event to your calendar"}
               </DialogDescription>
@@ -107,56 +160,129 @@ function EventFormModal({ open, onClose, onSaved, editEvent }) {
 
         <form onSubmit={handleSubmit}>
           <div className="px-5 py-5 space-y-4">
+
+            {/* Title */}
             <div className="space-y-1">
-              <Label className="text-slate-700 font-semibold text-xs">Event Title <span className="text-red-500">*</span></Label>
+              <Label className="text-slate-700 font-semibold text-xs">
+                Event Title <span className="text-red-500">*</span>
+              </Label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input value={form.title} onChange={set("title")} placeholder="e.g. General Assembly 2025" required className="pl-9 border-slate-200 h-10" />
+                <Input
+                  value={form.title}
+                  onChange={set("title")}
+                  placeholder="e.g. General Assembly 2025"
+                  required
+                  className="pl-9 border-slate-200 h-10"
+                />
               </div>
             </div>
 
+            {/* Date */}
+            <div className="space-y-1">
+              <Label className="text-slate-700 font-semibold text-xs">
+                Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="date"
+                value={form.event_date}
+                onChange={set("event_date")}
+                required
+                className="border-slate-200 h-10"
+              />
+            </div>
+
+            {/* Start time + End time */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-slate-700 font-semibold text-xs">Date <span className="text-red-500">*</span></Label>
-                <Input type="date" value={form.event_date} onChange={set("event_date")} required className="border-slate-200 h-10" />
+                <Label className="text-slate-700 font-semibold text-xs">Start Time</Label>
+                <Input
+                  type="time"
+                  value={form.event_time}
+                  onChange={set("event_time")}
+                  className="border-slate-200 h-10"
+                />
               </div>
               <div className="space-y-1">
-                <Label className="text-slate-700 font-semibold text-xs">Time</Label>
-                <Input type="time" value={form.event_time} onChange={set("event_time")} className="border-slate-200 h-10" />
+                <Label className="text-slate-700 font-semibold text-xs">End Time</Label>
+                <Input
+                  type="time"
+                  value={form.end_time}
+                  onChange={set("end_time")}
+                  min={form.event_time || undefined}
+                  className="border-slate-200 h-10"
+                />
               </div>
             </div>
 
+            {/* Auto-schedule hint */}
+            {scheduleHint && (
+              <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-500" />
+                <span>{scheduleHint}</span>
+              </div>
+            )}
+
+            {/* Location */}
             <div className="space-y-1">
               <Label className="text-slate-700 font-semibold text-xs">Location</Label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input value={form.location} onChange={set("location")} placeholder="e.g. University Auditorium" className="pl-9 border-slate-200 h-10" />
+                <Input
+                  value={form.location}
+                  onChange={set("location")}
+                  placeholder="e.g. University Auditorium"
+                  className="pl-9 border-slate-200 h-10"
+                />
               </div>
             </div>
 
+            {/* Status — still editable manually */}
             <div className="space-y-1">
               <Label className="text-slate-700 font-semibold text-xs">Status</Label>
               <Select value={form.status} onValueChange={set("status")}>
-                <SelectTrigger className="border-slate-200 bg-white h-10 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="border-slate-200 bg-white h-10 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="upcoming"><div className="flex items-center gap-2"><Clock className="w-3.5 h-3.5 text-blue-500" />Upcoming</div></SelectItem>
-                  <SelectItem value="ongoing"><div className="flex items-center gap-2"><Activity className="w-3.5 h-3.5 text-green-500" />Ongoing</div></SelectItem>
-                  <SelectItem value="completed"><div className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />Completed</div></SelectItem>
-                  <SelectItem value="cancelled"><div className="flex items-center gap-2"><X className="w-3.5 h-3.5 text-red-500" />Cancelled</div></SelectItem>
+                  <SelectItem value="upcoming">
+                    <div className="flex items-center gap-2"><Clock className="w-3.5 h-3.5 text-blue-500" />Upcoming</div>
+                  </SelectItem>
+                  <SelectItem value="ongoing">
+                    <div className="flex items-center gap-2"><Activity className="w-3.5 h-3.5 text-green-500" />Ongoing</div>
+                  </SelectItem>
+                  <SelectItem value="completed">
+                    <div className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />Completed</div>
+                  </SelectItem>
+                  <SelectItem value="cancelled">
+                    <div className="flex items-center gap-2"><X className="w-3.5 h-3.5 text-red-500" />Cancelled</div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Description */}
             <div className="space-y-1">
               <Label className="text-slate-700 font-semibold text-xs">Description</Label>
-              <Textarea value={form.description} onChange={set("description")} placeholder="Describe the event..." rows={3} className="border-slate-200 resize-none" />
+              <Textarea
+                value={form.description}
+                onChange={set("description")}
+                placeholder="Describe the event..."
+                rows={3}
+                className="border-slate-200 resize-none"
+              />
             </div>
           </div>
 
+          {/* Footer */}
           <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 rounded-b-2xl flex items-center justify-end gap-3 sticky bottom-0">
-            <Button type="button" variant="outline" onClick={onClose} className="border-slate-200 text-slate-600 h-9">Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose} className="border-slate-200 text-slate-600 h-9">
+              Cancel
+            </Button>
             <Button type="submit" disabled={saving} className="bg-[#0f2d5e] hover:bg-[#1e4db7] text-white min-w-[110px] h-9">
-              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : <><CheckCircle2 className="mr-2 h-4 w-4" />{isEdit ? "Update" : "Create"}</>}
+              {saving
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
+                : <><CheckCircle2 className="mr-2 h-4 w-4" />{isEdit ? "Update" : "Create"}</>}
             </Button>
           </div>
         </form>
@@ -224,25 +350,28 @@ function QRCodeDialog({ open, onClose, event }) {
             </div>
           </div>
         </div>
-
         <div className="px-5 py-5 space-y-4">
           <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
             <h3 className="font-semibold text-slate-900 text-sm">{event.title}</h3>
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <Calendar className="w-3.5 h-3.5" />
-              <span>{new Date(event.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+              <span>{formatDate(event.event_date)}</span>
             </div>
+            {(event.event_time || event.end_time) && (
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{formatTimeRange(event.event_time, event.end_time)}</span>
+              </div>
+            )}
             {event.location && (
               <div className="flex items-center gap-2 text-xs text-slate-600">
                 <MapPin className="w-3.5 h-3.5" /><span>{event.location}</span>
               </div>
             )}
           </div>
-
           <div className="flex justify-center bg-white border-2 border-slate-100 rounded-xl p-5">
             <img src={qrUrl} alt="Event QR Code" className="w-48 h-48 sm:w-56 sm:h-56" />
           </div>
-
           {event.qr_code && (
             <div className="space-y-1.5">
               <Label className="text-slate-700 font-semibold text-xs">Unique Code</Label>
@@ -259,7 +388,6 @@ function QRCodeDialog({ open, onClose, event }) {
               </div>
             </div>
           )}
-
           <div className="flex gap-2 pt-1">
             <Button onClick={handleDownload} className="flex-1 bg-[#0f2d5e] hover:bg-[#1e4db7] text-white">
               <QrCode className="mr-2 h-4 w-4" /> Download QR
@@ -282,6 +410,7 @@ export default function OfficerEvents() {
   const [editEvent, setEditEvent]       = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [qrEvent, setQrEvent]           = useState(null);
+  const [evalEvent, setEvalEvent]       = useState(null);
 
   const fetchEvents = async () => {
     try {
@@ -314,21 +443,15 @@ export default function OfficerEvents() {
 
   const filtered = events.filter((e) => {
     const q           = search.toLowerCase();
-    const matchSearch = !search || e.title?.toLowerCase().includes(q) || e.location?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q);
+    const matchSearch = !search
+      || e.title?.toLowerCase().includes(q)
+      || e.location?.toLowerCase().includes(q)
+      || e.description?.toLowerCase().includes(q);
     const matchStatus = filterStatus === "all" || e.status === filterStatus;
     return matchSearch && matchStatus;
   });
 
-  const formatDate = (s) => {
-    if (!s) return "—";
-    return new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
-
-  const formatTime = (s) => {
-    if (!s) return "—";
-    return new Date(`2000-01-01T${s}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-  };
-
+  // ── Inline Actions Dropdown ────────────────────────────────────────────
   const EventActions = ({ event }) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -336,8 +459,11 @@ export default function OfficerEvents() {
           <MoreHorizontal className="w-4 h-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40 rounded-xl border-slate-100 shadow-lg p-1">
-        <DropdownMenuItem onClick={() => { setEditEvent(event); setFormOpen(true); }} className="rounded-lg gap-2 cursor-pointer text-sm">
+      <DropdownMenuContent align="end" className="w-44 rounded-xl border-slate-100 shadow-lg p-1">
+        <DropdownMenuItem
+          onClick={() => { setEditEvent(event); setFormOpen(true); }}
+          className="rounded-lg gap-2 cursor-pointer text-sm"
+        >
           <Pencil className="w-3.5 h-3.5" /> Edit
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setQrEvent(event)} className="rounded-lg gap-2 cursor-pointer text-sm">
@@ -346,8 +472,14 @@ export default function OfficerEvents() {
         <DropdownMenuItem className="rounded-lg gap-2 cursor-pointer text-sm">
           <Users className="w-3.5 h-3.5" /> Attendance
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setEvalEvent(event)} className="rounded-lg gap-2 cursor-pointer text-sm">
+          <ClipboardList className="w-3.5 h-3.5" /> Evaluation
+        </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-slate-100 my-1" />
-        <DropdownMenuItem onClick={() => setDeleteTarget(event)} className="rounded-lg text-red-600 focus:bg-red-50 gap-2 cursor-pointer text-sm">
+        <DropdownMenuItem
+          onClick={() => setDeleteTarget(event)}
+          className="rounded-lg text-red-600 focus:bg-red-50 gap-2 cursor-pointer text-sm"
+        >
           <Trash2 className="w-3.5 h-3.5" /> Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -358,7 +490,7 @@ export default function OfficerEvents() {
     <TooltipProvider>
       <div className="space-y-5 sm:space-y-6">
 
-        {/* Header */}
+        {/* ── Header ── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-[#0f2d5e] to-[#1e4db7] flex items-center justify-center shadow-lg shadow-[#0f2d5e]/25">
@@ -372,8 +504,10 @@ export default function OfficerEvents() {
           <div className="flex items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={fetchEvents} disabled={loading}
-                  className="border-[#0f2d5e]/20 text-[#0f2d5e] h-9 w-9 rounded-xl bg-white shadow-sm">
+                <Button
+                  variant="outline" size="icon" onClick={fetchEvents} disabled={loading}
+                  className="border-[#0f2d5e]/20 text-[#0f2d5e] h-9 w-9 rounded-xl bg-white shadow-sm"
+                >
                   <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 </Button>
               </TooltipTrigger>
@@ -381,7 +515,8 @@ export default function OfficerEvents() {
             </Tooltip>
             <Button
               onClick={() => { setEditEvent(null); setFormOpen(true); }}
-              className="bg-gradient-to-r from-[#0f2d5e] to-[#1e4db7] hover:opacity-90 text-white shadow-md rounded-xl h-9 px-3 sm:px-4 font-semibold text-sm">
+              className="bg-gradient-to-r from-[#0f2d5e] to-[#1e4db7] hover:opacity-90 text-white shadow-md rounded-xl h-9 px-3 sm:px-4 font-semibold text-sm"
+            >
               <Plus className="mr-1.5 h-4 w-4" />
               <span className="hidden sm:inline">Add Event</span>
               <span className="sm:hidden">Add</span>
@@ -389,7 +524,7 @@ export default function OfficerEvents() {
           </div>
         </div>
 
-        {/* Stat Cards — 2 cols on mobile, 4 on desktop */}
+        {/* ── Stat Cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard icon={Calendar}     label="Total Events" value={total}     sub={`${upcoming} upcoming`} grad="from-[#0f2d5e] to-[#1a4a8a]" />
           <StatCard icon={Clock}        label="Upcoming"     value={upcoming}  sub="Scheduled"              grad="from-[#1e4db7] to-[#3b6fd4]" />
@@ -397,7 +532,7 @@ export default function OfficerEvents() {
           <StatCard icon={CheckCircle2} label="Completed"    value={completed} sub="Past events"            grad="from-[#6366f1] to-[#818cf8]" />
         </div>
 
-        {/* Table/List Card */}
+        {/* ── Table Card ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
 
           {/* Toolbar */}
@@ -405,8 +540,11 @@ export default function OfficerEvents() {
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <div className="relative flex-1 sm:flex-none sm:w-56">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search events..."
-                  className="pl-9 pr-8 h-8 border-slate-200 bg-slate-50 text-sm rounded-xl w-full" />
+                <Input
+                  value={search} onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search events..."
+                  className="pl-9 pr-8 h-8 border-slate-200 bg-slate-50 text-sm rounded-xl w-full"
+                />
                 {search && (
                   <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                     <X className="w-3.5 h-3.5" />
@@ -429,7 +567,7 @@ export default function OfficerEvents() {
             <span className="text-xs text-slate-400"><strong className="text-slate-600">{filtered.length}</strong> results</span>
           </div>
 
-          {/* Mobile card list */}
+          {/* ── Mobile cards ── */}
           <div className="sm:hidden">
             {loading ? (
               <div className="py-16 text-center">
@@ -441,7 +579,9 @@ export default function OfficerEvents() {
                 <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                 <p className="font-semibold text-slate-500 text-sm">No events found</p>
                 <Button variant="outline" size="sm" onClick={() => { setSearch(""); setFilterStatus("all"); }}
-                  className="mt-3 rounded-xl border-slate-200 text-slate-600 text-xs h-8">Clear filters</Button>
+                  className="mt-3 rounded-xl border-slate-200 text-slate-600 text-xs h-8">
+                  Clear filters
+                </Button>
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
@@ -464,7 +604,10 @@ export default function OfficerEvents() {
                           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3 text-slate-400" />
-                              {formatDate(event.event_date)} · {formatTime(event.event_time)}
+                              {formatDate(event.event_date)}
+                              {(event.event_time || event.end_time) && (
+                                <> · {formatTimeRange(event.event_time, event.end_time)}</>
+                              )}
                             </span>
                             {event.location && (
                               <span className="flex items-center gap-1">
@@ -481,7 +624,7 @@ export default function OfficerEvents() {
             )}
           </div>
 
-          {/* Desktop table */}
+          {/* ── Desktop table ── */}
           <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
@@ -504,7 +647,9 @@ export default function OfficerEvents() {
                     <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                     <p className="font-semibold text-slate-500 text-sm">No events found</p>
                     <Button variant="outline" size="sm" onClick={() => { setSearch(""); setFilterStatus("all"); }}
-                      className="mt-3 rounded-xl border-slate-200 text-slate-600 text-xs h-8">Clear filters</Button>
+                      className="mt-3 rounded-xl border-slate-200 text-slate-600 text-xs h-8">
+                      Clear filters
+                    </Button>
                   </td></tr>
                 ) : filtered.map((event) => {
                   const StatusIcon = STATUS_ICONS[event.status] || Clock;
@@ -523,7 +668,10 @@ export default function OfficerEvents() {
                       </td>
                       <td className="px-5 py-4">
                         <p className="text-sm text-slate-700 font-medium">{formatDate(event.event_date)}</p>
-                        <p className="text-xs text-slate-400">{formatTime(event.event_time)}</p>
+                        {/* Show "9:00 AM – 11:00 AM" if end_time exists, else just start time */}
+                        <p className="text-xs text-slate-400">
+                          {formatTimeRange(event.event_time, event.end_time)}
+                        </p>
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
@@ -550,7 +698,10 @@ export default function OfficerEvents() {
 
           {/* Footer */}
           <div className="px-4 sm:px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-            <span>Showing <strong className="text-slate-600">{filtered.length}</strong> of <strong className="text-slate-600">{total}</strong> events</span>
+            <span>
+              Showing <strong className="text-slate-600">{filtered.length}</strong> of{" "}
+              <strong className="text-slate-600">{total}</strong> events
+            </span>
             <span className="hidden sm:inline">
               <strong className="text-slate-600">{upcoming}</strong> upcoming ·{" "}
               <strong className="text-slate-600">{ongoing}</strong> ongoing ·{" "}
@@ -560,9 +711,20 @@ export default function OfficerEvents() {
         </div>
       </div>
 
-      <EventFormModal open={formOpen} onClose={() => { setFormOpen(false); setEditEvent(null); }} onSaved={fetchEvents} editEvent={editEvent} />
+      <EventFormModal
+        open={formOpen}
+        onClose={() => { setFormOpen(false); setEditEvent(null); }}
+        onSaved={fetchEvents}
+        editEvent={editEvent}
+      />
       <QRCodeDialog open={Boolean(qrEvent)} onClose={() => setQrEvent(null)} event={qrEvent} />
-      <DeleteDialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} event={deleteTarget} />
+      <DeleteDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        event={deleteTarget}
+      />
+      <EvaluationModal open={Boolean(evalEvent)} onClose={() => setEvalEvent(null)} event={evalEvent} />
     </TooltipProvider>
   );
 }
