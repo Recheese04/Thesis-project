@@ -1,18 +1,15 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import {
-  UserPlus, Loader2, Trash2, Mail, ShieldCheck,
-  UserCircle, Phone, GraduationCap, Search, X,
-  Pencil, Users, Shield, Star, CheckCircle2,
-  Eye, EyeOff, RefreshCw, Building2, AlertTriangle,
-  Lock, ChevronRight, Activity, MoreHorizontal, BookOpen, Filter
+  UserPlus, Loader2, Trash2, Mail,
+  UserCircle, GraduationCap, Search, X,
+  Pencil, Users, Shield, Star,
+  RefreshCw, Building2, AlertTriangle,
+  ChevronRight, Activity, MoreHorizontal, BookOpen, Filter
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog, DialogContent, DialogTitle, DialogDescription,
-} from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription,
@@ -32,45 +29,14 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-
-// ── Constants ──────────────────────────────────────────────────────────────
-const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year"];
-
-const COURSES_BY_DEPARTMENT = {
-  "1": [
-    "Bachelor of Science in Computer Science",
-    "Bachelor of Science in Environmental Science major in Coastal Resource Management"
-  ],
-  "2": [
-    "Bachelor of Science in Fisheries",
-    "Bachelor of Science in Marine Biology"
-  ],
-  "3": [
-    "Bachelor of Elementary Education",
-    "Bachelor of Secondary Education (BSEd)"
-  ],
-  "4": [
-    "Bachelor of Science in Hospitality Management",
-    "Bachelor of Science in Office Administration"
-  ]
-};
+import UserFormModal from "../../modals/UserFormModal";
+const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
 const ROLE_META = {
-  "1": { label: "Admin",   icon: Shield, badge: "bg-[#0f2d5e] text-white border-[#0f2d5e]",  grad: "from-[#0f2d5e] to-[#1a4a8a]" },
-  "2": { label: "Officer", icon: Star,   badge: "bg-[#1e4db7] text-white border-[#1e4db7]",  grad: "from-[#1e4db7] to-[#3b6fd4]" },
-  "3": { label: "Student", icon: GraduationCap, badge: "bg-blue-50 text-blue-700 border-blue-200", grad: "from-[#2563eb] to-[#5b9ef7]" },
+  "1": { label: "Admin",   icon: Shield,       badge: "bg-[#0f2d5e] text-white border-[#0f2d5e]",  grad: "from-[#0f2d5e] to-[#1a4a8a]" },
+  "2": { label: "Officer", icon: Star,          badge: "bg-[#1e4db7] text-white border-[#1e4db7]",  grad: "from-[#1e4db7] to-[#3b6fd4]" },
+  "3": { label: "Student", icon: GraduationCap, badge: "bg-blue-50 text-blue-700 border-blue-200",  grad: "from-[#2563eb] to-[#5b9ef7]" },
 };
-
-const EMPTY_FORM = {
-  email: "", password: "", user_type_id: "", is_active: "1",
-  student_number: "", first_name: "", middle_name: "",
-  last_name: "", department_id: "", year_level: "", contact_number: "",
-  course: "",
-  organization_id: "", org_role: "officer", position: "",
-};
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
 const getInitials = (u) =>
   u?.student
@@ -100,550 +66,7 @@ function StatCard({ icon: Icon, label, value, sub, grad }) {
   );
 }
 
-// ── Section label inside form ──────────────────────────────────────────────
-function SLabel({ icon: Icon, text }) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <div className="w-6 h-6 rounded-md bg-[#0f2d5e]/10 flex items-center justify-center shrink-0">
-        <Icon className="w-3.5 h-3.5 text-[#0f2d5e]" />
-      </div>
-      <span className="text-[11px] font-bold uppercase tracking-widest text-[#0f2d5e]/60">{text}</span>
-      <div className="flex-1 h-px bg-slate-100" />
-    </div>
-  );
-}
-
-// ── Password field ─────────────────────────────────────────────────────────
-function PwdInput({ value, onChange, required, hint }) {
-  const [show, setShow] = useState(false);
-  return (
-    <>
-      <div className="relative">
-        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={onChange}
-          placeholder="••••••••"
-          required={required}
-          className="pl-9 pr-10 border-slate-200 focus:border-[#1e4db7] bg-white h-9"
-        />
-        <button type="button" tabIndex={-1}
-          onClick={() => setShow(s => !s)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
-      </div>
-      {hint && <p className="text-[11px] text-slate-400 mt-1">{hint}</p>}
-    </>
-  );
-}
-
-// ── User Form Modal ────────────────────────────────────────────────────────
-function UserFormModal({ open, onClose, onSaved, editUser, departments, organizations }) {
-  const isEdit   = Boolean(editUser);
-  const [form, setForm]     = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [step, setStep]     = useState(1);
-
-  const needsStudentProfile = form.user_type_id === "2" || form.user_type_id === "3";
-  const isOfficer           = form.user_type_id === "2";
-  const totalSteps = isOfficer ? 3 : needsStudentProfile ? 2 : 1;
-
-  const STEPS = isOfficer
-    ? [{ n: 1, label: "Account" }, { n: 2, label: "Student Profile" }, { n: 3, label: "Organization" }]
-    : needsStudentProfile
-    ? [{ n: 1, label: "Account" }, { n: 2, label: "Student Profile" }]
-    : [{ n: 1, label: "Account" }];
-
-  useEffect(() => {
-    if (!open) return;
-
-    if (editUser) {
-      const membership = editUser.officer_membership ?? null;
-      const typeId = String(editUser.user_type_id ?? "");
-
-      setForm({
-        email:           editUser.email                   ?? "",
-        password:        "",
-        user_type_id:    typeId,
-        is_active:       editUser.is_active ? "1" : "0",
-        student_number:  editUser.student?.student_number ?? "",
-        first_name:      editUser.student?.first_name     ?? "",
-        middle_name:     editUser.student?.middle_name    ?? "",
-        last_name:       editUser.student?.last_name      ?? "",
-        department_id:   String(editUser.student?.department_id ?? ""),
-        year_level:      editUser.student?.year_level     ?? "",
-        contact_number:  editUser.student?.contact_number ?? "",
-        course:          editUser.student?.course         ?? "",
-        organization_id: String(membership?.organization_id ?? ""),
-        org_role:        membership?.role                 ?? "officer",
-        position:        membership?.position             ?? "",
-      });
-
-      if (typeId === "2") setStep(3);
-      else if (typeId === "3") setStep(2);
-      else setStep(1);
-
-    } else {
-      setForm(EMPTY_FORM);
-      setStep(1);
-    }
-  }, [open, editUser]);
-
-  const set = (f) => (e) => setForm(p => ({ ...p, [f]: e?.target?.value ?? e }));
-
-  const resetRole = (val) =>
-    setForm(p => ({
-      ...p,
-      user_type_id:    val,
-      organization_id: val === "2" ? p.organization_id : "",
-      org_role:        val === "2" ? p.org_role        : "officer",
-      position:        val === "2" ? p.position        : "",
-    }));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const response = isEdit
-        ? await axios.put(`/api/users/${editUser.id}`, form, authH())
-        : await axios.post("/api/users", form, authH());
-      toast.success(isEdit ? "Account Updated!" : "Account Created!", {
-        description: response.data.message,
-      });
-      onSaved();
-      onClose();
-    } catch (err) {
-      const errs = err.response?.data?.errors;
-      toast.error("Error", {
-        description: errs ? Object.values(errs).flat().join("\n") : err.response?.data?.message ?? "An error occurred.",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const selectedDept     = departments.find(d => String(d.id) === form.department_id);
-  const availableCourses = COURSES_BY_DEPARTMENT[form.department_id] || [];
-
-  return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="bg-white border-0 shadow-2xl sm:max-w-[520px] p-0 rounded-2xl gap-0 max-h-[90vh] overflow-y-auto">
-
-        {/* Header */}
-        <div className="bg-gradient-to-br from-[#0f2d5e] via-[#153d80] to-[#1e4db7] px-6 py-5 rounded-t-2xl sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-              {isEdit ? <Pencil className="w-5 h-5 text-white" /> : <ShieldCheck className="w-5 h-5 text-white" />}
-            </div>
-            <div>
-              <DialogTitle className="text-lg font-bold text-white">
-                {isEdit ? "Edit Account" : "Create New Account"}
-              </DialogTitle>
-              <DialogDescription className="text-blue-200 text-xs mt-0.5">
-                {isEdit ? "Update user details and permissions" : "Register a new system user"}
-              </DialogDescription>
-            </div>
-          </div>
-
-          {needsStudentProfile && (
-            <div className="flex items-center gap-2 mt-4 flex-wrap">
-              {STEPS.map(({ n, label }, i, arr) => (
-                <div key={n} className="flex items-center gap-1.5">
-                  <button type="button" onClick={() => setStep(n)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                      step === n ? "bg-white text-[#0f2d5e]" : "bg-white/15 text-white/70 hover:bg-white/25"
-                    }`}>
-                    <span className={`w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
-                      step === n ? "bg-[#0f2d5e] text-white" : "bg-white/25 text-white"
-                    }`}>{n}</span>
-                    {label}
-                  </button>
-                  {i < arr.length - 1 && <ChevronRight className="w-3 h-3 text-white/30" />}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {isEdit && needsStudentProfile && (
-            <p className="text-[11px] text-blue-200/70 mt-2">
-              Click any step above to jump directly to it
-            </p>
-          )}
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="px-6 py-5 space-y-4">
-
-            {/* ── STEP 1 ── */}
-            {step === 1 && (
-              <>
-                <SLabel icon={Mail} text="Credentials" />
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">Email <span className="text-red-500">*</span></Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <Input type="email" value={form.email} onChange={set("email")} required
-                        placeholder="user@organization.edu"
-                        className="pl-9 border-slate-200 focus:border-[#1e4db7] bg-white h-9" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">
-                      Password {!isEdit && <span className="text-red-500">*</span>}
-                    </Label>
-                    <PwdInput value={form.password} onChange={set("password")} required={!isEdit}
-                      hint={isEdit ? "Leave blank to keep current password" : null} />
-                  </div>
-                </div>
-
-                <SLabel icon={Shield} text="Access Control" />
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">Role <span className="text-red-500">*</span></Label>
-                    <Select value={form.user_type_id} onValueChange={resetRole} required>
-                      <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="1">
-                          <div className="flex items-center gap-2"><Shield className="w-3.5 h-3.5 text-[#0f2d5e]" />Admin</div>
-                        </SelectItem>
-                        <SelectItem value="2">
-                          <div className="flex items-center gap-2"><Star className="w-3.5 h-3.5 text-[#1e4db7]" />Officer</div>
-                        </SelectItem>
-                        <SelectItem value="3">
-                          <div className="flex items-center gap-2"><GraduationCap className="w-3.5 h-3.5 text-blue-500" />Student</div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">Status</Label>
-                    <Select value={form.is_active} onValueChange={set("is_active")}>
-                      <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="1"><div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />Active</div></SelectItem>
-                        <SelectItem value="0"><div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />Inactive</div></SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {form.user_type_id === "2" && (
-                  <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
-                    <Star className="w-3.5 h-3.5 text-[#1e4db7] shrink-0 mt-0.5" />
-                    <p className="text-xs text-slate-600">
-                      Officers are students assigned to manage an organization. You'll set their student profile and organization assignment in the next steps.
-                    </p>
-                  </div>
-                )}
-                {form.user_type_id === "3" && (
-                  <div className="flex items-start gap-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
-                    <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                    <p className="text-xs text-slate-600">
-                      Students are regular enrolled users. You'll fill in their student profile in the next step.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* ── STEP 2 ── */}
-            {step === 2 && needsStudentProfile && (
-              <>
-                <SLabel icon={GraduationCap} text="Student Information" />
-
-                {isEdit && (
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-1">
-                    <Pencil className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <p className="text-xs text-slate-600">Fields are pre-filled — only update what needs changing.</p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { f: "first_name",  label: "First Name", ph: "Juan",      req: true  },
-                    { f: "middle_name", label: "Middle",      ph: "Optional",  req: false },
-                    { f: "last_name",   label: "Last Name",  ph: "Dela Cruz", req: true  },
-                  ].map(({ f, label, ph, req }) => (
-                    <div key={f} className="space-y-1">
-                      <Label className="text-slate-700 font-semibold text-xs">
-                        {label} {req && <span className="text-red-500">*</span>}
-                      </Label>
-                      <Input value={form[f]} onChange={set(f)} placeholder={ph} required={req}
-                        className="border-slate-200 focus:border-[#1e4db7] bg-white h-9 text-sm" />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">
-                      Student No. <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      value={form.student_number}
-                      onChange={set("student_number")}
-                      placeholder="2024-00001"
-                      required
-                      className="border-slate-200 focus:border-[#1e4db7] bg-white h-9 font-mono text-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">
-                      Department <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={form.department_id}
-                      onValueChange={(val) => setForm(p => ({ ...p, department_id: val, course: "" }))}
-                      required
-                    >
-                      <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                        <SelectValue placeholder={departments.length === 0 ? "No departments…" : "Select department"} />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl max-h-52">
-                        {departments.map(dept => (
-                          <SelectItem key={dept.id} value={String(dept.id)}>
-                            <div className="flex items-center gap-2">
-                              <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span className="truncate">{dept.name}</span>
-                              {dept.code && <span className="text-slate-400 text-[10px] font-mono shrink-0">{dept.code}</span>}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-slate-700 font-semibold text-xs">
-                    Course / Program <span className="text-red-500">*</span>
-                  </Label>
-                  <Select value={form.course} onValueChange={set("course")} required disabled={!form.department_id}>
-                    <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                      <SelectValue placeholder={!form.department_id ? "Select department first" : "Select course"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl max-h-60">
-                      {availableCourses.map(course => (
-                        <SelectItem key={course} value={course}>
-                          <div className="flex items-start gap-2 py-1">
-                            <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                            <span className="text-xs leading-relaxed">{course}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">
-                      Year Level <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={form.year_level} onValueChange={set("year_level")} required>
-                      <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                        <SelectValue placeholder="Select year" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        {YEAR_LEVELS.map(y => (
-                          <SelectItem key={y} value={y}>
-                            <div className="flex items-center gap-2">
-                              <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              {y}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">Contact Number</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <Input value={form.contact_number} onChange={set("contact_number")}
-                        placeholder="09XX XXX XXXX"
-                        className="pl-9 border-slate-200 bg-white h-9 text-sm" />
-                    </div>
-                  </div>
-                </div>
-
-                {selectedDept && (
-                  <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
-                    <Building2 className="w-3.5 h-3.5 text-[#1e4db7] shrink-0" />
-                    <span className="text-xs text-slate-600">
-                      Department: <strong className="text-[#0f2d5e]">{selectedDept.name}</strong>
-                      {selectedDept.code && <span className="ml-1.5 font-mono text-slate-400">({selectedDept.code})</span>}
-                    </span>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* ── STEP 3 ── */}
-            {step === 3 && isOfficer && (
-              <>
-                <SLabel icon={Users} text="Organization Assignment" />
-
-                {isEdit && (
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-1">
-                    <Pencil className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <p className="text-xs text-slate-600">
-                      {form.organization_id
-                        ? "Current org assignment is pre-filled — update to reassign or promote."
-                        : "No org assigned yet — select one below to assign this officer."}
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <Label className="text-slate-700 font-semibold text-xs">
-                    Organization <span className="text-red-500">*</span>
-                  </Label>
-                  <Select value={form.organization_id} onValueChange={set("organization_id")} required>
-                    <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                      <SelectValue placeholder={
-                        organizations.length === 0 ? "No organizations available" : "Select organization"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl max-h-60">
-                      {organizations.length === 0 ? (
-                        <div className="px-3 py-4 text-center text-xs text-slate-400">
-                          No organizations found. Create one first.
-                        </div>
-                      ) : organizations.map(org => (
-                        <SelectItem key={org.id} value={String(org.id)}>
-                          <div className="flex items-center gap-2">
-                            <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span>{org.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {organizations.length === 0 && (
-                    <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-                      <AlertTriangle className="w-3 h-3" />
-                      Please create an organization before assigning an officer.
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">
-                      Org Role <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={form.org_role} onValueChange={set("org_role")} required>
-                      <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="officer">
-                          <div className="flex items-center gap-2">
-                            <Star className="w-3.5 h-3.5 text-[#1e4db7]" />Officer
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="adviser">
-                          <div className="flex items-center gap-2">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />Adviser
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">Position / Title</Label>
-                    <Input
-                      value={form.position}
-                      onChange={set("position")}
-                      placeholder="e.g. President, Secretary"
-                      className="border-slate-200 focus:border-[#1e4db7] bg-white h-9 text-sm"
-                    />
-                  </div>
-                </div>
-
-                {form.organization_id && (
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 space-y-1.5">
-                    <p className="text-xs font-semibold text-[#0f2d5e]">Assignment Summary</p>
-                    <div className="text-xs text-slate-600 space-y-1">
-                      <p>
-                        <span className="text-slate-400">Organization: </span>
-                        <strong>{organizations.find(o => String(o.id) === form.organization_id)?.name ?? "—"}</strong>
-                      </p>
-                      <p>
-                        <span className="text-slate-400">Role: </span>
-                        <strong className="capitalize">{form.org_role}</strong>
-                        {form.position && <> · <strong>{form.position}</strong></>}
-                      </p>
-                      <p>
-                        <span className="text-slate-400">Name: </span>
-                        <strong>{[form.first_name, form.last_name].filter(Boolean).join(" ") || "—"}</strong>
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 rounded-b-2xl flex items-center justify-between gap-3 sticky bottom-0">
-            <span className="text-xs text-slate-400">
-              {needsStudentProfile
-                ? isEdit
-                  ? `Step ${step} of ${totalSteps} · click steps to jump`
-                  : `Step ${step} of ${totalSteps}`
-                : ""}
-            </span>
-            <div className="flex gap-2">
-              {step > 1 && (
-                <Button type="button" variant="outline" onClick={() => setStep(s => s - 1)}
-                  className="border-slate-200 text-slate-600 hover:bg-slate-100 h-9">
-                  Back
-                </Button>
-              )}
-              {step === 1 && (
-                <Button type="button" variant="outline" onClick={onClose}
-                  className="border-slate-200 text-slate-600 hover:bg-slate-100 h-9">
-                  Cancel
-                </Button>
-              )}
-              {step < totalSteps && (
-                <Button type="button" onClick={() => setStep(s => s + 1)}
-                  className="bg-[#0f2d5e] hover:bg-[#1e4db7] text-white h-9">
-                  Next <ChevronRight className="ml-1 w-4 h-4" />
-                </Button>
-              )}
-              {step === totalSteps && (
-                <Button type="submit" disabled={saving}
-                  className="bg-[#0f2d5e] hover:bg-[#1e4db7] text-white min-w-[130px] h-9">
-                  {saving
-                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
-                    : <><CheckCircle2 className="mr-2 h-4 w-4" />{isEdit ? "Save Changes" : "Create Account"}</>
-                  }
-                </Button>
-              )}
-            </div>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Delete Confirmation ────────────────────────────────────────────────────
+// ── Delete Dialog ──────────────────────────────────────────────────────────
 function DeleteDialog({ open, onClose, onConfirm, userName }) {
   return (
     <AlertDialog open={open} onOpenChange={v => !v && onClose()}>
@@ -674,20 +97,20 @@ function DeleteDialog({ open, onClose, onConfirm, userName }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function UserManagement() {
-  const [users, setUsers]               = useState([]);
-  const [departments, setDepartments]   = useState([]);
+  const [users, setUsers]                 = useState([]);
+  const [departments, setDepartments]     = useState([]);
   const [organizations, setOrganizations] = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [search, setSearch]             = useState("");
-  const [filterRole, setFilterRole]     = useState("all");
-  const [filterYear, setFilterYear]     = useState("all");
-  const [filterDept, setFilterDept]     = useState("all");
-  const [filterCourse, setFilterCourse] = useState("all");
-  const [filterOrg, setFilterOrg]       = useState("all");
-  const [showFilters, setShowFilters]   = useState(false);
-  const [formOpen, setFormOpen]         = useState(false);
-  const [editUser, setEditUser]         = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [loading, setLoading]             = useState(true);
+  const [search, setSearch]               = useState("");
+  const [filterRole, setFilterRole]       = useState("all");
+  const [filterYear, setFilterYear]       = useState("all");
+  const [filterDept, setFilterDept]       = useState("all");
+  const [filterCourse, setFilterCourse]   = useState("all");
+  const [filterOrg, setFilterOrg]         = useState("all");
+  const [showFilters, setShowFilters]     = useState(false);
+  const [formOpen, setFormOpen]           = useState(false);
+  const [editUser, setEditUser]           = useState(null);
+  const [deleteTarget, setDeleteTarget]   = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -739,16 +162,17 @@ export default function UserManagement() {
       || getFullName(u).toLowerCase().includes(q)
       || u.email?.toLowerCase().includes(q)
       || u.student?.student_number?.toLowerCase().includes(q);
-    const matchRole   = filterRole === "all"   || String(u.user_type_id) === filterRole;
-    const matchYear   = filterYear === "all"   || u.student?.year_level === filterYear;
-    const matchDept   = filterDept === "all"   || String(u.student?.department_id) === filterDept;
+    const matchRole   = filterRole === "all" || String(u.user_type_id) === filterRole;
+    const matchYear   = filterYear === "all" || u.student?.year_level === filterYear;
+    const matchDept   = filterDept === "all" || String(u.student?.department_id) === filterDept;
     const matchCourse = filterCourse === "all" || u.student?.course === filterCourse;
-    const matchOrg    = filterOrg === "all";
+    const matchOrg    = filterOrg === "all"
+      || (u.all_memberships ?? []).some(m => String(m.organization_id) === filterOrg);
     return matchSearch && matchRole && matchYear && matchDept && matchCourse && matchOrg;
   });
 
-  const availableYears   = [...new Set(users.map(u => u.student?.year_level).filter(Boolean))].sort();
-  const availableCourses = [...new Set(users.map(u => u.student?.course).filter(Boolean))].sort();
+  const availableYears     = [...new Set(users.map(u => u.student?.year_level).filter(Boolean))].sort();
+  const availableCourses   = [...new Set(users.map(u => u.student?.course).filter(Boolean))].sort();
   const activeFiltersCount = [filterYear, filterDept, filterCourse, filterOrg].filter(f => f !== "all").length;
 
   return (
@@ -785,10 +209,10 @@ export default function UserManagement() {
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatCard icon={Users}         label="Total Accounts" value={total}    sub={`${active} active`}  grad="from-[#0f2d5e] to-[#1a4a8a]" />
-          <StatCard icon={Shield}        label="Admins"         value={admins}   sub="Full access"         grad="from-[#1a3568] to-[#2d5ca8]" />
-          <StatCard icon={Star}          label="Officers"       value={officers} sub="Org managers"        grad="from-[#1e4db7] to-[#3b6fd4]" />
-          <StatCard icon={GraduationCap} label="Students"       value={students} sub="Enrolled accounts"   grad="from-[#2563eb] to-[#5b9ef7]" />
+          <StatCard icon={Users}         label="Total Accounts" value={total}    sub={`${active} active`} grad="from-[#0f2d5e] to-[#1a4a8a]" />
+          <StatCard icon={Shield}        label="Admins"         value={admins}   sub="Full access"        grad="from-[#1a3568] to-[#2d5ca8]" />
+          <StatCard icon={Star}          label="Officers"       value={officers} sub="Org managers"       grad="from-[#1e4db7] to-[#3b6fd4]" />
+          <StatCard icon={GraduationCap} label="Students"       value={students} sub="Enrolled accounts"  grad="from-[#2563eb] to-[#5b9ef7]" />
         </div>
 
         {/* Table card */}
@@ -938,13 +362,11 @@ export default function UserManagement() {
                     </td>
                   </tr>
                 ) : filtered.map(user => {
-                  const rk   = String(user.user_type_id);
-                  const meta = ROLE_META[rk];
-                  const Ico  = meta?.icon ?? UserCircle;
-                  const deptName =
-                    user.student?.department?.name ??
-                    departments.find(d => d.id === user.student?.department_id)?.name ??
-                    null;
+                  const rk             = String(user.user_type_id);
+                  const meta           = ROLE_META[rk];
+                  const Ico            = meta?.icon ?? UserCircle;
+                  const deptName       = user.student?.department?.name ?? departments.find(d => d.id === user.student?.department_id)?.name ?? null;
+                  const allMemberships = user.all_memberships ?? [];
 
                   return (
                     <tr key={user.id} className="hover:bg-blue-50/30 transition-colors group">
@@ -963,6 +385,17 @@ export default function UserManagement() {
                             <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
                               <Mail className="w-3 h-3 shrink-0" />{user.email}
                             </p>
+                            {allMemberships.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {allMemberships.map((m, i) => (
+                                  <span key={i} className="inline-flex items-center gap-0.5 bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-medium px-1.5 py-0.5 rounded-full">
+                                    <Users className="w-2.5 h-2.5" />
+                                    {m.organization?.name ?? "—"}
+                                    {rk === "2" && <span className="text-slate-400 capitalize"> · {m.role}</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
