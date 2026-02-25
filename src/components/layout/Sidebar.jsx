@@ -130,7 +130,7 @@ export default function Sidebar({ onClose }) {
     : {
         name: `${storedUser.student?.first_name ?? ''} ${storedUser.student?.last_name ?? ''}`.trim() || 'Student',
         email:     storedUser.email ?? '',
-        studentId: storedUser.student?.student_id ?? '—',
+        studentId: storedUser.student?.student_number ?? '—',
         role:      isOfficer ? 'Officer' : 'Member',
         yearLevel: storedUser.student?.year_level ?? '—',
       };

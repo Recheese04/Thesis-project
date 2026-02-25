@@ -17,6 +17,7 @@ class Event extends Model
         'description',
         'event_date',
         'event_time',
+        'end_time',
         'location',
         'qr_code',
         'status',
@@ -25,31 +26,25 @@ class Event extends Model
 
     protected $casts = [
         'event_date' => 'date',
-        'event_time' => 'datetime:H:i',
-        'status' => 'string',
+        // ✅ Use 'string' for TIME columns — NOT 'datetime:H:i'
+        // 'datetime:H:i' is for full DATETIME columns and corrupts TIME values on save
+        'event_time' => 'string',
+        'end_time'   => 'string',
+        'status'     => 'string',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────
 
-    /**
-     * Get the organization that owns this event
-     */
     public function organization()
     {
         return $this->belongsTo(Organization::class, 'organization_id');
     }
 
-    /**
-     * Get the user who created this event
-     */
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    /**
-     * Get event attendees (if you have an attendance system)
-     */
     public function attendances()
     {
         return $this->hasMany(EventAttendance::class, 'event_id');
@@ -57,69 +52,67 @@ class Event extends Model
 
     // ── Scopes ─────────────────────────────────────────────────────────────
 
-    /**
-     * Scope to get only upcoming events
-     */
     public function scopeUpcoming($query)
     {
         return $query->where('status', 'upcoming')
                      ->where('event_date', '>=', now()->toDateString());
     }
 
-    /**
-     * Scope to get only ongoing events
-     */
     public function scopeOngoing($query)
     {
         return $query->where('status', 'ongoing');
     }
 
-    /**
-     * Scope to get only completed events
-     */
     public function scopeCompleted($query)
     {
         return $query->where('status', 'completed');
     }
 
-    /**
-     * Scope to get events by organization
-     */
     public function scopeByOrganization($query, $organizationId)
     {
         return $query->where('organization_id', $organizationId);
     }
 
-    /**
-     * Scope to get events in date range
-     */
     public function scopeInDateRange($query, $startDate, $endDate)
     {
         return $query->whereBetween('event_date', [$startDate, $endDate]);
     }
 
-    // ── Accessors & Mutators ───────────────────────────────────────────────
+    // ── Accessors ─────────────────────────────────────────────────────────
 
-    /**
-     * Get formatted event date
-     */
-    public function getFormattedDateAttribute()
+    public function getFormattedDateAttribute(): ?string
     {
         return $this->event_date ? $this->event_date->format('F d, Y') : null;
     }
 
     /**
-     * Get formatted event time
+     * Returns formatted start time e.g. "2:09 PM"
+     * Parses the raw "H:i:s" string from the TIME column manually.
      */
-    public function getFormattedTimeAttribute()
+    public function getFormattedTimeAttribute(): ?string
     {
-        return $this->event_time ? $this->event_time->format('h:i A') : null;
+        if (!$this->event_time) return null;
+        try {
+            return \Carbon\Carbon::createFromFormat('H:i:s', $this->event_time)->format('h:i A');
+        } catch (\Exception $e) {
+            return $this->event_time;
+        }
     }
 
     /**
-     * Check if event is past
+     * Returns formatted end time e.g. "4:00 PM"
      */
-    public function getIsPastAttribute()
+    public function getFormattedEndTimeAttribute(): ?string
+    {
+        if (!$this->end_time) return null;
+        try {
+            return \Carbon\Carbon::createFromFormat('H:i:s', $this->end_time)->format('h:i A');
+        } catch (\Exception $e) {
+            return $this->end_time;
+        }
+    }
+
+    public function getIsPastAttribute(): bool
     {
         return $this->event_date && $this->event_date->isPast();
     }

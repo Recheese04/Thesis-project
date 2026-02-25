@@ -7,8 +7,10 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserTypeController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\OrganizationController;
+use App\Http\Controllers\Api\MemberOrganizationController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\AttendanceController;
+use App\Http\Controllers\Api\EvaluationController;
 use App\Models\Student;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -88,28 +90,65 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/organizations/{id}', [OrganizationController::class, 'update']);
     Route::delete('/organizations/{id}', [OrganizationController::class, 'destroy']);
 
-    // ── Event Management ───────────────────────────────────────────────────
-    // ✅ Static routes BEFORE {id} wildcard
+    // Organization Members
+    Route::get('/organizations/{org_id}/students/search',               [MemberOrganizationController::class, 'searchStudents']);
+    Route::get('/organizations/{org_id}/members',                       [MemberOrganizationController::class, 'index']);
+    Route::post('/organizations/{org_id}/members',                      [MemberOrganizationController::class, 'store']);
+    Route::patch('/organizations/{org_id}/members/{membershipId}/role', [MemberOrganizationController::class, 'updateRole']);
+    Route::delete('/organizations/{org_id}/members/{membershipId}',     [MemberOrganizationController::class, 'destroy']);
+
+    // Event Management
+    // ⚠️ Static routes MUST come before {id} wildcard routes
     Route::get('/events',                  [EventController::class, 'index']);
     Route::post('/events',                 [EventController::class, 'store']);
-    Route::get('/events/upcoming',  [EventController::class, 'upcoming']);  // ← before {id}
+    Route::get('/events/upcoming',         [EventController::class, 'upcoming']);
+    Route::get('/events/debug-time',       [EventController::class, 'debugTime']); // ← TEMP: remove after debugging
+    Route::get('/events/{eventId}/evaluation',         [EvaluationController::class, 'getByEvent']);
+    Route::post('/events/{eventId}/evaluation/submit', [EvaluationController::class, 'submit']);
     Route::get('/events/{id}',             [EventController::class, 'show']);
     Route::put('/events/{id}',             [EventController::class, 'update']);
     Route::delete('/events/{id}',          [EventController::class, 'destroy']);
     Route::get('/events/{id}/qr',          [EventController::class, 'getQRCode']);
 
-    // ── Attendance ─────────────────────────────────────────────────────────
-    // ✅ Static/named routes BEFORE wildcard {id}
-    Route::post('attendance/checkin',          [AttendanceController::class, 'checkIn']);
-    Route::post('attendance/checkout',         [AttendanceController::class, 'checkOut']);
-    Route::get('attendance/my',                [AttendanceController::class, 'getMyAttendance']);
-    Route::get('attendance/status/{eventId}',  [AttendanceController::class, 'getCurrentStatus']);
-    Route::get('attendance/event/{eventId}',   [AttendanceController::class, 'getEventAttendance']);
-    Route::post('attendance/manual-checkin',   [AttendanceController::class, 'manualCheckIn']);
-    Route::post('attendance/manual-checkout',  [AttendanceController::class, 'manualCheckOut']);
+    // Attendance
+    Route::post('attendance/checkin',         [AttendanceController::class, 'checkIn']);
+    Route::post('attendance/checkout',        [AttendanceController::class, 'checkOut']);
+    Route::get('attendance/my',               [AttendanceController::class, 'getMyAttendance']);
+    Route::get('attendance/status/{eventId}', [AttendanceController::class, 'getCurrentStatus']);
+    Route::get('attendance/event/{eventId}',  [AttendanceController::class, 'getEventAttendance']);
+    Route::post('attendance/manual-checkin',  [AttendanceController::class, 'manualCheckIn']);
+    Route::post('attendance/manual-checkout', [AttendanceController::class, 'manualCheckOut']);
     Route::delete('attendance/{id}', function ($id) {
         \App\Models\Attendance::findOrFail($id)->delete();
         return response()->json(['message' => 'Record deleted.']);
+    });
+
+    // Evaluations
+    Route::get('/evaluations',              [EvaluationController::class, 'index']);
+    Route::post('/evaluations',             [EvaluationController::class, 'store']);
+    Route::get('/evaluations/{id}',         [EvaluationController::class, 'show']);
+    Route::put('/evaluations/{id}',         [EvaluationController::class, 'update']);
+    Route::delete('/evaluations/{id}',      [EvaluationController::class, 'destroy']);
+    Route::get('/evaluations/{id}/results', [EvaluationController::class, 'results']);
+
+    // AI Summarize
+    Route::post('/summarize', function (Request $request) {
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('HF_TOKEN'),
+                'Content-Type'  => 'application/json',
+            ])->timeout(30)->post('https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn', [
+                'inputs'     => $request->input('inputs'),
+                'parameters' => [
+                    'max_length' => 180,
+                    'min_length' => 60,
+                    'do_sample'  => false,
+                ],
+            ]);
+            return response()->json($response->json());
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     });
 
 });

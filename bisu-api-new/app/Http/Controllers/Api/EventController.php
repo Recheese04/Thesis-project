@@ -5,16 +5,56 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class EventController extends Controller
 {
+    /**
+     * Auto-update event statuses using raw MySQL NOW() to avoid
+     * any PHP timezone mismatch issues.
+     */
+    private function syncEventStatuses(): void
+    {
+        try {
+            // Step 1: Mark as completed when end_time has passed
+            DB::statement("
+                UPDATE events
+                SET status = 'completed', updated_at = NOW()
+                WHERE status IN ('upcoming', 'ongoing')
+                  AND event_date IS NOT NULL
+                  AND end_time IS NOT NULL
+                  AND CONCAT(event_date, ' ', end_time) <= NOW()
+            ");
+
+            // Step 2: Mark as ongoing when start time passed but not yet ended
+            DB::statement("
+                UPDATE events
+                SET status = 'ongoing', updated_at = NOW()
+                WHERE status = 'upcoming'
+                  AND event_date IS NOT NULL
+                  AND event_time IS NOT NULL
+                  AND CONCAT(event_date, ' ', event_time) <= NOW()
+                  AND (
+                      end_time IS NULL
+                      OR CONCAT(event_date, ' ', end_time) > NOW()
+                  )
+            ");
+
+        } catch (\Exception $e) {
+            Log::error('Event status sync error: ' . $e->getMessage());
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+
     public function index(Request $request)
     {
         try {
-            $user = auth()->user();
+            $this->syncEventStatuses();
 
+            $user  = auth()->user();
             $query = Event::with(['organization.department'])
                 ->orderBy('event_date', 'desc')
                 ->orderBy('event_time', 'desc');
@@ -53,7 +93,6 @@ class EventController extends Controller
             }
 
             $orgId = $user->getOfficerOrganizationId();
-
             if (!$orgId) {
                 return response()->json(['message' => 'You are not an active officer of any organization.'], 403);
             }
@@ -63,6 +102,7 @@ class EventController extends Controller
                 'description' => 'nullable|string',
                 'event_date'  => 'required|date',
                 'event_time'  => 'nullable|date_format:H:i',
+                'end_time'    => 'nullable|date_format:H:i|after:event_time',
                 'location'    => 'nullable|string|max:255',
                 'status'      => 'nullable|in:upcoming,ongoing,completed,cancelled',
             ]);
@@ -105,6 +145,7 @@ class EventController extends Controller
                 'description' => 'nullable|string',
                 'event_date'  => 'required|date',
                 'event_time'  => 'nullable|date_format:H:i',
+                'end_time'    => 'nullable|date_format:H:i|after:event_time',
                 'location'    => 'nullable|string|max:255',
                 'status'      => 'nullable|in:upcoming,ongoing,completed,cancelled',
             ]);
@@ -138,7 +179,6 @@ class EventController extends Controller
             }
 
             $event->delete();
-
             return response()->json(['message' => 'Event deleted successfully.']);
         } catch (\Exception $e) {
             Log::error('Event delete error: ' . $e->getMessage());
@@ -159,8 +199,9 @@ class EventController extends Controller
     public function upcoming()
     {
         try {
-            $user = auth()->user();
+            $this->syncEventStatuses();
 
+            $user  = auth()->user();
             $query = Event::with(['organization.department'])
                 ->where('status', 'ongoing')
                 ->orderBy('event_date', 'asc')
@@ -179,4 +220,6 @@ class EventController extends Controller
             return response()->json(['message' => 'Error fetching upcoming events'], 500);
         }
     }
+
+   
 }

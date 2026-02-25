@@ -14,6 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         // Register CORS middleware globally
         $middleware->append(\App\Http\Middleware\Cors::class);
+
+        // ✅ FIX: Return JSON 401 instead of crashing with "Route [login] not defined"
+        $middleware->redirectGuestsTo(fn() => response()->json(['message' => 'Unauthenticated.'], 401));
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
