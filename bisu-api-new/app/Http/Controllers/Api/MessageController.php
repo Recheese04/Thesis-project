@@ -15,12 +15,27 @@ class MessageController extends Controller
 {
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private function resolveOrgId(): ?int
-    {
-        $user = Auth::user();
-        return $user->getOfficerOrganizationId()
-            ?? (request()->integer('organization_id') ?: null);
+   private function resolveOrgId(): ?int
+{
+    $user = Auth::user();
+
+    if ($id = $user->getOfficerOrganizationId()) {
+        return $id;
     }
+
+    if ($id = request()->integer('organization_id') ?: null) {
+        return $id;
+    }
+
+    if ($user->student_id) {
+        $membership = MemberOrganization::where('student_id', $user->student_id)
+            ->where('status', 'active')
+            ->first();
+        return $membership?->organization_id;
+    }
+
+    return null;
+}
 
     private function fmt(Message $m): array
     {

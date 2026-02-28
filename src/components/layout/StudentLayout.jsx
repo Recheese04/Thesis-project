@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Menu } from 'lucide-react';
 
 export default function StudentLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  // Messages page needs zero padding and no scroll wrapper
+  const isMessages = location.pathname.includes('/messages');
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -16,7 +20,7 @@ export default function StudentLayout() {
         />
       )}
 
-      {/* Sidebar — fixed drawer on mobile, static on desktop */}
+      {/* Sidebar */}
       <div
         className={`
           fixed inset-y-0 left-0 z-40 lg:static lg:z-auto
@@ -29,6 +33,7 @@ export default function StudentLayout() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+
         {/* Mobile top bar */}
         <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
           <button
@@ -45,11 +50,20 @@ export default function StudentLayout() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-[1400px] mx-auto p-4 sm:p-6">
+        {/* Page area */}
+        {isMessages ? (
+          // Messages: full height, no padding, no scroll
+          <div className="flex-1 min-h-0 overflow-hidden">
             <Outlet />
           </div>
-        </div>
+        ) : (
+          // All other pages: padded, scrollable
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-[1400px] mx-auto p-4 sm:p-6">
+              <Outlet />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
