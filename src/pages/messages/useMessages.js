@@ -21,14 +21,13 @@ export const getCurrentUser = () => {
 const chatKey = (chat) => chat?.type === 'pm' ? `pm-${chat.userId}` : 'group';
 
 export default function useMessages() {
-  const [chats, setChats]     = useState({}); // { 'group': [...], 'pm-3': [...] }
+  const [chats, setChats] = useState({}); // { 'group': [...], 'pm-3': [...] }
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [error, setError]     = useState(null);
-  const lastIds               = useRef({});  // { 'group': 5, 'pm-3': 12 }
-  const pollRef               = useRef(null);
-  const activeChat            = useRef(null);
+  const [error, setError] = useState(null);
+  const lastIds = useRef({});  // { 'group': 5, 'pm-3': 12 }
+  const activeChat = useRef(null);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -61,8 +60,10 @@ export default function useMessages() {
 
   const pollActive = useCallback(async () => {
     const chat = activeChat.current;
-    if (!chat && chat !== null) return;  // nothing selected yet
-    const key    = chatKey(chat);
+    // FIX: 'undefined' guard was broken (!chat && chat !== null is always false when chat=null)
+    // activeChat.current is always null (group) or a chat object — never undefined
+    // so we just proceed; null = group chat, object = PM
+    const key = chatKey(chat);
     const lastId = lastIds.current[key] ?? 0;
     try {
       const params = chat?.type === 'pm'
@@ -87,12 +88,12 @@ export default function useMessages() {
     setSending(true);
     setError(null);
     try {
-      const key  = chatKey(chat);
+      const key = chatKey(chat);
       const form = new FormData();
       if (text?.trim()) form.append('message', text.trim());
-      if (imageFile)    form.append('image',   imageFile);
+      if (imageFile) form.append('image', imageFile);
       if (chat?.type === 'pm') {
-        form.append('type',        'pm');
+        form.append('type', 'pm');
         form.append('receiver_id', String(chat.userId));
       } else {
         form.append('type', 'group');
@@ -119,10 +120,15 @@ export default function useMessages() {
     loadChat(null);
   }, []);
 
+  // FIX: Use a stable ref so the interval is never recreated when pollActive
+  // gets a new reference (which happened on every fetchMembers re-render cycle).
+  const pollActiveRef = useRef(pollActive);
+  useEffect(() => { pollActiveRef.current = pollActive; }, [pollActive]);
+
   useEffect(() => {
-    pollRef.current = setInterval(pollActive, 4000);
-    return () => clearInterval(pollRef.current);
-  }, [pollActive]);
+    const id = setInterval(() => pollActiveRef.current(), 4000);
+    return () => clearInterval(id);
+  }, []); // runs once — no dependency churn
 
   const getMessages = (chat) => chats[chatKey(chat)] ?? [];
 
