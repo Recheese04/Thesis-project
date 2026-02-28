@@ -61,7 +61,6 @@ class EvaluationController extends Controller
     /**
      * POST /evaluations
      * Officer creates an evaluation form for an event
-     * Body: { event_id, title, description, is_anonymous, questions: [{ question_text, question_type, is_required, order_index, options: [] }] }
      */
     public function store(Request $request)
     {
@@ -92,13 +91,11 @@ class EvaluationController extends Controller
                 'questions.*.options.*.order_index' => 'nullable|integer',
             ]);
 
-            // Make sure the event belongs to the officer's org
             $event = Event::findOrFail($data['event_id']);
             if ($event->organization_id !== $orgId) {
                 return response()->json(['message' => 'This event does not belong to your organization.'], 403);
             }
 
-            // Only one evaluation per event
             $exists = EventEvaluation::where('event_id', $data['event_id'])->exists();
             if ($exists) {
                 return response()->json(['message' => 'An evaluation for this event already exists.'], 422);
@@ -156,7 +153,6 @@ class EvaluationController extends Controller
     /**
      * PUT /evaluations/{id}
      * Update evaluation status (open/closed) and basic info
-     * Body: { title, description, is_anonymous, status }
      */
     public function update(Request $request, $id)
     {
@@ -196,7 +192,6 @@ class EvaluationController extends Controller
 
     /**
      * DELETE /evaluations/{id}
-     * Delete an evaluation (cascades to questions, options, responses, answers)
      */
     public function destroy($id)
     {
@@ -220,23 +215,57 @@ class EvaluationController extends Controller
         }
     }
 
+    // ── Officer: Get events for evaluation management ───────────────────────
+
+    /**
+     * GET /officer/events
+     * Returns events for the authenticated officer's organization with evaluation status
+     */
+    public function officerEvents(Request $request)
+    {
+        try {
+            $user  = auth()->user();
+            $orgId = $user->getOfficerOrganizationId();
+
+            if (!$orgId) {
+                return response()->json(['message' => 'You are not an active officer of any organization.'], 403);
+            }
+
+            $events = Event::where('organization_id', $orgId)
+                ->with(['evaluation:id,event_id,status'])
+                ->orderBy('event_date', 'desc')
+                ->get()
+                ->map(fn($event) => [
+                    'id'                => $event->id,
+                    'title'             => $event->title,
+                    'event_date'        => $event->event_date?->format('M d, Y'),
+                    'evaluation_status' => $event->evaluation?->status ?? null,
+                ]);
+
+            return response()->json(['events' => $events]);
+
+        } catch (\Exception $e) {
+            Log::error('Officer events error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error fetching events', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     // ── Student: Submit Evaluation ─────────────────────────────────────────
 
     /**
      * GET /events/{eventId}/evaluation
-     * Student gets the evaluation form for an event
+     * Gets the evaluation form for an event (officer sees all statuses, student sees open only via submit guard)
      */
     public function getByEvent($eventId)
     {
         try {
+            // No status filter here — officers need to see closed evaluations too
             $evaluation = EventEvaluation::with(['questions.options'])
                 ->where('event_id', $eventId)
-                ->where('status', 'open')
                 ->firstOrFail();
 
-            // Check if student already submitted
             $user      = auth()->user();
-            $studentId = $user->student_id;
+            $studentId = $user->student_id ?? null;
             $submitted = false;
 
             if ($studentId) {
@@ -250,14 +279,79 @@ class EvaluationController extends Controller
                 'submitted'  => $submitted,
             ]);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'No open evaluation found for this event'], 404);
+            return response()->json(['message' => 'No evaluation found for this event'], 404);
+        }
+    }
+
+    /**
+     * POST /evaluations/{id}/responses
+     * Student submits answers directly against the evaluation ID
+     */
+    public function submitResponse(Request $request, $id)
+    {
+        try {
+            $user = auth()->user();
+
+            $evaluation = EventEvaluation::where('id', $id)
+                ->where('status', 'open')
+                ->firstOrFail();
+
+            $studentId = $evaluation->is_anonymous ? null : ($user->student_id ?? null);
+
+            if ($studentId) {
+                $alreadySubmitted = EvaluationResponse::where('evaluation_id', $evaluation->id)
+                    ->where('student_id', $studentId)
+                    ->exists();
+
+                if ($alreadySubmitted) {
+                    return response()->json(['message' => 'You have already submitted an evaluation for this event.'], 422);
+                }
+            }
+
+            $data = $request->validate([
+                'answers'                => 'required|array|min:1',
+                'answers.*.question_id'  => 'required|exists:evaluation_questions,id',
+                'answers.*.rating_value' => 'nullable|integer|min:1|max:5',
+                'answers.*.text_value'   => 'nullable|string',
+                'answers.*.option_id'    => 'nullable|exists:evaluation_question_options,id',
+                'answers.*.yes_no_value' => 'nullable|boolean',
+            ]);
+
+            DB::beginTransaction();
+
+            $response = EvaluationResponse::create([
+                'evaluation_id' => $evaluation->id,
+                'student_id'    => $studentId,
+                'submitted_at'  => now(),
+            ]);
+
+            foreach ($data['answers'] as $answer) {
+                EvaluationAnswer::create([
+                    'response_id'  => $response->id,
+                    'question_id'  => $answer['question_id'],
+                    'rating_value' => $answer['rating_value'] ?? null,
+                    'text_value'   => $answer['text_value'] ?? null,
+                    'option_id'    => $answer['option_id'] ?? null,
+                    'yes_no_value' => $answer['yes_no_value'] ?? null,
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json(['message' => 'Evaluation submitted successfully. Thank you!'], 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation error', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Evaluation submitResponse error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error submitting evaluation', 'error' => $e->getMessage()], 500);
         }
     }
 
     /**
      * POST /events/{eventId}/evaluation/submit
-     * Student submits their evaluation answers
-     * Body: { answers: [{ question_id, rating_value, text_value, option_id, yes_no_value }] }
+     * Legacy submit route — kept for backward compatibility
      */
     public function submit(Request $request, $eventId)
     {
@@ -268,9 +362,8 @@ class EvaluationController extends Controller
                 ->where('status', 'open')
                 ->firstOrFail();
 
-            $studentId = $evaluation->is_anonymous ? null : $user->student_id;
+            $studentId = $evaluation->is_anonymous ? null : ($user->student_id ?? null);
 
-            // Check if already submitted (non-anonymous)
             if ($studentId) {
                 $alreadySubmitted = EvaluationResponse::where('evaluation_id', $evaluation->id)
                     ->where('student_id', $studentId)
@@ -322,11 +415,78 @@ class EvaluationController extends Controller
         }
     }
 
+    /**
+     * POST /evaluations/{id}/questions
+     * Add questions to an existing evaluation
+     */
+    public function addQuestions(Request $request, $id)
+    {
+        try {
+            $user       = auth()->user();
+            $evaluation = EventEvaluation::with('questions')->findOrFail($id);
+
+            if (!$user->isAdmin()) {
+                $orgId = $user->getOfficerOrganizationId();
+                if (!$orgId || $evaluation->event->organization_id !== $orgId) {
+                    return response()->json(['message' => 'Unauthorized'], 403);
+                }
+            }
+
+            $data = $request->validate([
+                'questions'                         => 'required|array|min:1',
+                'questions.*.question_text'         => 'required|string',
+                'questions.*.question_type'         => 'required|in:rating,text,multiple_choice,yes_no',
+                'questions.*.is_required'           => 'nullable|boolean',
+                'questions.*.order_index'           => 'nullable|integer',
+                'questions.*.options'               => 'nullable|array',
+                'questions.*.options.*.option_text' => 'required_if:questions.*.question_type,multiple_choice|string|max:255',
+                'questions.*.options.*.order_index' => 'nullable|integer',
+            ]);
+
+            DB::beginTransaction();
+
+            foreach ($data['questions'] as $index => $q) {
+                $question = EvaluationQuestion::create([
+                    'evaluation_id' => $evaluation->id,
+                    'question_text' => $q['question_text'],
+                    'question_type' => $q['question_type'],
+                    'is_required'   => $q['is_required'] ?? true,
+                    'order_index'   => $q['order_index'] ?? $index,
+                ]);
+
+                if ($q['question_type'] === 'multiple_choice' && !empty($q['options'])) {
+                    foreach ($q['options'] as $optIndex => $opt) {
+                        EvaluationQuestionOption::create([
+                            'question_id' => $question->id,
+                            'option_text' => $opt['option_text'],
+                            'order_index' => $opt['order_index'] ?? $optIndex,
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
+
+            $evaluation->load(['event.organization', 'questions.options']);
+
+            return response()->json([
+                'message'    => 'Questions added successfully!',
+                'evaluation' => $evaluation,
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation error', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Add questions error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error adding questions', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     // ── Officer/Admin: View Results ────────────────────────────────────────
 
     /**
      * GET /evaluations/{id}/results
-     * Get evaluation results with average ratings and all text responses
      */
     public function results($id)
     {
@@ -391,6 +551,52 @@ class EvaluationController extends Controller
         } catch (\Exception $e) {
             Log::error('Evaluation results error: ' . $e->getMessage());
             return response()->json(['message' => 'Error fetching results', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // ── Student: List Evaluations ──────────────────────────────────────────
+
+    /**
+     * GET /student/evaluations
+     * Returns all evaluations visible to the student, with has_responded flag
+     */
+    public function studentEvaluations(Request $request)
+    {
+        try {
+            $user      = auth()->user();
+            $studentId = $user->student_id ?? null;
+
+            $evaluations = EventEvaluation::with(['event:id,title', 'questions:id,evaluation_id'])
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($evaluation) use ($studentId) {
+                    $hasResponded = false;
+                    if ($studentId) {
+                        $hasResponded = EvaluationResponse::where('evaluation_id', $evaluation->id)
+                            ->where('student_id', $studentId)
+                            ->exists();
+                    }
+
+                    return [
+                        'id'              => $evaluation->id,
+                        'title'           => $evaluation->title,
+                        'description'     => $evaluation->description,
+                        'status'          => $evaluation->status,
+                        'is_anonymous'    => $evaluation->is_anonymous,
+                        'questions_count' => $evaluation->questions->count(),
+                        'has_responded'   => $hasResponded,
+                        'event'           => $evaluation->event ? [
+                            'id'    => $evaluation->event->id,
+                            'title' => $evaluation->event->title,
+                        ] : null,
+                    ];
+                });
+
+            return response()->json(['evaluations' => $evaluations]);
+
+        } catch (\Exception $e) {
+            Log::error('Student evaluations error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error fetching evaluations', 'error' => $e->getMessage()], 500);
         }
     }
 }
