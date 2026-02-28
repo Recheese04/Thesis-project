@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Briefcase, Calendar,
   FileText, MessageSquare, ClipboardList, Settings, LogOut,
   ChevronRight, User, Shield, TrendingUp, QrCode, CheckCircle,
-  Bell, Award, X,
+  Bell, Award, X, ClipboardCheck,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -51,9 +51,10 @@ const officerMenuSections = [
   {
     label: 'Organization',
     items: [
-      { icon: Users,         label: 'Members',    path: '/officer/members',    badge: null },
-      { icon: Calendar,      label: 'Events',     path: '/officer/events',     badge: null },
-      { icon: ClipboardList, label: 'Attendance', path: '/officer/attendance', badge: null },
+      { icon: Users,          label: 'Members',     path: '/officer/members',     badge: null },
+      { icon: Calendar,       label: 'Events',      path: '/officer/events',      badge: null },
+      { icon: ClipboardList,  label: 'Attendance',  path: '/officer/attendance',  badge: null },
+      { icon: ClipboardCheck, label: 'Evaluations', path: '/officer/evaluations', badge: null }, // ← CREATE & MANAGE
     ],
   },
   {
@@ -88,9 +89,10 @@ const studentMenuSections = [
   {
     label: 'My Activities',
     items: [
-      { icon: Calendar,      label: 'Events',          path: '/student/events',     badge: null },
-      { icon: ClipboardList, label: 'My Attendance',   path: '/student/attendance', badge: null },
-      { icon: CheckCircle,   label: 'Clearance Status',path: '/student/clearance',  badge: null },
+      { icon: Calendar,       label: 'Events',           path: '/student/events',      badge: null },
+      { icon: ClipboardList,  label: 'My Attendance',    path: '/student/attendance',  badge: null },
+      { icon: CheckCircle,    label: 'Clearance Status', path: '/student/clearance',   badge: null },
+      { icon: ClipboardCheck, label: 'Evaluations',      path: '/student/evaluations', badge: null }, // ← ANSWER
     ],
   },
   {

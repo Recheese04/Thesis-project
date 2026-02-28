@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/auth/LoginPage';
 import LandingPage from './pages/LandingPage';
 
-// Admin Components
+// Admin
 import AdminLayout from './components/layout/AdminLayout';
 import Dashboard from './pages/dashboards/admin/Dashboard';
 import UserManagement from './pages/dashboards/admin/UserManagement';
@@ -12,7 +12,7 @@ import EventManagement from './pages/dashboards/admin/EventManagement';
 import Settings from './pages/dashboards/admin/Settings';
 import AttendanceManagement from './pages/dashboards/admin/AttendanceManagement';
 
-// Student Components
+// Student
 import StudentLayout from './components/layout/StudentLayout';
 import StudentDashboard from './pages/dashboards/student/StudentDashboard';
 import StudentCheckIn from './pages/dashboards/student/StudentCheckin';
@@ -23,8 +23,9 @@ import StudentAnnouncements from './pages/dashboards/student/StudentAnnouncement
 import StudentMessages from './pages/dashboards/student/StudentMessages';
 import StudentDocuments from './pages/dashboards/student/StudentDocuments';
 import StudentObligations from './pages/dashboards/student/StudentObligations';
+import StudentEvaluations from './pages/dashboards/student/StudentEvaluations'; // ← NEW
 
-// Officer Components
+// Officer
 import OfficerLayout from './components/layout/OfficerLayout';
 import OfficerDashboard from './pages/dashboards/officer/OfficerDashboard';
 import OfficerMembers from './pages/dashboards/officer/OfficerMembers';
@@ -33,41 +34,32 @@ import OfficerAttendance from './pages/dashboards/officer/OfficerAttendance';
 import OfficerTasks from './pages/dashboards/officer/OfficerTasks';
 import OfficerAnnouncements from './pages/dashboards/officer/OfficerAnnouncements';
 import OfficerMessages from './pages/dashboards/officer/OfficerMessages';
+import OfficerEvaluations from './pages/dashboards/officer/OfficerEvaluations'; // ← NEW
 
-// Get user role from localStorage
 function getUserRole() {
-  const role = localStorage.getItem('user_role');
-  return role || null;
+  return localStorage.getItem('user_role') || null;
 }
 
-// Protected Route — redirects to /login if no token
 function ProtectedRoute({ children, allowedRoles = [] }) {
-  const token = localStorage.getItem('token');
+  const token    = localStorage.getItem('token');
   const userRole = getUserRole();
-
   if (!token) return <Navigate to="/login" replace />;
-
   if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-    // Redirect based on role
-    if (userRole === 'admin') return <Navigate to="/admin/dashboard" replace />;
+    if (userRole === 'admin')   return <Navigate to="/admin/dashboard"   replace />;
     if (userRole === 'officer') return <Navigate to="/officer/dashboard" replace />;
     return <Navigate to="/student/dashboard" replace />;
   }
-
   return children;
 }
 
-// Public Route — if already logged in, skip login/landing and go to dashboard
 function PublicRoute({ children }) {
-  const token = localStorage.getItem('token');
+  const token    = localStorage.getItem('token');
   const userRole = getUserRole();
-
   if (token) {
-    if (userRole === 'admin') return <Navigate to="/admin/dashboard" replace />;
+    if (userRole === 'admin')   return <Navigate to="/admin/dashboard"   replace />;
     if (userRole === 'officer') return <Navigate to="/officer/dashboard" replace />;
     return <Navigate to="/student/dashboard" replace />;
   }
-
   return children;
 }
 
@@ -75,99 +67,68 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* ── Landing Page ────────────────────────────────────────────── */}
-        <Route
-          path="/"
-          element={
-            <PublicRoute>
-              <LandingPage />
-            </PublicRoute>
-          }
-        />
 
-        {/* ── Login ───────────────────────────────────────────────────── */}
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          }
-        />
+        {/* ── Landing ── */}
+        <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
 
-        {/* ── Admin Routes ────────────────────────────────────────────── */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
+        {/* ── Login ── */}
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+
+        {/* ── Admin ── */}
+        <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="departments" element={<DepartmentManagement />} />
+          <Route path="dashboard"     element={<Dashboard />} />
+          <Route path="users"         element={<UserManagement />} />
+          <Route path="departments"   element={<DepartmentManagement />} />
           <Route path="organizations" element={<OrganizationManagement />} />
-          <Route path="events" element={<EventManagement />} />
-          <Route path="attendance" element={<AttendanceManagement />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="events"        element={<EventManagement />} />
+          <Route path="attendance"    element={<AttendanceManagement />} />
+          <Route path="settings"      element={<Settings />} />
         </Route>
 
-        {/* ── Officer Routes ──────────────────────────────────────────── */}
-       // ── Officer Routes ──────────────────────────────────────────────────────
-<Route
-  path="/officer"
-  element={
-    <ProtectedRoute allowedRoles={['officer']}>
-      <OfficerLayout />
-    </ProtectedRoute>
-  }
->
-  <Route index element={<Navigate to="/officer/dashboard" replace />} />
-  <Route path="dashboard" element={<OfficerDashboard />} />
-  <Route path="members" element={<OfficerMembers />} />
-  <Route path="events" element={<OfficerEvents />} />
-  <Route path="attendance" element={<OfficerAttendance />} />
-  <Route path="tasks" element={<OfficerTasks />} />
-  <Route path="announcements" element={<OfficerAnnouncements />} />
-  <Route path="messages" element={<OfficerMessages />} />
+        {/* ── Officer ── */}
+        <Route path="/officer" element={<ProtectedRoute allowedRoles={['officer']}><OfficerLayout /></ProtectedRoute>}>
+          <Route index element={<Navigate to="/officer/dashboard" replace />} />
+          <Route path="dashboard"     element={<OfficerDashboard />} />
+          <Route path="members"       element={<OfficerMembers />} />
+          <Route path="events"        element={<OfficerEvents />} />
+          <Route path="attendance"    element={<OfficerAttendance />} />
+          <Route path="tasks"         element={<OfficerTasks />} />
+          <Route path="announcements" element={<OfficerAnnouncements />} />
+          <Route path="messages"      element={<OfficerMessages />} />
+          {/* Officer creates/manages evaluations */}
+          <Route path="evaluations"   element={<OfficerEvaluations />} />
+          {/* Merged student routes for officers */}
+          <Route path="checkin"       element={<StudentCheckIn />} />
+          <Route path="my-events"     element={<StudentEvents />} />
+          <Route path="my-attendance" element={<StudentAttendance />} />
+          <Route path="clearance"     element={<StudentClearance />} />
+          <Route path="documents"     element={<StudentDocuments />} />
+          <Route path="obligations"   element={<StudentObligations />} />
+        </Route>
 
-  {/* ── Merged student routes for officers ── */}
-  <Route path="checkin" element={<StudentCheckIn />} />
-  <Route path="my-events" element={<StudentEvents />} />
-  <Route path="my-attendance" element={<StudentAttendance />} />
-  <Route path="clearance" element={<StudentClearance />} />
-  <Route path="documents" element={<StudentDocuments />} />
-  <Route path="obligations" element={<StudentObligations />} />
-</Route>
-
-        {/* ── Student/Member Routes ───────────────────────────────────── */}
-        <Route
-          path="/student"
-          element={
-            <ProtectedRoute allowedRoles={['student', 'member', 'officer']}>
-              <StudentLayout />
-            </ProtectedRoute>
-          }
-        >
+        {/* ── Student / Member ── */}
+        <Route path="/student" element={<ProtectedRoute allowedRoles={['student', 'member', 'officer']}><StudentLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/student/dashboard" replace />} />
-          <Route path="dashboard" element={<StudentDashboard />} />
-          <Route path="checkin" element={<StudentCheckIn />} />
-          <Route path="events" element={<StudentEvents />} />
-          <Route path="attendance" element={<StudentAttendance />} />
-          <Route path="clearance" element={<StudentClearance />} />
+          <Route path="dashboard"     element={<StudentDashboard />} />
+          <Route path="checkin"       element={<StudentCheckIn />} />
+          <Route path="events"        element={<StudentEvents />} />
+          <Route path="attendance"    element={<StudentAttendance />} />
+          <Route path="clearance"     element={<StudentClearance />} />
           <Route path="announcements" element={<StudentAnnouncements />} />
-          <Route path="messages" element={<StudentMessages />} />
-          <Route path="documents" element={<StudentDocuments />} />
-          <Route path="obligations" element={<StudentObligations />} />
+          <Route path="messages"      element={<StudentMessages />} />
+          <Route path="documents"     element={<StudentDocuments />} />
+          <Route path="obligations"   element={<StudentObligations />} />
+          {/* Students answer evaluations */}
+          <Route path="evaluations"   element={<StudentEvaluations />} />
         </Route>
 
-        {/* ── 404 fallback ────────────────────────────────────────────── */}
+        {/* ── 404 ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
+
       </Routes>
     </Router>
   );
-} 
+}
 
 export default App;
