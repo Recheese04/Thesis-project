@@ -26,8 +26,6 @@ class Event extends Model
 
     protected $casts = [
         'event_date' => 'date',
-        // ✅ Use 'string' for TIME columns — NOT 'datetime:H:i'
-        // 'datetime:H:i' is for full DATETIME columns and corrupts TIME values on save
         'event_time' => 'string',
         'end_time'   => 'string',
         'status'     => 'string',
@@ -48,6 +46,11 @@ class Event extends Model
     public function attendances()
     {
         return $this->hasMany(EventAttendance::class, 'event_id');
+    }
+
+    public function evaluation()
+    {
+        return $this->hasOne(EventEvaluation::class, 'event_id');
     }
 
     // ── Scopes ─────────────────────────────────────────────────────────────
@@ -78,17 +81,13 @@ class Event extends Model
         return $query->whereBetween('event_date', [$startDate, $endDate]);
     }
 
-    // ── Accessors ─────────────────────────────────────────────────────────
+    // ── Accessors ──────────────────────────────────────────────────────────
 
     public function getFormattedDateAttribute(): ?string
     {
         return $this->event_date ? $this->event_date->format('F d, Y') : null;
     }
 
-    /**
-     * Returns formatted start time e.g. "2:09 PM"
-     * Parses the raw "H:i:s" string from the TIME column manually.
-     */
     public function getFormattedTimeAttribute(): ?string
     {
         if (!$this->event_time) return null;
@@ -99,9 +98,6 @@ class Event extends Model
         }
     }
 
-    /**
-     * Returns formatted end time e.g. "4:00 PM"
-     */
     public function getFormattedEndTimeAttribute(): ?string
     {
         if (!$this->end_time) return null;
