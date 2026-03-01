@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Briefcase, Calendar,
   FileText, MessageSquare, ClipboardList, Settings, LogOut,
   ChevronRight, User, Shield, TrendingUp, QrCode, CheckCircle,
-  Bell, Award, X, ClipboardCheck,
+  Bell, Award, X, ClipboardCheck, AlertTriangle, Wallet, BookOpen, Eye,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -25,88 +25,131 @@ const adminMenuSections = [
   {
     label: 'Management',
     items: [
-      { icon: Users,      label: 'Users',         path: '/admin/users',         badge: null },
-      { icon: Building2,  label: 'Departments',   path: '/admin/departments',   badge: null },
-      { icon: Briefcase,  label: 'Organizations', path: '/admin/organizations', badge: null },
-      { icon: Calendar,   label: 'Events',        path: '/admin/events',        badge: 'New' },
+      { icon: Users, label: 'Users', path: '/admin/users', badge: null },
+      { icon: Building2, label: 'Departments', path: '/admin/departments', badge: null },
+      { icon: Briefcase, label: 'Organizations', path: '/admin/organizations', badge: null },
+      { icon: Calendar, label: 'Events', path: '/admin/events', badge: 'New' },
     ],
   },
   {
     label: 'Operations',
     items: [
       { icon: ClipboardList, label: 'Attendance', path: '/admin/attendance', badge: null },
-      { icon: FileText,      label: 'Documents',  path: '/admin/documents',  badge: null },
-      { icon: MessageSquare, label: 'Messages',   path: '/admin/messages',   badge: null },
+      { icon: FileText, label: 'Documents', path: '/admin/documents', badge: null },
+      { icon: MessageSquare, label: 'Messages', path: '/admin/messages', badge: null },
     ],
   },
 ];
 
-const officerMenuSections = [
+// Position-based visibility: empty positions array = visible to all officers
+// President / Vice President see everything; others see role-specific items
+const ALL_POSITIONS = [];  // empty = everyone
+const LEADERSHIP = ['President', 'Vice President'];
+const ADMIN_ROLES = ['President', 'Vice President', 'Secretary'];
+const FINANCE = ['President', 'Vice President', 'Treasurer', 'Auditor'];
+
+const officerMenuBase = [
   {
     label: 'Overview',
     items: [
-      { icon: LayoutDashboard, label: 'Dashboard', path: '/officer/dashboard', badge: null },
+      { icon: LayoutDashboard, label: 'Dashboard', path: '/officer/dashboard', badge: null, positions: ALL_POSITIONS },
+      { icon: Eye, label: 'Adviser Overview', path: '/officer/adviser-overview', badge: null, positions: ['__adviser__'] },
     ],
   },
   {
     label: 'Organization',
     items: [
-      { icon: Users,          label: 'Members',     path: '/officer/members',     badge: null },
-      { icon: Calendar,       label: 'Events',      path: '/officer/events',      badge: null },
-      { icon: ClipboardList,  label: 'Attendance',  path: '/officer/attendance',  badge: null },
-      { icon: ClipboardCheck, label: 'Evaluations', path: '/officer/evaluations', badge: null }, // ← CREATE & MANAGE
+      { icon: Users, label: 'Members', path: '/officer/members', badge: null, positions: LEADERSHIP },
+      { icon: Calendar, label: 'Events', path: '/officer/events', badge: null, positions: ALL_POSITIONS },
+      { icon: ClipboardList, label: 'Attendance', path: '/officer/attendance', badge: null, positions: [...LEADERSHIP, 'Secretary', 'Auditor'] },
+      { icon: ClipboardCheck, label: 'Evaluations', path: '/officer/evaluations', badge: null, positions: [...ADMIN_ROLES, 'Auditor'] },
+    ],
+  },
+  {
+    label: 'Treasury',
+    items: [
+      { icon: Wallet, label: 'Finance', path: '/officer/finance', badge: null, positions: [...FINANCE] },
+      { icon: CheckCircle, label: 'Manage Clearance', path: '/officer/clearance', badge: null, positions: [...FINANCE, 'Secretary'] },
+    ],
+  },
+  {
+    label: 'Secretary',
+    items: [
+      { icon: BookOpen, label: 'Meeting Minutes', path: '/officer/minutes', badge: null, positions: [...ADMIN_ROLES] },
     ],
   },
   {
     label: 'Communication',
     items: [
-      { icon: Bell,          label: 'Announcements', path: '/officer/announcements', badge: null },
-      { icon: MessageSquare, label: 'Messages',      path: '/officer/messages',      badge: '2' },
-      { icon: Award,         label: 'Tasks',         path: '/officer/tasks',         badge: '5' },
+      { icon: Bell, label: 'Announcements', path: '/officer/announcements', badge: null, positions: ALL_POSITIONS },
+      { icon: MessageSquare, label: 'Messages', path: '/officer/messages', badge: '2', positions: ALL_POSITIONS },
+      { icon: Award, label: 'Tasks', path: '/officer/tasks', badge: '5', positions: ALL_POSITIONS },
+    ],
+  },
+  {
+    label: 'Compliance',
+    items: [
+      { icon: AlertTriangle, label: 'Consequence Rules', path: '/officer/consequence-rules', badge: null, positions: LEADERSHIP },
     ],
   },
   {
     label: 'My Student',
     items: [
-      { icon: QrCode,        label: 'Check In',      path: '/officer/checkin',       badge: 'Scan' },
-      { icon: Calendar,      label: 'My Events',     path: '/officer/my-events',     badge: null },
-      { icon: ClipboardList, label: 'My Attendance', path: '/officer/my-attendance', badge: null },
-      { icon: CheckCircle,   label: 'Clearance',     path: '/officer/clearance',     badge: null },
-      { icon: FileText,      label: 'Documents',     path: '/officer/documents',     badge: null },
-      { icon: Award,         label: 'Obligations',   path: '/officer/obligations',   badge: null },
+      { icon: QrCode, label: 'Check In', path: '/officer/checkin', badge: 'Scan', positions: ALL_POSITIONS },
+      { icon: Calendar, label: 'My Events', path: '/officer/my-events', badge: null, positions: ALL_POSITIONS },
+      { icon: ClipboardList, label: 'My Attendance', path: '/officer/my-attendance', badge: null, positions: ALL_POSITIONS },
+      { icon: CheckCircle, label: 'My Clearance', path: '/officer/my-clearance', badge: null, positions: ALL_POSITIONS },
+      { icon: FileText, label: 'Documents', path: '/officer/documents', badge: null, positions: ALL_POSITIONS },
+      { icon: Award, label: 'Obligations', path: '/officer/obligations', badge: null, positions: ALL_POSITIONS },
     ],
   },
 ];
+
+// Build filtered officer menu based on position and role
+const getOfficerMenu = (position, membershipRole) => {
+  const pos = (position || '').trim();
+  const isAdviser = membershipRole === 'adviser';
+  return officerMenuBase
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (isAdviser) return true; // advisers see everything
+        if (!item.positions || item.positions.length === 0) return true; // visible to all
+        return item.positions.some((p) => p.toLowerCase() === pos.toLowerCase());
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
+};
 
 const studentMenuSections = [
   {
     label: 'Overview',
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/student/dashboard', badge: null },
-      { icon: QrCode,          label: 'Check In',  path: '/student/checkin',   badge: 'Scan' },
+      { icon: QrCode, label: 'Check In', path: '/student/checkin', badge: 'Scan' },
     ],
   },
   {
     label: 'My Activities',
     items: [
-      { icon: Calendar,       label: 'Events',           path: '/student/events',      badge: null },
-      { icon: ClipboardList,  label: 'My Attendance',    path: '/student/attendance',  badge: null },
-      { icon: CheckCircle,    label: 'Clearance Status', path: '/student/clearance',   badge: null },
-      { icon: ClipboardCheck, label: 'Evaluations',      path: '/student/evaluations', badge: null }, // ← ANSWER
+      { icon: Calendar, label: 'Events', path: '/student/events', badge: null },
+      { icon: ClipboardList, label: 'My Attendance', path: '/student/attendance', badge: null },
+      { icon: CheckCircle, label: 'Clearance Status', path: '/student/clearance', badge: null },
+      { icon: ClipboardCheck, label: 'Evaluations', path: '/student/evaluations', badge: null },
     ],
   },
   {
     label: 'Communication',
     items: [
-      { icon: Bell,          label: 'Announcements', path: '/student/announcements', badge: '3' },
-      { icon: MessageSquare, label: 'Messages',      path: '/student/messages',      badge: '2' },
+      { icon: Bell, label: 'Announcements', path: '/student/announcements', badge: '3' },
+      { icon: MessageSquare, label: 'Messages', path: '/student/messages', badge: '2' },
     ],
   },
   {
     label: 'Requirements',
     items: [
-      { icon: FileText, label: 'Documents',   path: '/student/documents',   badge: null },
-      { icon: Award,    label: 'Obligations', path: '/student/obligations', badge: null },
+      { icon: FileText, label: 'Documents', path: '/student/documents', badge: null },
+      { icon: Award, label: 'Obligations', path: '/student/obligations', badge: null },
     ],
   },
 ];
@@ -121,21 +164,25 @@ export default function Sidebar({ onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const userRole  = localStorage.getItem('user_role') || 'member';
-  const isAdmin   = userRole === 'admin';
+  const userRole = localStorage.getItem('user_role') || 'member';
+  const isAdmin = userRole === 'admin';
   const isOfficer = userRole === 'officer';
 
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const storedMember = JSON.parse(localStorage.getItem('membership') || 'null');
+  const officerPosition = storedMember?.position || '';
+  const membershipRole = storedMember?.role || '';
+  const isAdviser = membershipRole === 'adviser';
 
   const currentUser = isAdmin
     ? { name: 'Admin User', email: storedUser.email ?? '', role: 'System Admin' }
     : {
-        name: `${storedUser.student?.first_name ?? ''} ${storedUser.student?.last_name ?? ''}`.trim() || 'Student',
-        email:     storedUser.email ?? '',
-        studentId: storedUser.student?.student_number ?? '—',
-        role:      isOfficer ? 'Officer' : 'Member',
-        yearLevel: storedUser.student?.year_level ?? '—',
-      };
+      name: `${storedUser.student?.first_name ?? ''} ${storedUser.student?.last_name ?? ''}`.trim() || 'Student',
+      email: storedUser.email ?? '',
+      studentId: storedUser.student?.student_number ?? '—',
+      role: isOfficer ? (isAdviser ? 'Adviser' : (officerPosition || 'Officer')) : 'Member',
+      yearLevel: storedUser.student?.year_level ?? '—',
+    };
 
   const getInitials = (name) =>
     name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
@@ -149,38 +196,37 @@ export default function Sidebar({ onClose }) {
 
   const theme = isAdmin
     ? {
-        gradient:       'from-[#0f2d5e] via-[#1a4a8a] to-[#1e4db7]',
-        activeGradient: 'from-[#0f2d5e] to-[#1e4db7]',
-        activeShadow:   'shadow-[#0f2d5e]/20',
-        hoverText:      'hover:text-[#0f2d5e]',
-        activeText:     'text-[#0f2d5e]',
-        title:          'Admin Portal',
-      }
+      gradient: 'from-[#0f2d5e] via-[#1a4a8a] to-[#1e4db7]',
+      activeGradient: 'from-[#0f2d5e] to-[#1e4db7]',
+      activeShadow: 'shadow-[#0f2d5e]/20',
+      hoverText: 'hover:text-[#0f2d5e]',
+      activeText: 'text-[#0f2d5e]',
+      title: 'Admin Portal',
+    }
     : isOfficer
-    ? {
-        gradient:       'from-[#7c3aed] via-[#8b5cf6] to-[#a78bfa]',
+      ? {
+        gradient: 'from-[#7c3aed] via-[#8b5cf6] to-[#a78bfa]',
         activeGradient: 'from-[#7c3aed] to-[#a78bfa]',
-        activeShadow:   'shadow-[#7c3aed]/20',
-        hoverText:      'hover:text-[#7c3aed]',
-        activeText:     'text-[#7c3aed]',
-        title:          'Officer Portal',
+        activeShadow: 'shadow-[#7c3aed]/20',
+        hoverText: 'hover:text-[#7c3aed]',
+        activeText: 'text-[#7c3aed]',
+        title: 'Officer Portal',
       }
-    : {
-        gradient:       'from-[#2563eb] via-[#3b6fd4] to-[#5b9ef7]',
+      : {
+        gradient: 'from-[#2563eb] via-[#3b6fd4] to-[#5b9ef7]',
         activeGradient: 'from-[#2563eb] to-[#5b9ef7]',
-        activeShadow:   'shadow-[#2563eb]/20',
-        hoverText:      'hover:text-[#2563eb]',
-        activeText:     'text-[#2563eb]',
-        title:          'Student Portal',
+        activeShadow: 'shadow-[#2563eb]/20',
+        hoverText: 'hover:text-[#2563eb]',
+        activeText: 'text-[#2563eb]',
+        title: 'Student Portal',
       };
 
   const menuSections = isAdmin
     ? adminMenuSections
     : isOfficer
-    ? officerMenuSections
-    : studentMenuSections;
+      ? getOfficerMenu(officerPosition, membershipRole)
+      : studentMenuSections;
 
-  // Close sidebar and navigate on mobile
   const handleNavClick = () => {
     if (onClose) onClose();
   };
@@ -198,7 +244,6 @@ export default function Sidebar({ onClose }) {
             <p className="text-[10px] text-slate-400 font-medium -mt-0.5">{theme.title}</p>
           </div>
         </div>
-        {/* Close button — mobile only */}
         {onClose && (
           <button
             onClick={onClose}
@@ -224,11 +269,10 @@ export default function Sidebar({ onClose }) {
                     key={item.path}
                     to={item.path}
                     onClick={handleNavClick}
-                    className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                      isActive
-                        ? `bg-gradient-to-r ${theme.activeGradient} text-white shadow-md ${theme.activeShadow}`
-                        : `text-slate-600 hover:bg-slate-50 ${theme.hoverText}`
-                    }`}
+                    className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive
+                      ? `bg-gradient-to-r ${theme.activeGradient} text-white shadow-md ${theme.activeShadow}`
+                      : `text-slate-600 hover:bg-slate-50 ${theme.hoverText}`
+                      }`}
                   >
                     <item.icon className={`w-4 h-4 shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
                     <span className="font-medium text-sm flex-1">{item.label}</span>
@@ -261,9 +305,8 @@ export default function Sidebar({ onClose }) {
                   key={item.path}
                   to={item.path}
                   onClick={handleNavClick}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                    isActive ? `bg-slate-100 ${theme.activeText}` : `text-slate-600 hover:bg-slate-50 ${theme.hoverText}`
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? `bg-slate-100 ${theme.activeText}` : `text-slate-600 hover:bg-slate-50 ${theme.hoverText}`
+                    }`}
                 >
                   <item.icon className="w-4 h-4" />
                   <span className="font-medium text-sm">{item.label}</span>

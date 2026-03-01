@@ -8,10 +8,11 @@ class Message extends Model
 {
     protected $fillable = [
         'organization_id',
+        'group_chat_id',
         'sender_id',
-        'receiver_id',   // null = group, set = PM
+        'receiver_id',
         'message',
-        'image_path',    // nullable
+        'image_path',
     ];
 
     public function sender()
@@ -26,7 +27,7 @@ class Message extends Model
 
     public function scopeGroup($query)
     {
-        return $query->whereNull('receiver_id');
+        return $query->whereNull('receiver_id')->whereNull('group_chat_id');
     }
 
     public function scopePmThread($query, int $userA, int $userB)
