@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 
 class MemberOrganizationController extends Controller
 {
-    // ── GET /api/organizations/{org_id}/members ───────────────────────────
+    // â”€â”€ GET /api/organizations/{org_id}/members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public function index(Request $request, $orgId)
     {
         try {
@@ -49,7 +49,7 @@ class MemberOrganizationController extends Controller
                 ->orderBy('students.first_name')
                 ->get();
 
-            // ── Attendance rate ───────────────────────────────────────────
+            // â”€â”€ Attendance rate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             $eventIds    = Event::where('organization_id', $orgId)
                 ->whereIn('status', ['completed', 'ongoing'])
                 ->pluck('id');
@@ -70,10 +70,10 @@ class MemberOrganizationController extends Controller
                 $members->each(fn($m) => $m->setAttribute('attendance_rate', null));
             }
 
-            // ── Map: expose user_id at top level for task assignment ──────
+            // â”€â”€ Map: expose user_id at top level for task assignment â”€â”€â”€â”€â”€â”€
             $mapped = $members->map(fn($m) => [
                 'id'              => $m->id,
-                'user_id'         => $m->student->user->id ?? null,    // ← actual users.id
+                'user_id'         => $m->student->user->id ?? null,    // â† actual users.id
                 'student_id'      => $m->student_id,
                 'role'            => $m->role,
                 'position'        => $m->position,
@@ -102,7 +102,7 @@ class MemberOrganizationController extends Controller
         }
     }
 
-    // ── POST /api/organizations/{org_id}/members ──────────────────────────
+    // â”€â”€ POST /api/organizations/{org_id}/members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public function store(Request $request, $orgId)
     {
         try {
@@ -140,7 +140,7 @@ class MemberOrganizationController extends Controller
                 'message'    => 'Member added successfully.',
                 'membership' => [
                     'id'          => $membership->id,
-                    'user_id'     => $membership->student->user->id ?? null, // ← actual users.id
+                    'user_id'     => $membership->student->user->id ?? null, // â† actual users.id
                     'student_id'  => $membership->student_id,
                     'role'        => $membership->role,
                     'position'    => $membership->position,
@@ -167,7 +167,7 @@ class MemberOrganizationController extends Controller
         }
     }
 
-    // ── PATCH /api/organizations/{org_id}/members/{membershipId}/role ─────
+    // â”€â”€ PATCH /api/organizations/{org_id}/members/{membershipId}/role â”€â”€â”€â”€â”€
     public function updateRole(Request $request, $orgId, $membershipId)
     {
         try {
@@ -199,7 +199,7 @@ class MemberOrganizationController extends Controller
         }
     }
 
-    // ── DELETE /api/organizations/{org_id}/members/{membershipId} ─────────
+    // â”€â”€ DELETE /api/organizations/{org_id}/members/{membershipId} â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public function destroy($orgId, $membershipId)
     {
         try {
@@ -216,7 +216,7 @@ class MemberOrganizationController extends Controller
         }
     }
 
-    // ── GET /api/organizations/{org_id}/students/search ───────────────────
+    // â”€â”€ GET /api/organizations/{org_id}/students/search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public function searchStudents(Request $request, $orgId)
     {
         try {

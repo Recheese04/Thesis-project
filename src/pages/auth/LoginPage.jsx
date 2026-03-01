@@ -4,18 +4,18 @@ import { Eye, EyeOff, Lock, Mail, AlertCircle, QrCode, Users, BarChart3, ShieldC
 import axios from 'axios';
 
 const features = [
-  { icon: QrCode,      title: 'QR Code Check-In',    desc: 'Instant attendance marking via QR scan' },
-  { icon: Users,       title: 'Member Management',    desc: 'Students, officers & departments in one place' },
-  { icon: BarChart3,   title: 'Attendance Analytics', desc: 'Real-time reports and completion tracking' },
-  { icon: ShieldCheck, title: 'Clearance System',     desc: 'Automated clearance based on attendance' },
+  { icon: QrCode, title: 'QR Code Check-In', desc: 'Instant attendance marking via QR scan' },
+  { icon: Users, title: 'Member Management', desc: 'Students, officers & departments in one place' },
+  { icon: BarChart3, title: 'Attendance Analytics', desc: 'Real-time reports and completion tracking' },
+  { icon: ShieldCheck, title: 'Clearance System', desc: 'Automated clearance based on attendance' },
 ];
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData]         = useState({ email: '', password: '' });
-  const [loading, setLoading]           = useState(false);
-  const [error, setError]               = useState('');
-  const navigate                        = useNavigate();
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,17 +32,17 @@ export default function Login() {
       await axios.get('/sanctum/csrf-cookie', { withCredentials: true });
 
       const response = await axios.post('/api/login', {
-        email:    formData.email,
+        email: formData.email,
         password: formData.password,
       }, { withCredentials: true });
 
       const { token, user, role, membership, organization_id } = response.data;
 
       // Persist everything the app needs
-      localStorage.setItem('token',           token);
-      localStorage.setItem('user',            JSON.stringify(user));
-      localStorage.setItem('user_role',       role);                          // 'admin' | 'officer' | 'member'
-      localStorage.setItem('membership',      JSON.stringify(membership));    // OrganizationMember row or null
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('user_role', role);                          // 'admin' | 'officer' | 'member'
+      localStorage.setItem('membership', JSON.stringify(membership));    // OrganizationMember row or null
       localStorage.setItem('organization_id', organization_id ?? '');        // org they manage, or ''
 
       // Route based on role returned by the server
@@ -219,19 +219,13 @@ export default function Login() {
 
             {/* Logo */}
             <div className="flex items-center gap-3 mb-14">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
-                style={{ background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', boxShadow: '0 6px 20px rgba(37,99,235,0.45)' }}>
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                    stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
+              <img src="/bisu-logo.png" alt="BISU" className="w-11 h-11 rounded-full object-cover shrink-0" style={{ boxShadow: '0 6px 20px rgba(37,99,235,0.45)' }} />
               <div>
                 <p className="font-display text-white font-extrabold text-[17px] leading-none tracking-tight">
-                  BISU Attendance
+                  TAPasok
                 </p>
                 <p style={{ color: 'rgba(147,197,253,0.55)', fontSize: '10px', fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', marginTop: '4px' }}>
-                  Management System
+                  BISU Candijay
                 </p>
               </div>
             </div>
@@ -254,7 +248,7 @@ export default function Login() {
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                 }}>
-                  Built for BISU.
+                  Built for BISU Candijay.
                 </span>
               </h1>
 
@@ -282,7 +276,7 @@ export default function Login() {
             {/* Footer */}
             <div className="mt-10 pt-5 flex items-center justify-between"
               style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-              <p style={{ color: 'rgba(147,197,253,0.35)', fontSize: 11 }}>© 2026 Bohol Island State University</p>
+              <p style={{ color: 'rgba(147,197,253,0.35)', fontSize: 11 }}>© 2026 TAPasok — BISU Candijay</p>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
                 <span style={{ color: 'rgba(147,197,253,0.4)', fontSize: 11 }}>All systems normal</span>
@@ -298,14 +292,8 @@ export default function Login() {
 
             {/* Mobile logo */}
             <div className="flex lg:hidden items-center gap-2.5 mb-9">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                    stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <span className="font-display font-extrabold text-[#091832] text-[16px]">BISU Attendance</span>
+              <img src="/bisu-logo.png" alt="BISU" className="w-9 h-9 rounded-full object-cover" />
+              <span className="font-display font-extrabold text-[#091832] text-[16px]">TAPasok</span>
             </div>
 
             {/* Heading */}
@@ -337,7 +325,7 @@ export default function Login() {
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail style={{ position:'absolute', left:13, top:'50%', transform:'translateY(-50%)', width:16, height:16, color:'#94a3b8', pointerEvents:'none' }} />
+                  <Mail style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, color: '#94a3b8', pointerEvents: 'none' }} />
                   <input
                     id="email"
                     type="email"
@@ -365,7 +353,7 @@ export default function Login() {
                   </Link>
                 </div>
                 <div className="relative">
-                  <Lock style={{ position:'absolute', left:13, top:'50%', transform:'translateY(-50%)', width:16, height:16, color:'#94a3b8', pointerEvents:'none' }} />
+                  <Lock style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, color: '#94a3b8', pointerEvents: 'none' }} />
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
@@ -378,13 +366,13 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    style={{ position:'absolute', right:13, top:'50%', transform:'translateY(-50%)', color:'#94a3b8', background:'none', border:'none', cursor:'pointer', padding:2, display:'flex' }}
+                    style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                     onMouseEnter={e => e.currentTarget.style.color = '#475569'}
                     onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
                   >
                     {showPassword
-                      ? <EyeOff style={{ width:16, height:16 }} />
-                      : <Eye    style={{ width:16, height:16 }} />
+                      ? <EyeOff style={{ width: 16, height: 16 }} />
+                      : <Eye style={{ width: 16, height: 16 }} />
                     }
                   </button>
                 </div>
@@ -393,7 +381,7 @@ export default function Login() {
               {/* Remember me */}
               <div className="flex items-start gap-2.5 mb-6">
                 <input id="remember" type="checkbox" className="custom-check" />
-                <label htmlFor="remember" style={{ fontSize:14, color:'#64748b', cursor:'pointer', userSelect:'none', lineHeight:1.5 }}>
+                <label htmlFor="remember" style={{ fontSize: 14, color: '#64748b', cursor: 'pointer', userSelect: 'none', lineHeight: 1.5 }}>
                   Keep me signed in for 30 days
                 </label>
               </div>
@@ -403,9 +391,9 @@ export default function Login() {
                 {loading ? (
                   <>
                     <span className="anim-spin" style={{
-                      display:'inline-block', width:16, height:16,
-                      border:'2.5px solid rgba(255,255,255,0.35)',
-                      borderTopColor:'white', borderRadius:'50%'
+                      display: 'inline-block', width: 16, height: 16,
+                      border: '2.5px solid rgba(255,255,255,0.35)',
+                      borderTopColor: 'white', borderRadius: '50%'
                     }} />
                     Signing in...
                   </>
@@ -417,15 +405,15 @@ export default function Login() {
             {/* Divider */}
             <div className="flex items-center gap-3 mb-5">
               <div className="flex-1 h-px" style={{ background: '#f1f5f9' }} />
-              <span style={{ color:'#cbd5e1', fontSize:12, fontWeight:500 }}>or</span>
+              <span style={{ color: '#cbd5e1', fontSize: 12, fontWeight: 500 }}>or</span>
               <div className="flex-1 h-px" style={{ background: '#f1f5f9' }} />
             </div>
 
             {/* Register */}
-            <p className="text-center" style={{ fontSize:14, color:'#94a3b8' }}>
+            <p className="text-center" style={{ fontSize: 14, color: '#94a3b8' }}>
               Don't have an account?{' '}
               <Link to="/register"
-                style={{ color:'#2563eb', fontWeight:700, textDecoration:'none', fontFamily:'Plus Jakarta Sans, sans-serif' }}
+                style={{ color: '#2563eb', fontWeight: 700, textDecoration: 'none', fontFamily: 'Plus Jakarta Sans, sans-serif' }}
                 onMouseEnter={e => e.target.style.color = '#1d4ed8'}
                 onMouseLeave={e => e.target.style.color = '#2563eb'}>
                 Request Access
@@ -434,8 +422,8 @@ export default function Login() {
 
             {/* Security note */}
             <div className="flex items-center justify-center gap-1.5 mt-8">
-              <ShieldCheck style={{ width:13, height:13, color:'#cbd5e1' }} />
-              <span style={{ fontSize:11.5, color:'#cbd5e1' }}>Secured with end-to-end encryption</span>
+              <ShieldCheck style={{ width: 13, height: 13, color: '#cbd5e1' }} />
+              <span style={{ fontSize: 11.5, color: '#cbd5e1' }}>Secured with end-to-end encryption</span>
             </div>
 
           </div>
