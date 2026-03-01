@@ -5,6 +5,7 @@ import {
   ChevronRight, User, Shield, TrendingUp, QrCode, CheckCircle,
   Bell, Award, X, ClipboardCheck, AlertTriangle, Wallet, BookOpen, Eye,
 } from 'lucide-react';
+import bisuLogo from '@/images/bisu-logo.png';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -68,14 +69,14 @@ const officerMenuBase = [
   {
     label: 'Treasury',
     items: [
-      { icon: Wallet, label: 'Finance', path: '/officer/finance', badge: null, positions: [...FINANCE] },
-      { icon: CheckCircle, label: 'Manage Clearance', path: '/officer/clearance', badge: null, positions: [...FINANCE, 'Secretary'] },
+      { icon: Wallet, label: 'Finance', path: '/officer/finance', badge: null, positions: ['Treasurer'] },
+      { icon: CheckCircle, label: 'Manage Clearance', path: '/officer/clearance', badge: null, positions: [...LEADERSHIP, ...FINANCE, 'Secretary'] },
     ],
   },
   {
     label: 'Secretary',
     items: [
-      { icon: BookOpen, label: 'Meeting Minutes', path: '/officer/minutes', badge: null, positions: [...ADMIN_ROLES] },
+      { icon: BookOpen, label: 'Meeting Minutes', path: '/officer/minutes', badge: null, positions: ['Secretary'] },
     ],
   },
   {
@@ -107,15 +108,15 @@ const officerMenuBase = [
 
 // Build filtered officer menu based on position and role
 const getOfficerMenu = (position, membershipRole) => {
-  const pos = (position || '').trim();
+  const pos = (position || '').trim().toLowerCase();
   const isAdviser = membershipRole === 'adviser';
   return officerMenuBase
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
         if (isAdviser) return true; // advisers see everything
-        if (!item.positions || item.positions.length === 0) return true; // visible to all
-        return item.positions.some((p) => p.toLowerCase() === pos.toLowerCase());
+        if (!item.positions || item.positions === ALL_POSITIONS || item.positions.length === 0) return true; // visible to all
+        return item.positions.some((p) => p.toLowerCase() === pos);
       }),
     }))
     .filter((section) => section.items.length > 0);
@@ -236,11 +237,9 @@ export default function Sidebar({ onClose }) {
       {/* Logo Header */}
       <div className="h-16 px-4 flex items-center justify-between border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${theme.gradient} flex items-center justify-center shadow-md shrink-0`}>
-            <TrendingUp className="w-5 h-5 text-white" />
-          </div>
+          <img src={bisuLogo} alt="BISU" className="w-9 h-9 rounded-full object-cover shadow-md shrink-0" />
           <div>
-            <h1 className="text-base font-bold tracking-tight text-slate-800">OrgAttend</h1>
+            <h1 className="text-base font-bold tracking-tight text-slate-800">TAPasok</h1>
             <p className="text-[10px] text-slate-400 font-medium -mt-0.5">{theme.title}</p>
           </div>
         </div>

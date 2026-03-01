@@ -59,28 +59,28 @@ const ACTIVITIES = [
 ];
 
 const FEATURES = [
-  { icon: QrCode,       title: "QR Code Check-In",     desc: "Students scan to mark attendance instantly. No paper logs, no manual counting." },
-  { icon: Cpu,          title: "RFID Integration",      desc: "Hardware-level check-in via RFID cards for supported events and venues." },
-  { icon: Users,        title: "Member Management",     desc: "Full roster of students, officers, and departments in one organized system." },
-  { icon: CalendarDays, title: "Event Scheduling",      desc: "Create and manage events with attendance requirements and time windows." },
-  { icon: FileCheck,    title: "Clearance Automation",  desc: "Attendance-based clearance issued automatically when requirements are met." },
-  { icon: BarChart3,    title: "Analytics & Reports",   desc: "Visual dashboards showing attendance rates, trends, and event metrics." },
-  { icon: Bell,         title: "Announcements",         desc: "Push updates and notices directly to student members in real time." },
-  { icon: Shield,       title: "Role-Based Access",     desc: "Separate portals for admins, officers, and students with appropriate permissions." },
+  { icon: QrCode, title: "QR Code Check-In", desc: "Students scan to mark attendance instantly. No paper logs, no manual counting." },
+  { icon: Cpu, title: "RFID Integration", desc: "Hardware-level check-in via RFID cards for supported events and venues." },
+  { icon: Users, title: "Member Management", desc: "Full roster of students, officers, and departments in one organized system." },
+  { icon: CalendarDays, title: "Event Scheduling", desc: "Create and manage events with attendance requirements and time windows." },
+  { icon: FileCheck, title: "Clearance Automation", desc: "Attendance-based clearance issued automatically when requirements are met." },
+  { icon: BarChart3, title: "Analytics & Reports", desc: "Visual dashboards showing attendance rates, trends, and event metrics." },
+  { icon: Bell, title: "Announcements", desc: "Push updates and notices directly to student members in real time." },
+  { icon: Shield, title: "Role-Based Access", desc: "Separate portals for admins, officers, and students with appropriate permissions." },
 ];
 
 const STATS = [
   { value: "500+", label: "Students Enrolled" },
-  { value: "40+",  label: "Events Tracked" },
-  { value: "98%",  label: "Attendance Accuracy" },
-  { value: "3",    label: "User Roles Supported" },
+  { value: "40+", label: "Events Tracked" },
+  { value: "98%", label: "Attendance Accuracy" },
+  { value: "3", label: "User Roles Supported" },
 ];
 
 // ── Animation helpers ─────────────────────────────────────────────────────────
 
 const fadeUp = (delay = 0) => ({
-  initial:    { opacity: 0, y: 28 },
-  animate:    { opacity: 1, y: 0 },
+  initial: { opacity: 0, y: 28 },
+  animate: { opacity: 1, y: 0 },
   transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1], delay },
 });
 
@@ -430,11 +430,11 @@ export default function LandingPage() {
                   style={{ fontSize: 'clamp(1.9rem, 4.5vw, 3.4rem)', fontWeight: 900, color: 'white', lineHeight: 1.08, marginBottom: 24, letterSpacing: '-0.5px' }}
                 >
                   Attendance Tracking<br />
-                  <span className="gradient-text">Built for BISU.</span>
+                  <span className="gradient-text">Built for BISU Candijay.</span>
                 </motion.h1>
 
                 <motion.p {...fadeUp(0.26)} style={{ color: 'rgba(147,197,253,0.7)', fontSize: 'clamp(14px, 1.8vw, 17px)', lineHeight: 1.75, marginBottom: 40, maxWidth: 420 }}>
-                  The centralized platform for Bohol Island State University — manage student attendance, events, clearances, and organizational records seamlessly.
+                  The centralized platform for BISU Candijay Campus — manage student attendance, events, clearances, and organizational records seamlessly.
                 </motion.p>
 
                 <motion.div {...fadeUp(0.32)} className="hero-ctas">
@@ -518,7 +518,7 @@ export default function LandingPage() {
                   Everything You Need
                 </h2>
                 <p style={{ color: 'rgba(147,197,253,0.6)', fontSize: 16, maxWidth: 520, margin: '0 auto' }}>
-                  A complete suite of tools for student organization management at BISU.
+                  A complete suite of tools for student organization management at BISU Candijay.
                 </p>
               </div>
             </FadeIn>
@@ -608,7 +608,7 @@ export default function LandingPage() {
                     Ready to get started?
                   </p>
                   <h2 className="jk" style={{ color: 'white', fontSize: 'clamp(1.4rem, 3.5vw, 2.5rem)', fontWeight: 900, marginBottom: 16, lineHeight: 1.15 }}>
-                    Access the BISU<br />Attendance Portal
+                    Access the TAPasok<br />Attendance Portal
                   </h2>
                   <p style={{ color: 'rgba(191,219,254,0.7)', fontSize: 'clamp(13px, 1.8vw, 16px)', maxWidth: 440, margin: '0 auto 36px', lineHeight: 1.7 }}>
                     Sign in with your university credentials to manage attendance, events, and clearances.
@@ -639,19 +639,15 @@ export default function LandingPage() {
         <footer style={{ background: '#070f22', padding: 'clamp(24px, 4vw, 40px) clamp(16px, 4vw, 32px)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto' }} className="footer-inner">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
+              <img src="/bisu-logo.png" alt="BISU" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
               <div>
-                <p className="jk" style={{ color: 'white', fontWeight: 800, fontSize: 14, margin: 0 }}>BISU Attendance</p>
-                <p style={{ color: 'rgba(147,197,253,0.4)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', margin: 0 }}>Management System</p>
+                <p className="jk" style={{ color: 'white', fontWeight: 800, fontSize: 14, margin: 0 }}>TAPasok</p>
+                <p style={{ color: 'rgba(147,197,253,0.4)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', margin: 0 }}>BISU Candijay</p>
               </div>
             </div>
 
             <p style={{ color: 'rgba(147,197,253,0.3)', fontSize: 12, margin: 0 }}>
-              © 2026 Bohol Island State University — Candijay Campus. All rights reserved.
+              © 2026 TAPasok — BISU Candijay Campus. All rights reserved.
             </p>
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

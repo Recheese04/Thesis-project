@@ -4,15 +4,15 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Menu, X } from 'lucide-react';
 
 // ── LandingNav ────────────────────────────────────────────────────────────────
-// Sticky navigation bar for the BISU Attendance Management System landing page.
+// Sticky navigation bar for the TAPasok (BISU Candijay) landing page.
 // Fully responsive: collapses to hamburger menu on mobile (< md breakpoint).
 // Props: none (self-contained)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const NAV_LINKS = [
-  { href: '#features',   label: 'Features'       },
-  { href: '#activities', label: 'SDS Activities'  },
-  { href: '#about',      label: 'About'           },
+  { href: '#features', label: 'Features' },
+  { href: '#activities', label: 'SDS Activities' },
+  { href: '#about', label: 'About' },
 ];
 
 export default function LandingNav() {
@@ -146,25 +146,13 @@ export default function LandingNav() {
 
             {/* Logo */}
             <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
-              <div style={{
-                width: 40, height: 40,
-                borderRadius: 12,
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 16px rgba(37,99,235,0.35)',
-                flexShrink: 0,
-              }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                    stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
+              <img src="/bisu-logo.png" alt="BISU" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 4px 16px rgba(37,99,235,0.35)', flexShrink: 0 }} />
               <div>
                 <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontWeight: 800, fontSize: 16, color: '#091832', lineHeight: 1.1, margin: 0 }}>
-                  BISU Attendance
+                  TAPasok
                 </p>
                 <p style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', margin: 0 }}>
-                  Management System
+                  BISU Candijay
                 </p>
               </div>
             </Link>
