@@ -61,7 +61,7 @@ function ImagePreview({ file, onRemove, dark }) {
   );
 }
 
-export default function ChatArea({ chat, messages, loading, sending, error, members, onSend, onRetry, onClearError, onBack }) {
+export default function ChatArea({ chat, messages, loading, sending, error, members, activeGroup, onSend, onRetry, onClearError, onBack, onOpenGroupSettings }) {
   const [text, setText]   = useState('');
   const [image, setImage] = useState(null);
   const endRef            = useRef(null);
@@ -72,9 +72,16 @@ export default function ChatArea({ chat, messages, loading, sending, error, memb
   const { dark }          = useTheme();
 
   const isGroup  = !chat || chat.type !== 'pm';
-  const title    = isGroup ? 'Group Chat' : chat?.name ?? '';
-  const subtitle = isGroup ? `${members.length} member${members.length !== 1 ? 's' : ''}` : (chat?.position || chat?.role || '');
-  const bg       = isGroup ? 'from-violet-500 to-indigo-600' : avatarColor(chat?.name ?? '');
+  const isCustomGc = chat?.type === 'gc';
+  const title    = isCustomGc
+    ? (activeGroup?.name ?? chat?.name ?? 'Group Chat')
+    : isGroup ? 'Group Chat' : chat?.name ?? '';
+  const subtitle = isCustomGc
+    ? `${activeGroup?.members_count ?? activeGroup?.members?.length ?? ''} members`
+    : isGroup ? `${members.length} member${members.length !== 1 ? 's' : ''}` : (chat?.position || chat?.role || '');
+  const bg = isCustomGc
+    ? (activeGroup?.avatar_color ?? 'from-violet-500 to-indigo-600')
+    : isGroup ? 'from-slate-600 to-slate-800' : avatarColor(chat?.name ?? '');
   const grouped  = groupByDate(messages);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, chat]);
@@ -142,9 +149,11 @@ export default function ChatArea({ chat, messages, loading, sending, error, memb
           <button onClick={onRetry} className={`p-2 rounded-full hover:bg-white/10 transition-colors ${icon_col}`}>
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button className={`hidden sm:flex p-2 rounded-full hover:bg-white/10 transition-colors ${icon_col}`}>
-            <Info className="w-4 h-4" />
-          </button>
+          {isCustomGc && onOpenGroupSettings && (
+            <button onClick={onOpenGroupSettings} className={`p-2 rounded-full hover:bg-white/10 transition-colors ${icon_col}`} title="Group settings">
+              <Info className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
