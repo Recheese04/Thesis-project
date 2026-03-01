@@ -30,13 +30,13 @@ const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem(
 
 const apiFetch = async (path, options = {}) => {
   const method = (options.method ?? 'GET').toUpperCase();
-  const body   = options.body ? JSON.parse(options.body) : undefined;
+  const body = options.body ? JSON.parse(options.body) : undefined;
   let res;
-  if (method === 'GET')    res = await axios.get   (`/api${path}`,        authH());
-  else if (method === 'POST')  res = await axios.post  (`/api${path}`, body, authH());
-  else if (method === 'PATCH') res = await axios.patch (`/api${path}`, body, authH());
-  else if (method === 'PUT')   res = await axios.put   (`/api${path}`, body, authH());
-  else if (method === 'DELETE') res = await axios.delete(`/api${path}`,       authH());
+  if (method === 'GET') res = await axios.get(`/api${path}`, authH());
+  else if (method === 'POST') res = await axios.post(`/api${path}`, body, authH());
+  else if (method === 'PATCH') res = await axios.patch(`/api${path}`, body, authH());
+  else if (method === 'PUT') res = await axios.put(`/api${path}`, body, authH());
+  else if (method === 'DELETE') res = await axios.delete(`/api${path}`, authH());
   return res.data;
 };
 
@@ -46,9 +46,9 @@ const apiFetch = async (path, options = {}) => {
 const ROLES = ['member', 'officer', 'adviser'];
 
 const roleConfig = {
-  officer: { label: 'Officer',  bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', Icon: Shield },
-  adviser: { label: 'Adviser',  bg: 'bg-amber-100',  text: 'text-amber-700',  border: 'border-amber-200',  Icon: Briefcase },
-  member:  { label: 'Member',   bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-200',   Icon: User },
+  officer: { label: 'Officer', bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', Icon: Shield },
+  adviser: { label: 'Adviser', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200', Icon: Briefcase },
+  member: { label: 'Member', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', Icon: User },
 };
 
 const RoleBadge = ({ role }) => {
@@ -96,24 +96,41 @@ const useToast = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Promote / Edit-Role Dialog
 // ─────────────────────────────────────────────────────────────────────────────
+const POSITIONS = [
+  'President', 'Vice President', 'Secretary', 'Treasurer',
+  'Auditor', 'P.R.O.', 'Sergeant-at-Arms', 'Business Manager', 'Other',
+];
+
 const PromoteDialog = ({ membership, orgId, onClose, onSaved, pushToast }) => {
-  const [role, setRole]         = useState(membership.role);
-  const [position, setPosition] = useState(membership.position ?? '');
-  const [saving, setSaving]     = useState(false);
+  const [role, setRole] = useState(membership.role);
+  const initPos = membership.position ?? '';
+  const isPreset = POSITIONS.some(p => p.toLowerCase() === initPos.toLowerCase());
+  const [positionSelect, setPositionSelect] = useState(isPreset ? initPos : (initPos ? 'Other' : ''));
+  const [customPosition, setCustomPosition] = useState(isPreset ? '' : initPos);
+  const [saving, setSaving] = useState(false);
+
+  // Auto-set role to 'officer' when a named position is assigned
+  const handlePositionChange = (v) => {
+    setPositionSelect(v);
+    if (v !== 'Other') setCustomPosition('');
+    if (v && v !== '') setRole('officer');
+  };
 
   const fullName = membership.student
     ? `${membership.student.first_name} ${membership.student.last_name}`
     : '—';
+
+  const finalPosition = positionSelect === 'Other' ? customPosition.trim() : positionSelect;
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await apiFetch(`/organizations/${orgId}/members/${membership.id}/role`, {
         method: 'PATCH',
-        body: JSON.stringify({ role, position }),
+        body: JSON.stringify({ role, position: finalPosition || null }),
       });
       pushToast(`${fullName}'s role updated to ${roleConfig[role]?.label}.`);
-      onSaved({ ...membership, role, position });
+      onSaved({ ...membership, role, position: finalPosition });
       onClose();
     } catch (err) {
       pushToast(err.message, 'error');
@@ -156,14 +173,32 @@ const PromoteDialog = ({ membership, orgId, onClose, onSaved, pushToast }) => {
           </div>
 
           <div className="space-y-2">
-            <Label>Position / Title <span className="text-slate-400 font-normal">(optional)</span></Label>
-            <Input
-              placeholder="e.g. President, Secretary…"
-              value={position}
-              onChange={e => setPosition(e.target.value)}
-              className="rounded-xl"
-            />
+            <Label>Position / Title</Label>
+            <Select value={positionSelect} onValueChange={handlePositionChange}>
+              <SelectTrigger className="rounded-xl">
+                <SelectValue placeholder="Select a position…" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {POSITIONS.map(p => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
+          {positionSelect === 'Other' && (
+            <div className="space-y-2">
+              <Label>Custom Position</Label>
+              <Input
+                placeholder="e.g. Committee Head…"
+                value={customPosition}
+                onChange={e => setCustomPosition(e.target.value)}
+                className="rounded-xl"
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">
@@ -186,13 +221,14 @@ const PromoteDialog = ({ membership, orgId, onClose, onSaved, pushToast }) => {
 // Add Member Dialog
 // ─────────────────────────────────────────────────────────────────────────────
 const AddMemberDialog = ({ orgId, onClose, onAdded, pushToast }) => {
-  const [query,       setQuery]       = useState('');
-  const [results,     setResults]     = useState([]);
-  const [searching,   setSearching]   = useState(false);
-  const [selected,    setSelected]    = useState(null);
-  const [role,        setRole]        = useState('member');
-  const [position,    setPosition]    = useState('');
-  const [saving,      setSaving]      = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [role, setRole] = useState('member');
+  const [position, setPosition] = useState('');
+  const [customPos, setCustomPos] = useState('');
+  const [saving, setSaving] = useState(false);
   const debounce = useRef(null);
 
   const doSearch = useCallback(async (q) => {
@@ -218,9 +254,10 @@ const AddMemberDialog = ({ orgId, onClose, onAdded, pushToast }) => {
     if (!selected) return;
     setSaving(true);
     try {
+      const finalPos = position === 'Other' ? customPos.trim() : position;
       const data = await apiFetch(`/organizations/${orgId}/members`, {
         method: 'POST',
-        body: JSON.stringify({ student_id: selected.id, role, position }),
+        body: JSON.stringify({ student_id: selected.id, role, position: finalPos || null }),
       });
       pushToast(`${selected.full_name} added as ${roleConfig[role].label}.`);
       onAdded(data.membership);
@@ -301,14 +338,31 @@ const AddMemberDialog = ({ orgId, onClose, onAdded, pushToast }) => {
 
           {/* Position */}
           <div className="space-y-2">
-            <Label>Position <span className="text-slate-400 font-normal">(optional)</span></Label>
-            <Input
-              placeholder="e.g. Secretary, Treasurer…"
-              value={position}
-              onChange={e => setPosition(e.target.value)}
-              className="rounded-xl"
-            />
+            <Label>Position</Label>
+            <Select value={position} onValueChange={(v) => { setPosition(v); if (v !== 'Other') setCustomPos(''); if (v && v !== '') setRole('officer'); }}>
+              <SelectTrigger className="rounded-xl">
+                <SelectValue placeholder="Select a position…" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {POSITIONS.map(p => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+          {position === 'Other' && (
+            <div className="space-y-2">
+              <Label>Custom Position</Label>
+              <Input
+                placeholder="e.g. Committee Head…"
+                value={customPos}
+                onChange={e => setCustomPos(e.target.value)}
+                className="rounded-xl"
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">
@@ -387,10 +441,10 @@ const ConfirmRemoveDialog = ({ membership, orgId, onClose, onRemoved, pushToast 
  */
 export default function OfficerMembers({ orgId: orgIdProp }) {
   // ── resolve orgId from logged-in user when no prop supplied ──────────────
-  const [orgId,        setOrgId]        = useState(orgIdProp ?? null);
-  const [orgName,      setOrgName]      = useState('');
-  const [authLoading,  setAuthLoading]  = useState(!orgIdProp);  // false immediately if prop given
-  const [authError,    setAuthError]    = useState(null);
+  const [orgId, setOrgId] = useState(orgIdProp ?? null);
+  const [orgName, setOrgName] = useState('');
+  const [authLoading, setAuthLoading] = useState(!orgIdProp);  // false immediately if prop given
+  const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
     if (orgIdProp) { setOrgId(orgIdProp); return; }          // prop wins
@@ -398,7 +452,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
       try {
         const me = await apiFetch('/me');
         // /me returns { user, role, membership, organization_id }
-        
+
         if (!me?.organization_id) {
           setAuthError('You are not assigned as an officer in any organization.');
           return;
@@ -414,15 +468,15 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
   }, [orgIdProp]);
 
   // ── state ────────────────────────────────────────────────────────────────
-  const [members,      setMembers]      = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState(null);
-  const [searchQuery,  setSearchQuery]  = useState('');
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // modals
-  const [showAdd,      setShowAdd]      = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [promoteTarget, setPromoteTarget] = useState(null);   // membership object
-  const [removeTarget,  setRemoveTarget]  = useState(null);   // membership object
+  const [removeTarget, setRemoveTarget] = useState(null);   // membership object
 
   const { toasts, push: pushToast, dismiss } = useToast();
 
@@ -466,9 +520,9 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
 
   // ── derived stats ────────────────────────────────────────────────────────
   const stats = {
-    total:      members.length,
-    active:     members.filter(m => m.status === 'active').length,
-    officers:   members.filter(m => m.role === 'officer' || m.role === 'adviser').length,
+    total: members.length,
+    active: members.filter(m => m.status === 'active').length,
+    officers: members.filter(m => m.role === 'officer' || m.role === 'adviser').length,
     avgAttendance: members.length
       ? Math.round(members.reduce((s, m) => s + (m.attendance_rate ?? 0), 0) / members.length)
       : 0,
@@ -508,9 +562,9 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
     : 'Unknown';
 
   const studentId = (m) => m.student?.student_number ?? '—';
-  const email     = (m) => m.student?.user?.email ?? '—';
-  const phone     = (m) => m.student?.contact_number ?? '—';
-  const course    = (m) => m.student?.course ?? '—';
+  const email = (m) => m.student?.user?.email ?? '—';
+  const phone = (m) => m.student?.contact_number ?? '—';
+  const course = (m) => m.student?.course ?? '—';
   const yearLevel = (m) => m.student?.year_level ?? '—';
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -560,8 +614,8 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {[
-            { label: 'Total Members',   value: stats.total },
-            { label: 'Active Members',  value: stats.active },
+            { label: 'Total Members', value: stats.total },
+            { label: 'Active Members', value: stats.active },
             { label: 'Officers / Advisers', value: stats.officers },
             { label: 'Avg. Attendance', value: `${stats.avgAttendance}%` },
           ].map(({ label, value }) => (

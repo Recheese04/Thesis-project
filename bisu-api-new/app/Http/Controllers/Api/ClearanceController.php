@@ -128,6 +128,8 @@ class ClearanceController extends Controller
                         return [
                         'requirement_id' => $req->id,
                         'name' => $req->name,
+                        'type' => $req->type,
+                        'amount' => $req->amount,
                         'status' => $data['status'],
                         'notes' => $data['notes'],
                         ];
@@ -136,6 +138,8 @@ class ClearanceController extends Controller
                     return [
                     'requirement_id' => $req->id,
                     'name' => $req->name,
+                    'type' => $req->type,
+                    'amount' => $req->amount,
                     'status' => $clearance ? $clearance->status : 'pending',
                     'notes' => $clearance ? $clearance->notes : null,
                     ];
