@@ -14,6 +14,28 @@ use Carbon\Carbon;
 
 class ClearanceController extends Controller
 {
+    /**
+     * Only officers / advisers / admins of the given org may manage clearance.
+     */
+    private function authorizeOfficer($orgId)
+    {
+        $user = Auth::user();
+        if (!$user)
+            return false;
+        if ($user->user_type_id === 1)
+            return true; // admin
+
+        $student = $user->student;
+        if (!$student)
+            return false;
+
+        $m = MemberOrganization::where('organization_id', $orgId)
+            ->where('student_id', $student->id)
+            ->where('status', 'active')
+            ->first();
+
+        return $m && in_array($m->role, ['officer', 'adviser']);
+    }
     // GET /api/organizations/{orgId}/clearance-requirements
     public function getRequirements($orgId)
     {
@@ -27,6 +49,10 @@ class ClearanceController extends Controller
     // POST /api/organizations/{orgId}/clearance-requirements
     public function storeRequirement(Request $request, $orgId)
     {
+        if (!$this->authorizeOfficer($orgId)) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'required|in:auto,manual',
@@ -173,6 +199,11 @@ class ClearanceController extends Controller
 
         $req = ClearanceRequirement::findOrFail($requirementId);
 
+        // Authorization: must be officer/adviser/admin of this org
+        if (!$this->authorizeOfficer($req->organization_id)) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
         $clearance = StudentClearance::updateOrCreate(
         [
             'student_id' => $studentId,
@@ -202,6 +233,11 @@ class ClearanceController extends Controller
         ]);
 
         $req = ClearanceRequirement::findOrFail($requirementId);
+
+        // Authorization: must be officer/adviser/admin of this org
+        if (!$this->authorizeOfficer($req->organization_id)) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
 
         $clearance = StudentClearance::updateOrCreate(
         [

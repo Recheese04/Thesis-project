@@ -39,6 +39,7 @@ import OfficerClearance from './pages/dashboards/officer/OfficerClearance';
 import OfficerConsequenceRules from './pages/dashboards/officer/OfficerConsequenceRules';
 import OfficerFinance from './pages/dashboards/officer/OfficerFinance';
 import OfficerMinutes from './pages/dashboards/officer/OfficerMinutes';
+import OfficerAdviserDashboard from './pages/dashboards/officer/OfficerAdviserDashboard';
 
 function getUserRole() {
   return localStorage.getItem('user_role') || null;
@@ -114,6 +115,7 @@ function App() {
           {/* ── Position-specific pages ── */}
           <Route path="finance" element={<OfficerFinance />} />
           <Route path="minutes" element={<OfficerMinutes />} />
+          <Route path="adviser-overview" element={<OfficerAdviserDashboard />} />
         </Route>
 
         {/* ── Student / Member ── */}

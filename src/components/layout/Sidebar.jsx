@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Briefcase, Calendar,
   FileText, MessageSquare, ClipboardList, Settings, LogOut,
   ChevronRight, User, Shield, TrendingUp, QrCode, CheckCircle,
-  Bell, Award, X, ClipboardCheck, AlertTriangle, Wallet, BookOpen,
+  Bell, Award, X, ClipboardCheck, AlertTriangle, Wallet, BookOpen, Eye,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,7 @@ const officerMenuBase = [
     label: 'Overview',
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/officer/dashboard', badge: null, positions: ALL_POSITIONS },
+      { icon: Eye, label: 'Adviser Overview', path: '/officer/adviser-overview', badge: null, positions: ['__adviser__'] },
     ],
   },
   {
@@ -104,18 +105,20 @@ const officerMenuBase = [
   },
 ];
 
-// Build filtered officer menu based on position
-const getOfficerMenu = (position) => {
+// Build filtered officer menu based on position and role
+const getOfficerMenu = (position, membershipRole) => {
   const pos = (position || '').trim();
+  const isAdviser = membershipRole === 'adviser';
   return officerMenuBase
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        if (isAdviser) return true; // advisers see everything
         if (!item.positions || item.positions.length === 0) return true; // visible to all
         return item.positions.some((p) => p.toLowerCase() === pos.toLowerCase());
       }),
     }))
-    .filter((section) => section.items.length > 0); // hide empty sections
+    .filter((section) => section.items.length > 0);
 };
 
 const studentMenuSections = [
@@ -168,6 +171,8 @@ export default function Sidebar({ onClose }) {
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
   const storedMember = JSON.parse(localStorage.getItem('membership') || 'null');
   const officerPosition = storedMember?.position || '';
+  const membershipRole = storedMember?.role || '';
+  const isAdviser = membershipRole === 'adviser';
 
   const currentUser = isAdmin
     ? { name: 'Admin User', email: storedUser.email ?? '', role: 'System Admin' }
@@ -175,7 +180,7 @@ export default function Sidebar({ onClose }) {
       name: `${storedUser.student?.first_name ?? ''} ${storedUser.student?.last_name ?? ''}`.trim() || 'Student',
       email: storedUser.email ?? '',
       studentId: storedUser.student?.student_number ?? '—',
-      role: isOfficer ? (officerPosition || 'Officer') : 'Member',
+      role: isOfficer ? (isAdviser ? 'Adviser' : (officerPosition || 'Officer')) : 'Member',
       yearLevel: storedUser.student?.year_level ?? '—',
     };
 
@@ -219,7 +224,7 @@ export default function Sidebar({ onClose }) {
   const menuSections = isAdmin
     ? adminMenuSections
     : isOfficer
-      ? getOfficerMenu(officerPosition)
+      ? getOfficerMenu(officerPosition, membershipRole)
       : studentMenuSections;
 
   const handleNavClick = () => {
