@@ -23,7 +23,7 @@ import StudentAnnouncements from './pages/dashboards/student/StudentAnnouncement
 import StudentMessages from './pages/dashboards/student/StudentMessages';
 import StudentDocuments from './pages/dashboards/student/StudentDocuments';
 import StudentObligations from './pages/dashboards/student/StudentObligations';
-import StudentEvaluations from './pages/dashboards/student/StudentEvaluations'; // ← NEW
+import StudentEvaluations from './pages/dashboards/student/StudentEvaluations';
 
 // Officer
 import OfficerLayout from './components/layout/OfficerLayout';
@@ -34,7 +34,9 @@ import OfficerAttendance from './pages/dashboards/officer/OfficerAttendance';
 import OfficerTasks from './pages/dashboards/officer/OfficerTasks';
 import OfficerAnnouncements from './pages/dashboards/officer/OfficerAnnouncements';
 import OfficerMessages from './pages/dashboards/officer/OfficerMessages';
-import OfficerEvaluations from './pages/dashboards/officer/OfficerEvaluations'; // ← NEW
+import OfficerEvaluations from './pages/dashboards/officer/OfficerEvaluations';
+import OfficerClearance from './pages/dashboards/officer/OfficerClearance';               // ← NEW
+import OfficerConsequenceRules from './pages/dashboards/officer/OfficerConsequenceRules'; // ← NEW
 
 function getUserRole() {
   return localStorage.getItem('user_role') || null;
@@ -89,22 +91,24 @@ function App() {
         {/* ── Officer ── */}
         <Route path="/officer" element={<ProtectedRoute allowedRoles={['officer']}><OfficerLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/officer/dashboard" replace />} />
-          <Route path="dashboard"     element={<OfficerDashboard />} />
-          <Route path="members"       element={<OfficerMembers />} />
-          <Route path="events"        element={<OfficerEvents />} />
-          <Route path="attendance"    element={<OfficerAttendance />} />
-          <Route path="tasks"         element={<OfficerTasks />} />
-          <Route path="announcements" element={<OfficerAnnouncements />} />
-          <Route path="messages"      element={<OfficerMessages />} />
-          {/* Officer creates/manages evaluations */}
-          <Route path="evaluations"   element={<OfficerEvaluations />} />
-          {/* Merged student routes for officers */}
-          <Route path="checkin"       element={<StudentCheckIn />} />
-          <Route path="my-events"     element={<StudentEvents />} />
-          <Route path="my-attendance" element={<StudentAttendance />} />
-          <Route path="clearance"     element={<StudentClearance />} />
-          <Route path="documents"     element={<StudentDocuments />} />
-          <Route path="obligations"   element={<StudentObligations />} />
+          <Route path="dashboard"         element={<OfficerDashboard />} />
+          <Route path="members"           element={<OfficerMembers />} />
+          <Route path="events"            element={<OfficerEvents />} />
+          <Route path="attendance"        element={<OfficerAttendance />} />
+          <Route path="tasks"             element={<OfficerTasks />} />
+          <Route path="announcements"     element={<OfficerAnnouncements />} />
+          <Route path="messages"          element={<OfficerMessages />} />
+          <Route path="evaluations"       element={<OfficerEvaluations />} />
+          {/* ── NEW: Clearance management ── */}
+          <Route path="clearance"         element={<OfficerClearance />} />
+          <Route path="consequence-rules" element={<OfficerConsequenceRules />} />
+          {/* ── Officer's own student pages ── */}
+          <Route path="checkin"           element={<StudentCheckIn />} />
+          <Route path="my-events"         element={<StudentEvents />} />
+          <Route path="my-attendance"     element={<StudentAttendance />} />
+          <Route path="my-clearance"      element={<StudentClearance />} />  {/* officer's OWN clearance status */}
+          <Route path="documents"         element={<StudentDocuments />} />
+          <Route path="obligations"       element={<StudentObligations />} />
         </Route>
 
         {/* ── Student / Member ── */}
@@ -119,7 +123,6 @@ function App() {
           <Route path="messages"      element={<StudentMessages />} />
           <Route path="documents"     element={<StudentDocuments />} />
           <Route path="obligations"   element={<StudentObligations />} />
-          {/* Students answer evaluations */}
           <Route path="evaluations"   element={<StudentEvaluations />} />
         </Route>
 

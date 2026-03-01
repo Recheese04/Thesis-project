@@ -20,24 +20,20 @@ class MemberOrganizationController extends Controller
         try {
             Organization::findOrFail($orgId);
 
-            // Join students table so we can sort by name safely
             $query = MemberOrganization::with(['student.department', 'student.user'])
                 ->join('students', 'students.id', '=', 'member_organizations.student_id')
                 ->where('member_organizations.organization_id', $orgId)
                 ->select('member_organizations.*');
 
-            // ?status=active|inactive|all  (default: active)
             $status = $request->query('status', 'active');
             if ($status !== 'all') {
                 $query->where('member_organizations.status', $status);
             }
 
-            // ?role=member|officer|adviser
             if ($request->filled('role')) {
                 $query->where('member_organizations.role', $request->query('role'));
             }
 
-            // ?search=<name or student number>
             if ($request->filled('search')) {
                 $s = $request->search;
                 $query->where(function ($q) use ($s) {
@@ -53,7 +49,7 @@ class MemberOrganizationController extends Controller
                 ->orderBy('students.first_name')
                 ->get();
 
-            // ── Real attendance rate ──────────────────────────────────────
+            // ── Attendance rate ───────────────────────────────────────────
             $eventIds    = Event::where('organization_id', $orgId)
                 ->whereIn('status', ['completed', 'ongoing'])
                 ->pluck('id');
@@ -74,7 +70,29 @@ class MemberOrganizationController extends Controller
                 $members->each(fn($m) => $m->setAttribute('attendance_rate', null));
             }
 
-            return response()->json($members);
+            // ── Map: expose user_id at top level for task assignment ──────
+            $mapped = $members->map(fn($m) => [
+                'id'              => $m->id,
+                'user_id'         => $m->student->user->id ?? null,    // ← actual users.id
+                'student_id'      => $m->student_id,
+                'role'            => $m->role,
+                'position'        => $m->position,
+                'status'          => $m->status,
+                'joined_date'     => $m->joined_date,
+                'attendance_rate' => $m->attendance_rate,
+                'student'         => [
+                    'id'             => $m->student->id ?? null,
+                    'first_name'     => $m->student->first_name ?? '',
+                    'last_name'      => $m->student->last_name ?? '',
+                    'middle_name'    => $m->student->middle_name ?? '',
+                    'student_number' => $m->student->student_number ?? '',
+                    'course'         => $m->student->course ?? null,
+                    'year_level'     => $m->student->year_level ?? null,
+                    'department'     => $m->student->department?->name ?? null,
+                ],
+            ]);
+
+            return response()->json($mapped);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['message' => 'Organization not found'], 404);
@@ -120,7 +138,25 @@ class MemberOrganizationController extends Controller
 
             return response()->json([
                 'message'    => 'Member added successfully.',
-                'membership' => $membership,
+                'membership' => [
+                    'id'          => $membership->id,
+                    'user_id'     => $membership->student->user->id ?? null, // ← actual users.id
+                    'student_id'  => $membership->student_id,
+                    'role'        => $membership->role,
+                    'position'    => $membership->position,
+                    'status'      => $membership->status,
+                    'joined_date' => $membership->joined_date,
+                    'student'     => [
+                        'id'             => $membership->student->id ?? null,
+                        'first_name'     => $membership->student->first_name ?? '',
+                        'last_name'      => $membership->student->last_name ?? '',
+                        'middle_name'    => $membership->student->middle_name ?? '',
+                        'student_number' => $membership->student->student_number ?? '',
+                        'course'         => $membership->student->course ?? null,
+                        'year_level'     => $membership->student->year_level ?? null,
+                        'department'     => $membership->student->department?->name ?? null,
+                    ],
+                ],
             ], 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {

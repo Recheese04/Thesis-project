@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Briefcase, Calendar,
   FileText, MessageSquare, ClipboardList, Settings, LogOut,
   ChevronRight, User, Shield, TrendingUp, QrCode, CheckCircle,
-  Bell, Award, X, ClipboardCheck,
+  Bell, Award, X, ClipboardCheck, AlertTriangle,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -54,7 +54,7 @@ const officerMenuSections = [
       { icon: Users,          label: 'Members',     path: '/officer/members',     badge: null },
       { icon: Calendar,       label: 'Events',      path: '/officer/events',      badge: null },
       { icon: ClipboardList,  label: 'Attendance',  path: '/officer/attendance',  badge: null },
-      { icon: ClipboardCheck, label: 'Evaluations', path: '/officer/evaluations', badge: null }, // ← CREATE & MANAGE
+      { icon: ClipboardCheck, label: 'Evaluations', path: '/officer/evaluations', badge: null },
     ],
   },
   {
@@ -66,12 +66,20 @@ const officerMenuSections = [
     ],
   },
   {
+    // ← NEW SECTION
+    label: 'Clearance',
+    items: [
+      { icon: CheckCircle,   label: 'Manage Clearance',  path: '/officer/clearance',         badge: null },
+      { icon: AlertTriangle, label: 'Consequence Rules', path: '/officer/consequence-rules', badge: null },
+    ],
+  },
+  {
     label: 'My Student',
     items: [
       { icon: QrCode,        label: 'Check In',      path: '/officer/checkin',       badge: 'Scan' },
       { icon: Calendar,      label: 'My Events',     path: '/officer/my-events',     badge: null },
       { icon: ClipboardList, label: 'My Attendance', path: '/officer/my-attendance', badge: null },
-      { icon: CheckCircle,   label: 'Clearance',     path: '/officer/clearance',     badge: null },
+      { icon: CheckCircle,   label: 'My Clearance',  path: '/officer/my-clearance',  badge: null }, // ← officer's OWN clearance status
       { icon: FileText,      label: 'Documents',     path: '/officer/documents',     badge: null },
       { icon: Award,         label: 'Obligations',   path: '/officer/obligations',   badge: null },
     ],
@@ -92,7 +100,7 @@ const studentMenuSections = [
       { icon: Calendar,       label: 'Events',           path: '/student/events',      badge: null },
       { icon: ClipboardList,  label: 'My Attendance',    path: '/student/attendance',  badge: null },
       { icon: CheckCircle,    label: 'Clearance Status', path: '/student/clearance',   badge: null },
-      { icon: ClipboardCheck, label: 'Evaluations',      path: '/student/evaluations', badge: null }, // ← ANSWER
+      { icon: ClipboardCheck, label: 'Evaluations',      path: '/student/evaluations', badge: null },
     ],
   },
   {
@@ -180,7 +188,6 @@ export default function Sidebar({ onClose }) {
     ? officerMenuSections
     : studentMenuSections;
 
-  // Close sidebar and navigate on mobile
   const handleNavClick = () => {
     if (onClose) onClose();
   };
@@ -198,7 +205,6 @@ export default function Sidebar({ onClose }) {
             <p className="text-[10px] text-slate-400 font-medium -mt-0.5">{theme.title}</p>
           </div>
         </div>
-        {/* Close button — mobile only */}
         {onClose && (
           <button
             onClick={onClose}
