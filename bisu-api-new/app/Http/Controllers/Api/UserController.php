@@ -301,4 +301,82 @@ class UserController extends Controller
             return response()->json(['message' => 'Error deleting account', 'error' => $e->getMessage()], 500);
         }
     }
+
+    //  POST /api/users/import  Bulk import students from CSV 
+    public function importStudents(Request $request)
+    {
+        $request->validate([
+            'students'                  => 'required|array|min:1|max:500',
+            'students.*.student_number' => 'required|string|max:50',
+            'students.*.first_name'     => 'required|string|max:100',
+            'students.*.middle_name'    => 'nullable|string|max:100',
+            'students.*.last_name'      => 'required|string|max:100',
+            'students.*.email'          => 'required|email|max:255',
+            'students.*.department_id'  => 'required|integer|exists:departments,id',
+            'students.*.course'         => 'required|string|max:255',
+            'students.*.year_level'     => 'required|string|max:20',
+            'students.*.contact_number' => 'nullable|string|max:20',
+        ]);
+
+        $rows    = $request->students;
+        $created = 0;
+        $skipped = [];
+        $errors  = [];
+
+        DB::beginTransaction();
+        try {
+            foreach ($rows as $i => $row) {
+                $rowNum = $i + 1;
+
+                if (User::where('email', $row['email'])->exists()) {
+                    $skipped[] = ['row' => $rowNum, 'reason' => "Email {$row['email']} already exists"];
+                    continue;
+                }
+
+                if (Student::where('student_number', $row['student_number'])->exists()) {
+                    $skipped[] = ['row' => $rowNum, 'reason' => "Student # {$row['student_number']} already exists"];
+                    continue;
+                }
+
+                try {
+                    $student = Student::create([
+                        'student_number' => $row['student_number'],
+                        'first_name'     => $row['first_name'],
+                        'middle_name'    => $row['middle_name'] ?? null,
+                        'last_name'      => $row['last_name'],
+                        'department_id'  => $row['department_id'],
+                        'course'         => $row['course'],
+                        'year_level'     => $row['year_level'],
+                        'contact_number' => $row['contact_number'] ?? null,
+                    ]);
+
+                    User::create([
+                        'email'         => $row['email'],
+                        'password_hash' => Hash::make('bisu_' . $row['student_number']),
+                        'user_type_id'  => 3,
+                        'student_id'    => $student->id,
+                        'is_active'     => true,
+                    ]);
+
+                    $created++;
+                } catch (\Exception $e) {
+                    $errors[] = ['row' => $rowNum, 'reason' => $e->getMessage()];
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => "{$created} student(s) imported successfully.",
+                'created' => $created,
+                'skipped' => $skipped,
+                'errors'  => $errors,
+                'total'   => count($rows),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('User import error: ' . $e->getMessage());
+            return response()->json(['message' => 'Import failed', 'error' => $e->getMessage()], 500);
+        }
+    }
 }

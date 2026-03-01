@@ -1,0 +1,11 @@
+student_number,first_name,middle_name,last_name,email,department_id,course,year_level,contact_number
+2024-10001,Maria,Santos,Garcia,maria.garcia@bisu.edu.ph,1,Bachelor of Science in Computer Science,1st Year,09171234567
+2024-10002,Juan,Cruz,Dela Cruz,juan.delacruz@bisu.edu.ph,1,Bachelor of Science in Computer Science,2nd Year,09182345678
+2024-10003,Ana,Reyes,Lopez,ana.lopez@bisu.edu.ph,2,Bachelor of Science in Fisheries,1st Year,09193456789
+2024-10004,Pedro,Santos,Bautista,pedro.bautista@bisu.edu.ph,3,Bachelor of Elementary Education,3rd Year,09204567890
+2024-10005,Sophia,Mendoza,Rivera,sophia.rivera@bisu.edu.ph,4,Bachelor of Science in Hospitality Management,2nd Year,09215678901
+2024-10006,Miguel,Torres,Reyes,miguel.reyes@bisu.edu.ph,1,Bachelor of Science in Environmental Science major in Coastal Resource Management,1st Year,09226789012
+2024-10007,Isabella,Flores,Santos,isabella.santos@bisu.edu.ph,3,Bachelor of Secondary Education (BSEd),4th Year,09237890123
+2024-10008,Carlos,Aquino,Villareal,carlos.villareal@bisu.edu.ph,2,Bachelor of Science in Marine Biology,2nd Year,09248901234
+2024-10009,Jasmine,Ramos,Cruz,jasmine.cruz@bisu.edu.ph,4,Bachelor of Science in Office Administration,3rd Year,09259012345
+2024-10010,Rafael,Gonzales,Tan,rafael.tan@bisu.edu.ph,1,Bachelor of Science in Computer Science,4th Year,09260123456
