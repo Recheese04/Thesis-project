@@ -5,7 +5,7 @@ import {
   UserCircle, GraduationCap, Search, X,
   Pencil, Users, Shield, Star,
   RefreshCw, Building2, AlertTriangle,
-  ChevronRight, Activity, MoreHorizontal, BookOpen, Filter
+  ChevronRight, Activity, MoreHorizontal, BookOpen, Filter, Upload
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -30,12 +30,13 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import UserFormModal from "../../modals/UserFormModal";
+import ImportStudentsModal from "../../modals/ImportStudentsModal";
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
 const ROLE_META = {
-  "1": { label: "Admin",   icon: Shield,       badge: "bg-[#0f2d5e] text-white border-[#0f2d5e]",  grad: "from-[#0f2d5e] to-[#1a4a8a]" },
-  "2": { label: "Officer", icon: Star,          badge: "bg-[#1e4db7] text-white border-[#1e4db7]",  grad: "from-[#1e4db7] to-[#3b6fd4]" },
-  "3": { label: "Student", icon: GraduationCap, badge: "bg-blue-50 text-blue-700 border-blue-200",  grad: "from-[#2563eb] to-[#5b9ef7]" },
+  "1": { label: "Admin", icon: Shield, badge: "bg-[#0f2d5e] text-white border-[#0f2d5e]", grad: "from-[#0f2d5e] to-[#1a4a8a]" },
+  "2": { label: "Officer", icon: Star, badge: "bg-[#1e4db7] text-white border-[#1e4db7]", grad: "from-[#1e4db7] to-[#3b6fd4]" },
+  "3": { label: "Student", icon: GraduationCap, badge: "bg-blue-50 text-blue-700 border-blue-200", grad: "from-[#2563eb] to-[#5b9ef7]" },
 };
 
 const getInitials = (u) =>
@@ -97,20 +98,25 @@ function DeleteDialog({ open, onClose, onConfirm, userName }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function UserManagement() {
-  const [users, setUsers]                 = useState([]);
-  const [departments, setDepartments]     = useState([]);
+  const [users, setUsers] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [organizations, setOrganizations] = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [search, setSearch]               = useState("");
-  const [filterRole, setFilterRole]       = useState("all");
-  const [filterYear, setFilterYear]       = useState("all");
-  const [filterDept, setFilterDept]       = useState("all");
-  const [filterCourse, setFilterCourse]   = useState("all");
-  const [filterOrg, setFilterOrg]         = useState("all");
-  const [showFilters, setShowFilters]     = useState(false);
-  const [formOpen, setFormOpen]           = useState(false);
-  const [editUser, setEditUser]           = useState(null);
-  const [deleteTarget, setDeleteTarget]   = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState("all");
+  const [filterYear, setFilterYear] = useState("all");
+  const [filterDept, setFilterDept] = useState("all");
+  const [filterCourse, setFilterCourse] = useState("all");
+  const [filterOrg, setFilterOrg] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   useEffect(() => {
     Promise.all([
@@ -129,6 +135,7 @@ export default function UserManagement() {
       setLoading(true);
       const res = await axios.get("/api/users", authH());
       setUsers(res.data);
+      setCurrentPage(1); // Reset to first page on fetch
     } catch {
       toast.error("Error", { description: "Failed to load users. Please try again." });
     } finally {
@@ -137,6 +144,11 @@ export default function UserManagement() {
   };
 
   useEffect(() => { fetchUsers(); }, []);
+
+  // Reset pagination when filters or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterRole, filterYear, filterDept, filterCourse, filterOrg]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -150,30 +162,33 @@ export default function UserManagement() {
     }
   };
 
-  const total    = users.length;
-  const active   = users.filter(u => u.is_active).length;
-  const admins   = users.filter(u => String(u.user_type_id) === "1").length;
+  const total = users.length;
+  const active = users.filter(u => u.is_active).length;
+  const admins = users.filter(u => String(u.user_type_id) === "1").length;
   const officers = users.filter(u => String(u.user_type_id) === "2").length;
   const students = users.filter(u => String(u.user_type_id) === "3").length;
 
   const filtered = users.filter(u => {
-    const q           = search.toLowerCase();
+    const q = search.toLowerCase();
     const matchSearch = !search
       || getFullName(u).toLowerCase().includes(q)
       || u.email?.toLowerCase().includes(q)
       || u.student?.student_number?.toLowerCase().includes(q);
-    const matchRole   = filterRole === "all" || String(u.user_type_id) === filterRole;
-    const matchYear   = filterYear === "all" || u.student?.year_level === filterYear;
-    const matchDept   = filterDept === "all" || String(u.student?.department_id) === filterDept;
+    const matchRole = filterRole === "all" || String(u.user_type_id) === filterRole;
+    const matchYear = filterYear === "all" || u.student?.year_level === filterYear;
+    const matchDept = filterDept === "all" || String(u.student?.department_id) === filterDept;
     const matchCourse = filterCourse === "all" || u.student?.course === filterCourse;
-    const matchOrg    = filterOrg === "all"
+    const matchOrg = filterOrg === "all"
       || (u.all_memberships ?? []).some(m => String(m.organization_id) === filterOrg);
     return matchSearch && matchRole && matchYear && matchDept && matchCourse && matchOrg;
   });
 
-  const availableYears     = [...new Set(users.map(u => u.student?.year_level).filter(Boolean))].sort();
-  const availableCourses   = [...new Set(users.map(u => u.student?.course).filter(Boolean))].sort();
+  const availableYears = [...new Set(users.map(u => u.student?.year_level).filter(Boolean))].sort();
+  const availableCourses = [...new Set(users.map(u => u.student?.course).filter(Boolean))].sort();
   const activeFiltersCount = [filterYear, filterDept, filterCourse, filterOrg].filter(f => f !== "all").length;
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <TooltipProvider>
@@ -204,15 +219,19 @@ export default function UserManagement() {
               className="bg-gradient-to-r from-[#0f2d5e] to-[#1e4db7] hover:opacity-90 text-white shadow-md shadow-[#0f2d5e]/25 rounded-xl h-9 px-4 font-semibold text-sm">
               <UserPlus className="mr-2 h-4 w-4" /> Add User
             </Button>
+            <Button onClick={() => setImportOpen(true)}
+              className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-90 text-white shadow-md shadow-emerald-600/25 rounded-xl h-9 px-4 font-semibold text-sm">
+              <Upload className="mr-2 h-4 w-4" /> Import CSV
+            </Button>
           </div>
         </div>
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatCard icon={Users}         label="Total Accounts" value={total}    sub={`${active} active`} grad="from-[#0f2d5e] to-[#1a4a8a]" />
-          <StatCard icon={Shield}        label="Admins"         value={admins}   sub="Full access"        grad="from-[#1a3568] to-[#2d5ca8]" />
-          <StatCard icon={Star}          label="Officers"       value={officers} sub="Org managers"       grad="from-[#1e4db7] to-[#3b6fd4]" />
-          <StatCard icon={GraduationCap} label="Students"       value={students} sub="Enrolled accounts"  grad="from-[#2563eb] to-[#5b9ef7]" />
+          <StatCard icon={Users} label="Total Accounts" value={total} sub={`${active} active`} grad="from-[#0f2d5e] to-[#1a4a8a]" />
+          <StatCard icon={Shield} label="Admins" value={admins} sub="Full access" grad="from-[#1a3568] to-[#2d5ca8]" />
+          <StatCard icon={Star} label="Officers" value={officers} sub="Org managers" grad="from-[#1e4db7] to-[#3b6fd4]" />
+          <StatCard icon={GraduationCap} label="Students" value={students} sub="Enrolled accounts" grad="from-[#2563eb] to-[#5b9ef7]" />
         </div>
 
         {/* Table card */}
@@ -361,11 +380,11 @@ export default function UserManagement() {
                       </div>
                     </td>
                   </tr>
-                ) : filtered.map(user => {
-                  const rk             = String(user.user_type_id);
-                  const meta           = ROLE_META[rk];
-                  const Ico            = meta?.icon ?? UserCircle;
-                  const deptName       = user.student?.department?.name ?? departments.find(d => d.id === user.student?.department_id)?.name ?? null;
+                ) : paginated.map(user => {
+                  const rk = String(user.user_type_id);
+                  const meta = ROLE_META[rk];
+                  const Ico = meta?.icon ?? UserCircle;
+                  const deptName = user.student?.department?.name ?? departments.find(d => d.id === user.student?.department_id)?.name ?? null;
                   const allMemberships = user.all_memberships ?? [];
 
                   return (
@@ -458,14 +477,46 @@ export default function UserManagement() {
             </table>
           </div>
 
-          <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs text-slate-400">
+          <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
             <span>
-              Showing <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-              <strong className="text-slate-600">{total}</strong> accounts
+              Showing <strong className="text-slate-600">{Math.min((currentPage - 1) * itemsPerPage + 1, filtered.length)}</strong> to <strong className="text-slate-600">{Math.min(currentPage * itemsPerPage, filtered.length)}</strong> of{" "}
+              <strong className="text-slate-600">{filtered.length}</strong> accounts
               {(filterRole !== "all" || activeFiltersCount > 0) && " (filtered)"}
               {search && ` · "${search}"`}
             </span>
-            <span>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="sm"
+                  onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
+                  className="h-7 px-2 border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-50">
+                  <span className="sr-only">First Page</span>&laquo;
+                </Button>
+                <Button variant="outline" size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                  className="h-7 px-2 border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-50">
+                  <span className="sr-only">Previous Page</span>&lsaquo;
+                </Button>
+
+                <span className="px-2 font-medium text-slate-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <Button variant="outline" size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                  className="h-7 px-2 border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-50">
+                  <span className="sr-only">Next Page</span>&rsaquo;
+                </Button>
+                <Button variant="outline" size="sm"
+                  onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}
+                  className="h-7 px-2 border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-50">
+                  <span className="sr-only">Last Page</span>&raquo;
+                </Button>
+              </div>
+            )}
+
+            <span className="hidden sm:inline">
               <strong className="text-slate-600">{active}</strong> active ·{" "}
               <strong className="text-slate-600">{total - active}</strong> inactive
             </span>
@@ -480,6 +531,12 @@ export default function UserManagement() {
         editUser={editUser}
         departments={departments}
         organizations={organizations}
+      />
+      <ImportStudentsModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={fetchUsers}
+        departments={departments}
       />
       <DeleteDialog
         open={Boolean(deleteTarget)}

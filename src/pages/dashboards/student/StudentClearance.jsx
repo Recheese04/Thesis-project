@@ -39,13 +39,37 @@ export default function StudentClearance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [orgs, setOrgs] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState(null);
+
+  // 1. Fetch the student's organizations
+  const fetchMyOrgs = useCallback(async () => {
+    if (!studentId) return;
+    try {
+      const res = await axios.get(`/api/students/${studentId}/organizations`, authH());
+      setOrgs(res.data);
+
+      // Select the first org by default if none selected
+      if (res.data.length > 0) {
+        // Try to match active localStorage org first, otherwise fallback to first
+        const matchedOrg = orgId ? res.data.find(o => o.organization_id === orgId) : null;
+        setSelectedOrgId(matchedOrg ? matchedOrg.organization_id : res.data[0].organization_id);
+      }
+    } catch (err) {
+      console.error("Failed to load organizations:", err);
+    }
+  }, [studentId, orgId]);
+
+  useEffect(() => { fetchMyOrgs(); }, [fetchMyOrgs]);
+
+  // 2. Fetch clearance for the active organization
   const fetchClearance = useCallback(async () => {
-    if (!studentId || !orgId) return;
+    if (!studentId || !selectedOrgId) return;
     setLoading(true);
     setError(null);
     try {
       const res = await axios.get(`/api/students/${studentId}/clearance`, {
-        params: { org_id: orgId, school_year: schoolYear, semester },
+        params: { org_id: selectedOrgId, school_year: schoolYear, semester },
         ...authH(),
       });
       setData(res.data);
@@ -54,16 +78,28 @@ export default function StudentClearance() {
     } finally {
       setLoading(false);
     }
-  }, [studentId, orgId]);
+  }, [studentId, selectedOrgId]);
 
-  useEffect(() => { fetchClearance(); }, [fetchClearance]);
+  useEffect(() => {
+    if (selectedOrgId) fetchClearance();
+  }, [fetchClearance, selectedOrgId]);
 
   // ── Guard: missing IDs ──────────────────────────────────────────────────
-  if (!studentId || !orgId) {
+  if (!studentId) {
     return (
       <div className="flex items-center justify-center h-48">
         <p className="text-slate-500 text-sm">
-          No organization found for your account.
+          No student profile found for this account.
+        </p>
+      </div>
+    );
+  }
+
+  if (orgs.length === 0 && !loading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <p className="text-slate-500 text-sm">
+          You are not a member of any organization.
         </p>
       </div>
     );
@@ -97,17 +133,35 @@ export default function StudentClearance() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start flex-wrap gap-3">
+      <div className="flex justify-between items-start flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Clearance Status</h1>
           <p className="text-slate-600 mt-1">
             {schoolYear} — {semester} Semester
           </p>
         </div>
-        <Button variant="outline" onClick={fetchClearance} disabled={loading} className="gap-2">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+
+        <div className="flex items-center gap-3">
+          {orgs.length > 1 && (
+            <select
+              value={selectedOrgId || ''}
+              onChange={(e) => setSelectedOrgId(parseInt(e.target.value))}
+              className="bg-white border border-slate-200 text-sm rounded-lg px-3 py-2 shadow-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none"
+            >
+              <option value="" disabled>Select Organization</option>
+              {orgs.map(org => (
+                <option key={org.organization_id} value={org.organization_id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <Button variant="outline" onClick={fetchClearance} disabled={loading} className="gap-2 shrink-0">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Loading */}

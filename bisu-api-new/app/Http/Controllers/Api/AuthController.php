@@ -13,7 +13,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email'    => 'required|email',
+            'email' => 'required|email',
             'password' => 'required',
         ]);
 
@@ -29,8 +29,16 @@ class AuthController extends Controller
 
         $user->load(['student', 'userType']);
 
-        $role           = 'admin';
-        $membership     = null;
+        // Default base role from user_type_id (1=Admin, 2=Officer, 3=Student)
+        $role = 'member';
+        if ($user->user_type_id == 1) {
+            $role = 'admin';
+        }
+        elseif ($user->user_type_id == 2) {
+            $role = 'officer';
+        }
+
+        $membership = null;
         $organizationId = null;
 
         if ($user->student_id) {
@@ -42,21 +50,22 @@ class AuthController extends Controller
                 ->first();
 
             if ($membership) {
-                $role           = in_array($membership->role, ['officer', 'adviser']) ? 'officer' : 'member';
+                // If they have an officer/adviser org role, temporarily elevate their session to officer
+                if (in_array($membership->role, ['officer', 'adviser'])) {
+                    $role = 'officer';
+                }
                 $organizationId = $membership->organization_id;
-            } else {
-                $role = 'member';
             }
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'message'         => 'Login successful',
-            'token'           => $token,
-            'user'            => $user,
-            'role'            => $role,
-            'membership'      => $membership,
+            'message' => 'Login successful',
+            'token' => $token,
+            'user' => $user,
+            'role' => $role,
+            'membership' => $membership,
             'organization_id' => $organizationId,
         ], 200);
     }
@@ -72,9 +81,17 @@ class AuthController extends Controller
     {
         $user = $request->user()->load(['student', 'userType']);
 
-        $membership     = null;
+        // Default base role from user_type_id (1=Admin, 2=Officer, 3=Student)
+        $role = 'member';
+        if ($user->user_type_id == 1) {
+            $role = 'admin';
+        }
+        elseif ($user->user_type_id == 2) {
+            $role = 'officer';
+        }
+
+        $membership = null;
         $organizationId = null;
-        $role           = 'admin';
 
         if ($user->student_id) {
             // ✅ Load 'organization' so frontend can read membership.organization.name
@@ -85,18 +102,18 @@ class AuthController extends Controller
                 ->first();
 
             if ($membership) {
-                $role           = in_array($membership->role, ['officer', 'adviser']) ? 'officer' : 'member';
+                if (in_array($membership->role, ['officer', 'adviser'])) {
+                    $role = 'officer';
+                }
                 $organizationId = $membership->organization_id;
-            } else {
-                $role = 'member';
             }
         }
 
         return response()->json([
-            'user'            => $user,
-            'role'            => $role,
-            'membership'      => $membership,       // includes membership.organization.name
-            'organization_id' => $organizationId,   // ← this is what OfficerMembers reads
+            'user' => $user,
+            'role' => $role,
+            'membership' => $membership, // includes membership.organization.name
+            'organization_id' => $organizationId, // ← this is what OfficerMembers reads
         ]);
     }
 }

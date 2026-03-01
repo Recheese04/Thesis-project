@@ -19,7 +19,7 @@ class MemberOrganization extends Model
         'joined_date',
         'status',
     ];
-        
+
     protected $casts = [
         'joined_date' => 'date',
     ];
@@ -28,12 +28,12 @@ class MemberOrganization extends Model
 
     public function organization()
     {
-        return $this->belongsTo(Organization::class, 'organization_id');
+        return $this->belongsTo(Organization::class , 'organization_id');
     }
 
     public function student()
     {
-        return $this->belongsTo(Student::class, 'student_id');
+        return $this->belongsTo(Student::class , 'student_id');
     }
 
     // ── Scopes ─────────────────────────────────────────────────────────────

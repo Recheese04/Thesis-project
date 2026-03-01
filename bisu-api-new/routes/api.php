@@ -32,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users', [UserController::class , 'store']);
     Route::put('/users/{id}', [UserController::class , 'update']);
     Route::delete('/users/{id}', [UserController::class , 'destroy']);
+    Route::post('/users/import', [UserController::class , 'importStudents']);
 
     // Students
     Route::get('/students', function () {
@@ -116,6 +117,30 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/organizations/{orgId}/clearance-requirements', [ClearanceController::class , 'storeRequirement']);
 
                 // Clearance Status
+                Route::get('/students/{studentId}/organizations', function ($studentId) {
+            try {
+                $studentId = (int)$studentId;
+                $memberships = \App\Models\MemberOrganization::with(['organization'])
+                    ->where('student_id', $studentId)
+                    ->where('status', 'active')
+                    ->get();
+                $orgs = $memberships->map(function ($m) {
+                            return [
+                            'organization_id' => $m->organization_id,
+                            'name' => $m->organization->name,
+                            'role' => $m->role,
+                            'position' => $m->position,
+                            ];
+                        }
+                        );
+                        return response()->json($orgs);
+                    }
+                    catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error('myOrganizations error: ' . $e->getMessage());
+                        return response()->json(['message' => 'Error fetching organizations', 'error' => $e->getMessage()], 500);
+                    }
+                }
+                );
                 Route::get('/students/{studentId}/clearance', [ClearanceController::class , 'getStudentClearance']);
                 Route::get('/organizations/{orgId}/clearance', [ClearanceController::class , 'getOrgClearance']);
                 Route::post('/clearance/{requirementId}/students/{studentId}/clear', [ClearanceController::class , 'clearRequirement']);
