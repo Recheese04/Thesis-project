@@ -487,7 +487,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
     setError(null);
     try {
       const data = await apiFetch(
-        `/organizations/${orgId}/members?status=active${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`
+        `/organizations/${orgId}/members?status=all${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`
       );
       setMembers(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -517,6 +517,29 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
   const handleRemoved = (membershipId) => {
     setMembers(prev => prev.filter(m => m.id !== membershipId));
   };
+
+  const handleApprove = async (membershipId) => {
+    try {
+      await apiFetch(`/organizations/${orgId}/members/${membershipId}/approve`, { method: 'POST' });
+      pushToast('Join request approved!');
+      setMembers(prev => prev.map(m => m.id === membershipId ? { ...m, status: 'active' } : m));
+    } catch (err) {
+      pushToast(err.message, 'error');
+    }
+  };
+
+  const handleReject = async (membershipId) => {
+    try {
+      await apiFetch(`/organizations/${orgId}/members/${membershipId}/reject`, { method: 'POST' });
+      pushToast('Join request rejected.');
+      setMembers(prev => prev.filter(m => m.id !== membershipId));
+    } catch (err) {
+      pushToast(err.message, 'error');
+    }
+  };
+
+  const activeMembersList = members.filter(m => m.status === 'active');
+  const pendingMembersList = members.filter(m => m.status === 'pending');
 
   // ── derived stats ────────────────────────────────────────────────────────
   const stats = {
@@ -645,6 +668,52 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
           </CardContent>
         </Card>
 
+        {/* Pending Requests */}
+        {!loading && !error && pendingMembersList.length > 0 && (
+          <Card className="border-amber-200 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-amber-400" />
+            <CardHeader className="pb-3 border-b border-slate-100 bg-amber-50/50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-base sm:text-lg text-amber-900">Pending Join Requests</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm text-amber-700/80">Students waiting for approval</CardDescription>
+                </div>
+                <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200">
+                  {pendingMembersList.length} Pending
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3">
+              {pendingMembersList.map(m => (
+                <div key={m.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-white">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="w-10 h-10 shrink-0">
+                      <AvatarFallback className="bg-amber-100 text-amber-700 font-bold text-sm">
+                        {getInitials(fullName(m))}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900 text-sm truncate">{fullName(m)}</p>
+                      <p className="text-xs text-slate-500 font-mono">{studentId(m)} · {course(m)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button size="sm" onClick={() => handleApprove(m.id)} className="h-8 gap-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg px-3">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleReject(m.id)} className="h-8 gap-1 rounded-lg text-slate-600 hover:text-red-600 px-3">
+                      <X className="w-3.5 h-3.5" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Member list */}
         <Card>
           <CardHeader className="pb-3">
@@ -692,7 +761,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
               <>
                 {/* ── Mobile cards ── */}
                 <div className="sm:hidden space-y-3">
-                  {members.map(m => (
+                  {activeMembersList.map(m => (
                     <div key={m.id} className="rounded-xl border border-slate-200 p-4 space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3 min-w-0">
@@ -766,7 +835,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {members.map(m => (
+                      {activeMembersList.map(m => (
                         <TableRow key={m.id}>
                           <TableCell>
                             <div className="flex items-center gap-3">

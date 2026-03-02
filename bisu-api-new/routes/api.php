@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\ConsequenceRuleController;
 use App\Http\Controllers\Api\ClearanceController;
 use App\Http\Controllers\Api\TaskController;
 use App\Models\Student;
+use App\Models\MemberOrganization;
 
 Route::post('/login', [AuthController::class , 'login'])->middleware('throttle:5,1');
 
@@ -26,16 +27,98 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class , 'logout']);
     Route::get('/me', [AuthController::class , 'me']);
 
-    // User Management
-    Route::get('/users', [UserController::class , 'index']);
-    Route::get('/users/{id}', [UserController::class , 'show']);
-    Route::post('/users', [UserController::class , 'store']);
-    Route::put('/users/{id}', [UserController::class , 'update']);
-    Route::delete('/users/{id}', [UserController::class , 'destroy']);
-    Route::post('/users/import', [UserController::class , 'importStudents']);
+    // Student Profile
+    Route::put('/profile', function (Request $request) {
+            $user = $request->user();
+            $data = $request->validate([
+                'email' => "required|email|unique:users,email,{$user->id}",
+                'contact_number' => 'nullable|string|max:20',
+            ]);
+            $user->update(['email' => $data['email']]);
+            if ($user->student) {
+                $user->student->update(['contact_number' => $data['contact_number'] ?? null]);
+            }
+            return response()->json(['message' => 'Profile updated successfully.']);
+        }
+        );
 
-    // Students
-    Route::get('/students', function () {
+        Route::post('/profile/password', function (Request $request) {
+            $user = $request->user();
+            $data = $request->validate([
+                'current_password' => 'required|string',
+                'new_password' => 'required|string|min:8|confirmed',
+                'new_password_confirmation' => 'required|string',
+            ]);
+
+            \Illuminate\Support\Facades\Log::info('Password check attempt', [
+                'provided' => $data['current_password'],
+                'actual_hash' => $user->getAuthPassword() ?? 'NULL',
+                'is_valid' => \Illuminate\Support\Facades\Hash::check($data['current_password'], $user->getAuthPassword())
+            ]);
+
+            if (!\Illuminate\Support\Facades\Hash::check($data['current_password'], $user->getAuthPassword())) { // Corrected check
+                return response()->json(['message' => 'Current password is incorrect.'], 422);
+            }
+            $user->update(['password_hash' => \Illuminate\Support\Facades\Hash::make($data['new_password'])]);
+            return response()->json(['message' => 'Password changed successfully.']);
+        }
+        );
+
+        Route::get('/profile/my-organizations', function (Request $request) {
+            $user = $request->user();
+            if (!$user->student_id)
+                return response()->json([]);
+            return MemberOrganization::with('organization')
+            ->where('student_id', $user->student_id)
+            ->where('status', 'active')
+            ->get();
+        }
+        );
+
+        Route::get('/profile/join-requests', function (Request $request) {
+            $user = $request->user();
+            if (!$user->student_id)
+                return response()->json([]);
+            return MemberOrganization::with('organization')
+            ->where('student_id', $user->student_id)
+            ->where('status', 'pending')
+            ->get();
+        }
+        );
+
+        Route::post('/organizations/{orgId}/join-request', function (Request $request, $orgId) {
+            $user = $request->user();
+            if (!$user->student_id) {
+                return response()->json(['message' => 'Only students can join organizations.'], 403);
+            }
+            $exists = MemberOrganization::where('student_id', $user->student_id)
+                ->where('organization_id', $orgId)
+                ->whereIn('status', ['active', 'pending'])
+                ->exists();
+            if ($exists) {
+                return response()->json(['message' => 'You already have an active or pending membership.'], 422);
+            }
+            MemberOrganization::create([
+                'student_id' => $user->student_id,
+                'organization_id' => $orgId,
+                'role' => 'member',
+                'status' => 'pending',
+                'joined_date' => now()->toDateString(),
+            ]);
+            return response()->json(['message' => 'Join request sent! Waiting for officer approval.']);
+        }
+        );
+
+        // User Management
+        Route::get('/users', [UserController::class , 'index']);
+        Route::get('/users/{id}', [UserController::class , 'show']);
+        Route::post('/users', [UserController::class , 'store']);
+        Route::put('/users/{id}', [UserController::class , 'update']);
+        Route::delete('/users/{id}', [UserController::class , 'destroy']);
+        Route::post('/users/import', [UserController::class , 'importStudents']);
+
+        // Students
+        Route::get('/students', function () {
             try {
                 $query = Student::with([
                     'department:id,name,code',
@@ -106,18 +189,32 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::patch('/organizations/{org_id}/members/{membershipId}/role', [MemberOrganizationController::class , 'updateRole']);
                 Route::delete('/organizations/{org_id}/members/{membershipId}', [MemberOrganizationController::class , 'destroy']);
 
-                // Consequence Rules
-                Route::get('/organizations/{orgId}/consequence-rules', [ConsequenceRuleController::class , 'index']);
-                Route::post('/organizations/{orgId}/consequence-rules', [ConsequenceRuleController::class , 'store']);
-                Route::put('/consequence-rules/{id}', [ConsequenceRuleController::class , 'update']);
-                Route::delete('/consequence-rules/{id}', [ConsequenceRuleController::class , 'destroy']);
+                // Join Request Approvals
+                Route::post('/organizations/{org_id}/members/{membershipId}/approve', function (Request $request, $orgId, $membershipId) {
+            $membership = \App\Models\MemberOrganization::where('organization_id', $orgId)->findOrFail($membershipId);
+            $membership->update(['status' => 'active', 'joined_date' => now()->toDateString()]);
+            return response()->json(['message' => 'Join request approved.']);
+        }
+        );
+        Route::post('/organizations/{org_id}/members/{membershipId}/reject', function (Request $request, $orgId, $membershipId) {
+            $membership = \App\Models\MemberOrganization::where('organization_id', $orgId)->findOrFail($membershipId);
+            $membership->update(['status' => 'rejected']); // Or delete it: $membership->delete();
+            return response()->json(['message' => 'Join request rejected.']);
+        }
+        );
 
-                // Clearance Requirements
-                Route::get('/organizations/{orgId}/clearance-requirements', [ClearanceController::class , 'getRequirements']);
-                Route::post('/organizations/{orgId}/clearance-requirements', [ClearanceController::class , 'storeRequirement']);
+        // Consequence Rules
+        Route::get('/organizations/{orgId}/consequence-rules', [ConsequenceRuleController::class , 'index']);
+        Route::post('/organizations/{orgId}/consequence-rules', [ConsequenceRuleController::class , 'store']);
+        Route::put('/consequence-rules/{id}', [ConsequenceRuleController::class , 'update']);
+        Route::delete('/consequence-rules/{id}', [ConsequenceRuleController::class , 'destroy']);
 
-                // Clearance Status
-                Route::get('/students/{studentId}/organizations', function ($studentId) {
+        // Clearance Requirements
+        Route::get('/organizations/{orgId}/clearance-requirements', [ClearanceController::class , 'getRequirements']);
+        Route::post('/organizations/{orgId}/clearance-requirements', [ClearanceController::class , 'storeRequirement']);
+
+        // Clearance Status
+        Route::get('/students/{studentId}/organizations', function ($studentId) {
             try {
                 $studentId = (int)$studentId;
                 $memberships = \App\Models\MemberOrganization::with(['organization'])
