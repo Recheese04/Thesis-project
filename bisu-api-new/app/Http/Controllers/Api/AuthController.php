@@ -27,7 +27,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Your account has been deactivated.'], 403);
         }
 
-        $user->load(['student', 'userType']);
+        $user->load(['student.department', 'userType']);
 
         // Default base role from user_type_id (1=Admin, 2=Officer, 3=Student)
         $role = 'member';
@@ -79,7 +79,7 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        $user = $request->user()->load(['student', 'userType']);
+        $user = $request->user()->load(['student.department', 'userType']);
 
         // Default base role from user_type_id (1=Admin, 2=Officer, 3=Student)
         $role = 'member';
