@@ -81,14 +81,22 @@ class MemberOrganizationController extends Controller
                 'joined_date'     => $m->joined_date,
                 'attendance_rate' => $m->attendance_rate,
                 'student'         => [
-                    'id'             => $m->student->id ?? null,
-                    'first_name'     => $m->student->first_name ?? '',
-                    'last_name'      => $m->student->last_name ?? '',
-                    'middle_name'    => $m->student->middle_name ?? '',
-                    'student_number' => $m->student->student_number ?? '',
-                    'course'         => $m->student->course ?? null,
-                    'year_level'     => $m->student->year_level ?? null,
-                    'department'     => $m->student->department?->name ?? null,
+                    'id'                  => $m->student->id ?? null,
+                    'first_name'          => $m->student->first_name ?? '',
+                    'last_name'           => $m->student->last_name ?? '',
+                    'middle_name'         => $m->student->middle_name ?? '',
+                    'student_number'      => $m->student->student_number ?? '',
+                    'email'               => $m->student->email ?? null,
+                    'contact_number'      => $m->student->contact_number ?? null,
+                    'course'              => $m->student->course ?? null,
+                    'year_level'          => $m->student->year_level ?? null,
+                    'department'          => $m->student->department?->name ?? null,
+                    'rfid_uid'            => $m->student->rfid_uid ?? null,
+                    'profile_picture_url' => $m->student->profile_picture_url ?? null,
+                    'user'                => $m->student->user ? [
+                        'id'    => $m->student->user->id,
+                        'email' => $m->student->user->email,
+                    ] : null,
                 ],
             ]);
 
@@ -147,14 +155,22 @@ class MemberOrganizationController extends Controller
                     'status'      => $membership->status,
                     'joined_date' => $membership->joined_date,
                     'student'     => [
-                        'id'             => $membership->student->id ?? null,
-                        'first_name'     => $membership->student->first_name ?? '',
-                        'last_name'      => $membership->student->last_name ?? '',
-                        'middle_name'    => $membership->student->middle_name ?? '',
-                        'student_number' => $membership->student->student_number ?? '',
-                        'course'         => $membership->student->course ?? null,
-                        'year_level'     => $membership->student->year_level ?? null,
-                        'department'     => $membership->student->department?->name ?? null,
+                        'id'                  => $membership->student->id ?? null,
+                        'first_name'          => $membership->student->first_name ?? '',
+                        'last_name'           => $membership->student->last_name ?? '',
+                        'middle_name'         => $membership->student->middle_name ?? '',
+                        'student_number'      => $membership->student->student_number ?? '',
+                        'email'               => $membership->student->email ?? null,
+                        'contact_number'      => $membership->student->contact_number ?? null,
+                        'course'              => $membership->student->course ?? null,
+                        'year_level'          => $membership->student->year_level ?? null,
+                        'department'          => $membership->student->department?->name ?? null,
+                        'rfid_uid'            => $membership->student->rfid_uid ?? null,
+                        'profile_picture_url' => $membership->student->profile_picture_url ?? null,
+                        'user'                => $membership->student->user ? [
+                            'id'    => $membership->student->user->id,
+                            'email' => $membership->student->user->email,
+                        ] : null,
                     ],
                 ],
             ], 201);
@@ -252,4 +268,40 @@ class MemberOrganizationController extends Controller
             return response()->json(['message' => 'Error searching students', 'error' => $e->getMessage()], 500);
         }
     }
+
+    public function memberAttendance($orgId, $studentId)
+    {
+        try {
+            $events = \App\Models\Event::where('organization_id', $orgId)
+                ->orderBy('event_date', 'desc')
+                ->orderBy('event_time', 'desc')
+                ->get();
+
+            $attendances = \App\Models\Attendance::where('student_id', $studentId)
+                ->whereIn('event_id', $events->pluck('id'))
+                ->get()
+                ->keyBy('event_id');
+
+            $history = $events->map(function ($event) use ($attendances) {
+                $att = $attendances->get($event->id);
+                return [
+                    'event_title' => $event->title,
+                    'event_date' => $event->formatted_date,
+                    'event_status' => $event->status,
+                    'is_past' => $event->is_past,
+                    'attended' => $att !== null,
+                    'time_in' => $att && $att->time_in ? $att->time_in->format('h:i A') : null,
+                    'time_out' => $att && $att->time_out ? $att->time_out->format('h:i A') : null,
+                    'duration' => $att ? $att->formatted_duration : null,
+                ];
+            });
+
+            return response()->json($history);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('MemberOrg attendance history error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error fetching attendance history', 'error' => $e->getMessage()], 500);
+        }
+    }
 }
+
+

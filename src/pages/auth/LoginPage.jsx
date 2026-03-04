@@ -86,6 +86,14 @@ export default function Login() {
           0%,100% { opacity: 0.5; transform: scale(1); }
           50%     { opacity: 0.9; transform: scale(1.08); }
         }
+        @keyframes float {
+          0%, 100% { transform: translateY(0) rotate(-2deg); }
+          50% { transform: translateY(-10px) rotate(2deg); }
+        }
+        @keyframes floatReverse {
+          0%, 100% { transform: translateY(0) rotate(2deg); }
+          50% { transform: translateY(-12px) rotate(-2deg); }
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         .anim-panel  { animation: panelIn    0.75s cubic-bezier(.22,1,.36,1) both; }
@@ -93,6 +101,8 @@ export default function Login() {
         .anim-shake  { animation: shake      0.35s ease-in-out; }
         .anim-glow   { animation: glowPulse  3s ease-in-out infinite; }
         .anim-spin   { animation: spin       0.75s linear infinite; }
+        .anim-float  { animation: float      4s ease-in-out infinite; }
+        .anim-float-rev { animation: floatReverse 5s ease-in-out infinite; }
 
         .dot-bg {
           background-image: radial-gradient(circle, rgba(255,255,255,0.07) 1.5px, transparent 1.5px);
@@ -287,22 +297,55 @@ export default function Login() {
         </div>
 
         {/* ── RIGHT PANEL (Form) ───────────────────────────────────────────── */}
-        <div className="flex-1 flex items-center justify-center px-6 py-10 lg:px-14 bg-white">
-          <div className="w-full max-w-[390px] anim-form">
+        <div className="flex-1 flex items-center justify-center p-6 sm:p-10 lg:px-14 bg-slate-50 lg:bg-white relative overflow-hidden">
 
-            {/* Mobile logo */}
-            <div className="flex lg:hidden items-center gap-2.5 mb-9">
-              <img src="/bisu-logo.png" alt="BISU" className="w-9 h-9 rounded-full object-cover" />
-              <span className="font-display font-extrabold text-[#091832] text-[16px]">TAPasok</span>
+          {/* Mobile Background Elements & 3D Icons */}
+          <div className="absolute inset-0 block lg:hidden pointer-events-none">
+            {/* Gradient Orbs */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-50 transform translate-x-1/3 -translate-y-1/3" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-100 rounded-full mix-blend-multiply filter blur-3xl opacity-50 transform -translate-x-1/3 translate-y-1/3" />
+
+            {/* 3D Floating Icons for Mobile */}
+            <div className="absolute top-6 left-2 anim-float opacity-30 sm:opacity-50" style={{ filter: 'drop-shadow(0px 8px 16px rgba(37,99,235,0.25))', zIndex: 0 }}>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center transform -rotate-12 border border-blue-300">
+                <QrCode className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </div>
+            </div>
+
+            <div className="absolute top-[35%] right-1 anim-float-rev opacity-25 sm:opacity-50" style={{ filter: 'drop-shadow(0px 8px 16px rgba(16,185,129,0.25))', zIndex: 0 }}>
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center transform rotate-6 border border-emerald-300">
+                <BarChart3 className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              </div>
+            </div>
+
+            <div className="absolute bottom-10 left-4 anim-float-rev opacity-30 sm:opacity-50" style={{ filter: 'drop-shadow(0px 8px 16px rgba(139,92,246,0.25))', zIndex: 0 }}>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center transform -rotate-6 border border-purple-300">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full max-w-[420px] anim-form relative z-10 bg-white/80 backdrop-blur-md lg:bg-transparent rounded-3xl lg:rounded-none shadow-2xl lg:shadow-none p-8 lg:p-0 border border-white/40 lg:border-none">
+
+            {/* Mobile logo header */}
+            <div className="flex lg:hidden flex-col items-center gap-3 mb-10 mt-2">
+              <div className="relative">
+                <div className="absolute inset-0 bg-blue-500 rounded-full blur-md opacity-20"></div>
+                <img src="/bisu-logo.png" alt="BISU" className="w-16 h-16 rounded-full object-cover relative z-10 border-2 border-white shadow-md" />
+              </div>
+              <div className="text-center">
+                <h1 className="font-display font-extrabold text-[#0f172a] text-xl tracking-tight leading-none mb-1">TAPasok</h1>
+                <p className="text-blue-600 font-semibold text-[10px] tracking-widest uppercase">BISU Candijay</p>
+              </div>
             </div>
 
             {/* Heading */}
-            <div className="mb-8">
-              <h2 className="font-display font-extrabold text-[#091832] mb-2"
-                style={{ fontSize: '28px', letterSpacing: '-0.3px' }}>
+            <div className="mb-8 text-center lg:text-left">
+              <h2 className="font-display font-extrabold text-[#0f172a] mb-2"
+                style={{ fontSize: 'clamp(24px, 5vw, 28px)', letterSpacing: '-0.5px' }}>
                 Welcome back 👋
               </h2>
-              <p style={{ color: '#94a3b8', fontSize: 14 }}>
+              <p style={{ color: '#64748b', fontSize: '14.5px' }}>
                 Sign in to your account to continue
               </p>
             </div>

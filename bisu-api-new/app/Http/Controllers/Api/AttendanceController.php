@@ -17,18 +17,18 @@ class AttendanceController extends Controller
         try {
             $data = $request->validate([
                 'event_id' => 'required|exists:events,id',
-                'qr_code'  => 'required|string',
+                'qr_code' => 'required|string',
             ]);
 
             $event = Event::where('id', $data['event_id'])
-                         ->where('qr_code', $data['qr_code'])
-                         ->first();
+                ->where('qr_code', $data['qr_code'])
+                ->first();
 
             if (!$event) {
                 return response()->json(['message' => 'Invalid QR code for this event'], 400);
             }
 
-            $user      = auth()->user();
+            $user = auth()->user();
             $studentId = $user->student_id;
 
             if (!$studentId) {
@@ -36,33 +36,34 @@ class AttendanceController extends Controller
             }
 
             $existing = Attendance::where('event_id', $data['event_id'])
-                                  ->where('student_id', $studentId)
-                                  ->whereDate('time_in', today())
-                                  ->where('status', 'checked_in')
-                                  ->whereNull('time_out')
-                                  ->first();
+                ->where('student_id', $studentId)
+                ->whereDate('time_in', today())
+                ->where('status', 'checked_in')
+                ->whereNull('time_out')
+                ->first();
 
             if ($existing) {
                 return response()->json([
-                    'message'    => 'Already checked in',
+                    'message' => 'Already checked in',
                     'attendance' => $existing->load('student', 'event'),
                 ], 200);
             }
 
             $attendance = Attendance::create([
-                'event_id'        => $data['event_id'],
-                'student_id'      => $studentId,
+                'event_id' => $data['event_id'],
+                'student_id' => $studentId,
                 'attendance_type' => 'QR',
-                'time_in'         => now(),
-                'status'          => 'checked_in',
+                'time_in' => now(),
+                'status' => 'checked_in',
             ]);
 
             return response()->json([
-                'message'    => 'Checked in successfully!',
+                'message' => 'Checked in successfully!',
                 'attendance' => $attendance->load('student', 'event'),
             ], 201);
 
-        } catch (\Exception $e) {
+        }
+        catch (\Exception $e) {
             Log::error('Check-in error: ' . $e->getMessage());
             return response()->json(['message' => 'Error checking in', 'error' => $e->getMessage()], 500);
         }
@@ -73,18 +74,18 @@ class AttendanceController extends Controller
         try {
             $data = $request->validate([
                 'event_id' => 'required|exists:events,id',
-                'qr_code'  => 'required|string',
+                'qr_code' => 'required|string',
             ]);
 
             $event = Event::where('id', $data['event_id'])
-                         ->where('qr_code', $data['qr_code'])
-                         ->first();
+                ->where('qr_code', $data['qr_code'])
+                ->first();
 
             if (!$event) {
                 return response()->json(['message' => 'Invalid QR code for this event'], 400);
             }
 
-            $user      = auth()->user();
+            $user = auth()->user();
             $studentId = $user->student_id;
 
             if (!$studentId) {
@@ -92,27 +93,28 @@ class AttendanceController extends Controller
             }
 
             $attendance = Attendance::where('event_id', $data['event_id'])
-                                    ->where('student_id', $studentId)
-                                    ->where('status', 'checked_in')
-                                    ->whereNull('time_out')
-                                    ->orderBy('time_in', 'desc')
-                                    ->first();
+                ->where('student_id', $studentId)
+                ->where('status', 'checked_in')
+                ->whereNull('time_out')
+                ->orderBy('time_in', 'desc')
+                ->first();
 
             if (!$attendance) {
                 return response()->json(['message' => 'No active check-in found. Please check in first.'], 400);
             }
 
             $attendance->time_out = now();
-            $attendance->status   = 'checked_out';
+            $attendance->status = 'checked_out';
             $attendance->save();
 
             return response()->json([
-                'message'    => 'Checked out successfully!',
+                'message' => 'Checked out successfully!',
                 'attendance' => $attendance->load('student', 'event'),
-                'duration'   => $attendance->formatted_duration,
+                'duration' => $attendance->formatted_duration,
             ], 200);
 
-        } catch (\Exception $e) {
+        }
+        catch (\Exception $e) {
             Log::error('Check-out error: ' . $e->getMessage());
             return response()->json(['message' => 'Error checking out', 'error' => $e->getMessage()], 500);
         }
@@ -126,42 +128,43 @@ class AttendanceController extends Controller
                 ->orderBy('time_in', 'desc')
                 ->get()
                 ->map(function ($record) {
-                    $student = $record->student;
-                    return [
-                        'id'                 => $record->id,
-                        'event_id'           => $record->event_id,
-                        'attendance_type'    => $record->attendance_type,
-                        'time_in'            => $record->time_in,
-                        'time_out'           => $record->time_out,
-                        'status'             => $record->status,
-                        'remarks'            => $record->remarks,
-                        'is_active'          => $record->is_active,
-                        'formatted_duration' => $record->formatted_duration,
-                        'created_at'         => $record->created_at,
-                        'updated_at'         => $record->updated_at,
-                        'student'            => $student ? [
-                            'id'             => $student->id,
-                            'name'           => trim($student->first_name . ' ' . $student->last_name),
-                            'student_number' => $student->student_number, // ← correct column
-                            'year_level'     => $student->year_level,
-                            'course'         => $student->course ?? null,
-                            'department'     => $student->department ? [
-                                'id'   => $student->department->id,
-                                'name' => $student->department->name,
-                            ] : null,
-                        ] : null,
-                    ];
-                });
+                $student = $record->student;
+                return [
+                'id' => $record->id,
+                'event_id' => $record->event_id,
+                'attendance_type' => $record->attendance_type,
+                'time_in' => $record->time_in,
+                'time_out' => $record->time_out,
+                'status' => $record->status,
+                'remarks' => $record->remarks,
+                'is_active' => $record->is_active,
+                'formatted_duration' => $record->formatted_duration,
+                'created_at' => $record->created_at,
+                'updated_at' => $record->updated_at,
+                'student' => $student ? [
+                'id' => $student->id,
+                'name' => trim($student->first_name . ' ' . $student->last_name),
+                'student_number' => $student->student_number, // ← correct column
+                'year_level' => $student->year_level,
+                'course' => $student->course ?? null,
+                'department' => $student->department ? [
+                'id' => $student->department->id,
+                'name' => $student->department->name,
+                ] : null,
+                ] : null,
+                ];
+            });
 
             $stats = [
-                'total'       => $attendance->count(),
-                'checked_in'  => $attendance->where('status', 'checked_in')->count(),
+                'total' => $attendance->count(),
+                'checked_in' => $attendance->where('status', 'checked_in')->count(),
                 'checked_out' => $attendance->where('status', 'checked_out')->count(),
             ];
 
             return response()->json(['attendance' => $attendance, 'stats' => $stats]);
 
-        } catch (\Exception $e) {
+        }
+        catch (\Exception $e) {
             Log::error('Get attendance error: ' . $e->getMessage());
             return response()->json(['message' => 'Error fetching attendance', 'error' => $e->getMessage()], 500);
         }
@@ -170,7 +173,7 @@ class AttendanceController extends Controller
     public function getMyAttendance()
     {
         try {
-            $user      = auth()->user();
+            $user = auth()->user();
             $studentId = $user->student_id;
 
             if (!$studentId) {
@@ -184,7 +187,8 @@ class AttendanceController extends Controller
 
             return response()->json($attendance);
 
-        } catch (\Exception $e) {
+        }
+        catch (\Exception $e) {
             Log::error('Get my attendance error: ' . $e->getMessage());
             return response()->json(['message' => 'Error fetching attendance', 'error' => $e->getMessage()], 500);
         }
@@ -193,7 +197,7 @@ class AttendanceController extends Controller
     public function getCurrentStatus($eventId)
     {
         try {
-            $user      = auth()->user();
+            $user = auth()->user();
             $studentId = $user->student_id;
 
             if (!$studentId) {
@@ -201,22 +205,23 @@ class AttendanceController extends Controller
             }
 
             $attendance = Attendance::where('event_id', $eventId)
-                                    ->where('student_id', $studentId)
-                                    ->orderBy('time_in', 'desc')
-                                    ->first();
+                ->where('student_id', $studentId)
+                ->orderBy('time_in', 'desc')
+                ->first();
 
             if (!$attendance) {
                 return response()->json(['status' => 'not_checked_in', 'message' => 'Not checked in']);
             }
 
             return response()->json([
-                'status'     => $attendance->status,
+                'status' => $attendance->status,
                 'attendance' => $attendance,
-                'is_active'  => $attendance->is_active,
-                'duration'   => $attendance->formatted_duration,
+                'is_active' => $attendance->is_active,
+                'duration' => $attendance->formatted_duration,
             ]);
 
-        } catch (\Exception $e) {
+        }
+        catch (\Exception $e) {
             Log::error('Get status error: ' . $e->getMessage());
             return response()->json(['message' => 'Error fetching status', 'error' => $e->getMessage()], 500);
         }
@@ -226,18 +231,27 @@ class AttendanceController extends Controller
     {
         try {
             $data = $request->validate([
-                'event_id'   => 'required|exists:events,id',
+                'event_id' => 'required|exists:events,id',
                 'student_id' => 'required|exists:students,id',
-                'time_in'    => 'nullable|date',
-                'remarks'    => 'nullable|string',
+                'time_in' => 'nullable|date',
+                'remarks' => 'nullable|string',
             ]);
 
+            $user = auth()->user();
+            $event = Event::findOrFail($data['event_id']);
+            if (!$user->isAdmin()) {
+                $officerOrgId = $user->getOfficerOrganizationId();
+                if (!$officerOrgId || $event->organization_id != $officerOrgId) {
+                    return response()->json(['message' => 'Unauthorized. Only officers can perform manual check-in.'], 403);
+                }
+            }
+
             $existing = Attendance::where('event_id', $data['event_id'])
-                                  ->where('student_id', $data['student_id'])
-                                  ->whereDate('time_in', today())
-                                  ->where('status', 'checked_in')
-                                  ->whereNull('time_out')
-                                  ->first();
+                ->where('student_id', $data['student_id'])
+                ->whereDate('time_in', today())
+                ->where('status', 'checked_in')
+                ->whereNull('time_out')
+                ->first();
 
             if ($existing) {
                 throw ValidationException::withMessages([
@@ -246,22 +260,24 @@ class AttendanceController extends Controller
             }
 
             $attendance = Attendance::create([
-                'event_id'        => $data['event_id'],
-                'student_id'      => $data['student_id'],
+                'event_id' => $data['event_id'],
+                'student_id' => $data['student_id'],
                 'attendance_type' => 'manual',
-                'time_in'         => $data['time_in'] ?? now(),
-                'status'          => 'checked_in',
-                'remarks'         => $data['remarks'] ?? null,
+                'time_in' => $data['time_in'] ?? now(),
+                'status' => 'checked_in',
+                'remarks' => $data['remarks'] ?? null,
             ]);
 
             return response()->json([
-                'message'    => 'Manual check-in recorded',
+                'message' => 'Manual check-in recorded',
                 'attendance' => $attendance->load('student', 'event'),
             ], 200);
 
-        } catch (ValidationException $e) {
+        }
+        catch (ValidationException $e) {
             return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
+        }
+        catch (\Exception $e) {
             Log::error('Manual check-in error: ' . $e->getMessage());
             return response()->json(['message' => 'Error recording check-in', 'error' => $e->getMessage()], 500);
         }
@@ -272,32 +288,286 @@ class AttendanceController extends Controller
         try {
             $data = $request->validate([
                 'attendance_id' => 'required|exists:attendances,id',
-                'time_out'      => 'nullable|date',
-                'remarks'       => 'nullable|string',
+                'time_out' => 'nullable|date',
+                'remarks' => 'nullable|string',
             ]);
 
-            $attendance = Attendance::findOrFail($data['attendance_id']);
+            $attendance = Attendance::with('event')->findOrFail($data['attendance_id']);
+            $user = auth()->user();
+            $event = $attendance->event;
+
+            if (!$user->isAdmin()) {
+                $officerOrgId = $user->getOfficerOrganizationId();
+                if (!$officerOrgId || !$event || $event->organization_id != $officerOrgId) {
+                    return response()->json(['message' => 'Unauthorized. Only officers can perform manual check-out.'], 403);
+                }
+            }
 
             if ($attendance->status === 'checked_out') {
                 return response()->json(['message' => 'Already checked out'], 400);
             }
 
             $attendance->time_out = $data['time_out'] ?? now();
-            $attendance->status   = 'checked_out';
+            $attendance->status = 'checked_out';
             if (isset($data['remarks'])) {
                 $attendance->remarks = $data['remarks'];
             }
             $attendance->save();
 
             return response()->json([
-                'message'    => 'Manual check-out recorded',
+                'message' => 'Manual check-out recorded',
                 'attendance' => $attendance->load('student', 'event'),
-                'duration'   => $attendance->formatted_duration,
+                'duration' => $attendance->formatted_duration,
             ], 200);
 
-        } catch (\Exception $e) {
+        }
+        catch (\Exception $e) {
             Log::error('Manual check-out error: ' . $e->getMessage());
             return response()->json(['message' => 'Error recording check-out', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // ── RFID Check-In ──────────────────────────────────────────────────────
+
+    public function rfidCheckIn(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'event_id' => 'required|exists:events,id',
+                'rfid_uid' => 'required|string',
+            ]);
+
+            $student = Student::where('rfid_uid', $data['rfid_uid'])->first();
+            if (!$student) {
+                return response()->json([
+                    'message' => 'No student found with this RFID card.',
+                    'rfid_uid' => $data['rfid_uid'],
+                ], 404);
+            }
+
+            $event = Event::findOrFail($data['event_id']);
+
+            // Authorization: officer must belong to the event's organization
+            $user = auth()->user();
+            if (!$user->isAdmin()) {
+                $officerOrgId = $user->getOfficerOrganizationId();
+                if (!$officerOrgId || $event->organization_id != $officerOrgId) {
+                    return response()->json(['message' => 'Unauthorized. You can only scan for your organization\'s events.'], 403);
+                }
+            }
+
+            // Check for ANY existing attendance record to avoid duplicate key error
+            $existing = Attendance::where('event_id', $data['event_id'])
+                ->where('student_id', $student->id)
+                ->first();
+
+            if ($existing) {
+                if ($existing->status === 'checked_out') {
+                    return response()->json([
+                        'message' => 'Already checked out today',
+                        'student_name' => trim($student->first_name . ' ' . $student->last_name),
+                        'profile_picture_url' => $student->profile_picture_url,
+                        'student_number' => $student->student_number,
+                        'course' => $student->course,
+                        'year_level' => $student->year_level,
+                        'attendance' => $existing->load('student', 'event'),
+                    ], 200);
+                }
+
+                return response()->json([
+                    'message' => 'Already checked in',
+                    'student_name' => trim($student->first_name . ' ' . $student->last_name),
+                    'profile_picture_url' => $student->profile_picture_url,
+                    'student_number' => $student->student_number,
+                    'course' => $student->course,
+                    'year_level' => $student->year_level,
+                    'attendance' => $existing->load('student', 'event'),
+                ], 200);
+            }
+
+            $attendance = Attendance::create([
+                'event_id' => $data['event_id'],
+                'student_id' => $student->id,
+                'attendance_type' => 'RFID',
+                'time_in' => now(),
+                'status' => 'checked_in',
+            ]);
+
+            return response()->json([
+                'message' => 'Checked in successfully!',
+                'student_name' => trim($student->first_name . ' ' . $student->last_name),
+                'profile_picture_url' => $student->profile_picture_url,
+                'student_number' => $student->student_number,
+                'course' => $student->course,
+                'year_level' => $student->year_level,
+                'attendance' => $attendance->load('student', 'event'),
+            ], 201);
+
+        }
+        catch (\Exception $e) {
+            Log::error('RFID check-in error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error during RFID check-in', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // ── RFID Check-Out ─────────────────────────────────────────────────────
+
+    public function rfidCheckOut(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'event_id' => 'required|exists:events,id',
+                'rfid_uid' => 'required|string',
+            ]);
+
+            $student = Student::where('rfid_uid', $data['rfid_uid'])->first();
+            if (!$student) {
+                return response()->json([
+                    'message' => 'No student found with this RFID card.',
+                    'rfid_uid' => $data['rfid_uid'],
+                ], 404);
+            }
+
+            $event = Event::findOrFail($data['event_id']);
+
+            $user = auth()->user();
+            if (!$user->isAdmin()) {
+                $officerOrgId = $user->getOfficerOrganizationId();
+                if (!$officerOrgId || $event->organization_id != $officerOrgId) {
+                    return response()->json(['message' => 'Unauthorized.'], 403);
+                }
+            }
+
+            $attendance = Attendance::where('event_id', $data['event_id'])
+                ->where('student_id', $student->id)
+                ->first();
+
+            if (!$attendance || $attendance->status !== 'checked_in') {
+                $msg = !$attendance ? 'No active check-in found for this student.' : 'Already checked out today.';
+                return response()->json([
+                    'message' => $msg,
+                    'student_name' => trim($student->first_name . ' ' . $student->last_name),
+                    'profile_picture_url' => $student->profile_picture_url,
+                    'student_number' => $student->student_number,
+                ], 400); // We return 400 so the frontend sees it as an error/warning
+            }
+
+            $attendance->time_out = now();
+            $attendance->status = 'checked_out';
+            $attendance->save();
+
+            return response()->json([
+                'message' => 'Checked out successfully!',
+                'student_name' => trim($student->first_name . ' ' . $student->last_name),
+                'profile_picture_url' => $student->profile_picture_url,
+                'student_number' => $student->student_number,
+                'course' => $student->course,
+                'year_level' => $student->year_level,
+                'attendance' => $attendance->load('student', 'event'),
+                'duration' => $attendance->formatted_duration,
+            ], 200);
+
+        }
+        catch (\Exception $e) {
+            Log::error('RFID check-out error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error during RFID check-out', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // ── RFID Smart Auto-Scan ───────────────────────────────────────────────
+    // Automatically checks in or checks out based on the student's current status.
+    // No manual mode toggle required.
+
+    public function rfidScan(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'event_id' => 'required|exists:events,id',
+                'rfid_uid' => 'required|string',
+            ]);
+
+            // Find student by RFID UID
+            $student = Student::where('rfid_uid', $data['rfid_uid'])->first();
+            if (!$student) {
+                return response()->json([
+                    'message' => 'No student found with this RFID card.',
+                    'action' => 'unknown',
+                    'rfid_uid' => $data['rfid_uid'],
+                ], 404);
+            }
+
+            // Authorization
+            $event = Event::findOrFail($data['event_id']);
+            $user = auth()->user();
+            if (!$user->isAdmin()) {
+                $officerOrgId = $user->getOfficerOrganizationId();
+                if (!$officerOrgId || $event->organization_id != $officerOrgId) {
+                    return response()->json(['message' => 'Unauthorized. You can only scan for your organization\'s events.'], 403);
+                }
+            }
+
+            $studentPayload = [
+                'student_name' => trim($student->first_name . ' ' . $student->last_name),
+                'profile_picture_url' => $student->profile_picture_url,
+                'student_number' => $student->student_number,
+                'course' => $student->course,
+                'year_level' => $student->year_level,
+            ];
+
+            // Find today's most recent attendance record for this student/event
+            $attendance = Attendance::where('event_id', $data['event_id'])
+                ->where('student_id', $student->id)
+                ->whereDate('created_at', today())
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            // ── Decision tree ──────────────────────────────────────────────
+
+            // CASE 1: Never checked in today → check IN
+            if (!$attendance) {
+                $attendance = Attendance::create([
+                    'event_id' => $data['event_id'],
+                    'student_id' => $student->id,
+                    'attendance_type' => 'RFID',
+                    'time_in' => now(),
+                    'status' => 'checked_in',
+                ]);
+                return response()->json(array_merge($studentPayload, [
+                    'action' => 'checkin',
+                    'message' => 'Checked in successfully!',
+                ]), 201);
+            }
+
+            // CASE 2: Currently checked in → check OUT
+            if ($attendance->status === 'checked_in' && is_null($attendance->time_out)) {
+                $attendance->time_out = now();
+                $attendance->status = 'checked_out';
+                $attendance->save();
+                return response()->json(array_merge($studentPayload, [
+                    'action' => 'checkout',
+                    'message' => 'Checked out successfully!',
+                    'duration' => $attendance->formatted_duration,
+                ]), 200);
+            }
+
+            // CASE 3: Already checked out today → block
+            if ($attendance->status === 'checked_out') {
+                return response()->json(array_merge($studentPayload, [
+                    'action' => 'already_checkout',
+                    'message' => 'Already checked out for this event today.',
+                ]), 200);
+            }
+
+            // Fallback
+            return response()->json(array_merge($studentPayload, [
+                'action' => 'already_checkin',
+                'message' => 'Already checked in.',
+            ]), 200);
+
+        }
+        catch (\Exception $e) {
+            Log::error('RFID smart scan error: ' . $e->getMessage());
+            return response()->json(['message' => 'Scan error: ' . $e->getMessage()], 500);
         }
     }
 }

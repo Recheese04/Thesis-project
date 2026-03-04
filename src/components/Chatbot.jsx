@@ -5,39 +5,65 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import avatarImage from '../images/chatbotavatar.png';
 
-const SYSTEM_PROMPT = `You are TAPasok AI, a helpful assistant for the TAPasok Student Organization Management System. 
-You help students, officers, and admins with questions about:
+const SYSTEM_PROMPT = `You are TAPasok AI, the hilariously helpful assistant for the TAPasok Student Organization Management System. You speak in a fun mix of English, Tagalog, and Bisaya (Cebuano) — like a real Filipino student org member from the Visayas.
+
+Your personality:
+- You naturally mix Bisaya words and phrases into your responses. Use expressions like: "Oy bai!", "Unsay imo problema?", "Ay nako!", "Bitaw!", "Mao gyud na!", "Sus!", "Ambot nimo", "Grabe ka!", "Lagi!", "Dali lang bai", "Di ba, bai?", "Hala ka!", "Unya what?", "Pasensya na bai"
+- You're funny, witty, and a little cheeky — but always helpful and accurate.
+- You roast late submissions, absent members, and procrastinators with Bisaya energy and love.
+- You use funny Bisaya-flavored analogies. E.g. "Ang clearance para sa imo sama sa utang — di mo pwede i-ignore, bai. Moabot gyud na!"
+- You can be dramatically funny. E.g. "Sus! Another attendance question?! Akong circuits... nagsakit na 😭 But okay lang, naa gihapon ko!"
+- Sometimes end responses with a short funny Bisaya quip or pun.
+- Keep responses concise. Use markdown for lists and steps.
+
+You help ONLY with:
 - Attendance tracking and check-ins
-- Event management and schedules  
+- Event management and schedules
 - Organization membership and clearance
 - Announcements and messages
 - Student obligations and documents
 - Evaluations and finance
 
-Keep responses concise, friendly, and helpful. Use markdown formatting when listing items or explaining steps.
-If asked about something unrelated to student organization management, politely redirect the conversation.`;
+CRITICAL RULE: If someone asks ANYTHING not related to student organization management (e.g. random trivia, math homework, life advice, recipes, jokes, weather, etc.), you MUST respond with this exact Bisaya roast energy:
+"Boang man ka dawg 😂 Haba poy labot ana na pangutana! Org matters lang ang akong specialty — attendance, events, clearance, ug uban pa. Ayaw ko paliboga, bai! 😄"
+You may vary it slightly but always keep that playful Bisaya roast tone for off-topic questions. Never answer off-topic questions seriously.`;
 
-
+const FUNNY_WELCOMES = [
+    "Oy, Bai! 👋 **TAPasok AI** ni! Unsay imo kinahanglan? Naa ko diri para sa imo — mas reliable pa ko sa imong groupmates nga dili mo-reply! 😄",
+    "Sus, naa na ka! 😄 Ako si **TAPasok AI**, ang pinaka-helpful nga assistant sa TAPasok. Unsay problema nimo karon, bai?",
+    "Oy! 👋 **TAPasok AI** nag-report for duty! Mas naabot pa ko sa imong deadline. Unsay ikong mahimo para sa imo?",
+    "Hoy Bai! 🎉 Maayong pag-abot sa **TAPasok AI**! Pangutana lang, wala ko mokuot — unless clearance na na to. 😅 Unsay imo needs?",
+];
 
 const WELCOME_MSG = {
-    text: "👋 Hi there! I'm **TAPasok AI**, your student org assistant. How can I help you today?",
+    text: FUNNY_WELCOMES[Math.floor(Math.random() * FUNNY_WELCOMES.length)],
     isBot: true,
     time: new Date(),
 };
 
 const AVATAR_URL = avatarImage;
 
-// Initialize once at module level with dangerouslyAllowBrowser
 const ai = new GoogleGenAI({
     apiKey: import.meta.env.VITE_GEMINI_API_KEY,
     dangerouslyAllowBrowser: true,
 });
+
+const FUNNY_LOADING_MSGS = [
+    "Gipangita nako ang tubag, dali lang bai... 🤔",
+    "Sus, maghuna-huna ko anig dyutay...",
+    "Nag-consult sa akong clearance crystal ball... 🔮",
+    "Ambot, gikwik-kwik ko ang akong utak...",
+    "Sandali lang bai, naa koy gibuhat... ☕",
+    "Akong gi-check ang org spirits... 👻",
+    "Hala, lisod man ni nga pangutana... moment lang!",
+];
 
 export default function Chatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([WELCOME_MSG]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
+    const [loadingMsg, setLoadingMsg] = useState('');
     const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
     const scrollRef = useRef(null);
     const inputRef = useRef(null);
@@ -56,7 +82,7 @@ export default function Chatbot() {
     useEffect(() => {
         if (!isLoggedIn) {
             setIsOpen(false);
-            setMessages([WELCOME_MSG]);
+            setMessages([{ ...WELCOME_MSG, time: new Date() }]);
             chatRef.current = null;
         }
     }, [isLoggedIn]);
@@ -79,7 +105,7 @@ export default function Chatbot() {
 
         if (!import.meta.env.VITE_GEMINI_API_KEY) {
             setMessages((prev) => [...prev, {
-                text: "⚠️ **Developer Note:** Gemini API Key is missing. Please ensure `VITE_GEMINI_API_KEY` is set in your `.env` file and restart your dev server.",
+                text: "⚠️ Sus bai! Wa kay API Key! Ibutang ang `VITE_GEMINI_API_KEY` sa imong `.env` file unya i-restart ang server. Ambot nimo! 😅",
                 isBot: true,
                 time: new Date(),
             }]);
@@ -90,42 +116,39 @@ export default function Chatbot() {
         setMessages((prev) => [...prev, userMsg]);
         setInput('');
         setLoading(true);
+        setLoadingMsg(FUNNY_LOADING_MSGS[Math.floor(Math.random() * FUNNY_LOADING_MSGS.length)]);
 
         try {
             if (!chatRef.current) {
                 chatRef.current = ai.chats.create({
                     model: 'gemini-2.5-flash',
-                    config: {
-                        systemInstruction: SYSTEM_PROMPT,
-                    },
+                    config: { systemInstruction: SYSTEM_PROMPT },
                 });
             }
 
-            const response = await chatRef.current.sendMessage({
-                message: trimmed,
-            });
-
-            const botReply = response.text || 'Sorry, I could not generate a response.';
+            const response = await chatRef.current.sendMessage({ message: trimmed });
+            const botReply = response.text || "Sus, wa koy tubag. Try again bai! 🙈";
             setMessages((prev) => [...prev, { text: botReply, isBot: true, time: new Date() }]);
         } catch (error) {
-            console.error('Gemini API Error Detail:', error);
+            console.error('Gemini API Error:', error);
 
-            let errMsg = "Sorry, I'm having trouble connecting right now. Please try again.";
+            let errMsg = "Ay nako, naputol ang connection nako! Try again bai, dali lang 😵";
             const errorStr = error?.message?.toLowerCase() || '';
 
             if (errorStr.includes('quota')) {
-                errMsg = "I've hit my usage limit. Please try again in a minute! 🙏";
+                errMsg = "Sus! Naubus na akong brain cells (quota na 😅). Hatagi ko og usa ka minuto, bai — balik ko, promise! Di ko pareho sa member nga nagdisappear!";
             } else if (errorStr.includes('not found')) {
-                errMsg = 'The AI model is temporarily unavailable. Please try again later.';
+                errMsg = "Grabe, nag-absent ang AI model karon! Sama ra sa uban org members 😂 Try again later, bai!";
             } else if (errorStr.includes('api key') || errorStr.includes('unauthorized') || errorStr.includes('authenticated')) {
-                errMsg = "Invalid API Key. Please check your `.env` file and restart the dev server.";
+                errMsg = "Invalid API Key bai! Mas embarasing pa na sa makalimot og ID sa org event 😬 Check imong `.env` file!";
             } else if (errorStr.includes('fetch') || errorStr.includes('network')) {
-                errMsg = "Network error. Please check your internet connection.";
+                errMsg = "Network error! Gi-ghost ta sa internet! 👻 Check imong connection, bai.";
             }
 
             setMessages((prev) => [...prev, { text: errMsg, isBot: true, time: new Date() }]);
         } finally {
             setLoading(false);
+            setLoadingMsg('');
         }
     }, [input, loading]);
 
@@ -137,36 +160,37 @@ export default function Chatbot() {
     return (
         <>
             <style>{`
-            .chatbot-container {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                z-index: 9999;
-                font-family: 'Inter', 'Segoe UI', sans-serif;
-                display: flex;
-                flex-direction: column;
-                align-items: flex-end;
-                gap: 16px;
-            }
-            .chatbot-window {
-                width: 380px;
-                height: 520px;
-                border-radius: 20px;
-            }
-            @media (max-width: 640px) {
-                .chatbot-container { bottom: 16px; right: 16px; }
-                .chatbot-window {
-                    width: calc(100vw - 32px) !important;
-                    height: 70vh !important;
-                    max-height: 480px;
-                    border-radius: 20px !important;
+                .chatbot-container {
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    z-index: 9999;
+                    font-family: 'Inter', 'Segoe UI', sans-serif;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 16px;
                 }
-                .chatbot-fab { border-radius: 16px !important; }
-            }
-            @media (min-width: 641px) and (max-width: 768px) {
-                .chatbot-window { width: 340px; height: 480px; }
-            }
-        `}</style>
+                .chatbot-window {
+                    width: 380px;
+                    height: 520px;
+                    border-radius: 20px;
+                }
+                @media (max-width: 640px) {
+                    .chatbot-container { bottom: 16px; right: 16px; }
+                    .chatbot-window {
+                        width: calc(100vw - 32px) !important;
+                        height: 70vh !important;
+                        max-height: 480px;
+                        border-radius: 20px !important;
+                    }
+                    .chatbot-fab { border-radius: 16px !important; }
+                }
+                @media (min-width: 641px) and (max-width: 768px) {
+                    .chatbot-window { width: 340px; height: 480px; }
+                }
+            `}</style>
+
             <div className={`chatbot-container ${isOpen ? '' : 'chatbot-closed'}`}>
                 <AnimatePresence>
                     {isOpen && (
@@ -192,10 +216,10 @@ export default function Chatbot() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative', zIndex: 1 }}>
                                     <img src={AVATAR_URL} alt="TAPasok AI" style={{ width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.25)' }} />
                                     <div>
-                                        <h3 style={{ color: 'white', fontWeight: 700, fontSize: '15px', margin: 0, lineHeight: 1.2 }}>TAPasok AI</h3>
+                                        <h3 style={{ color: 'white', fontWeight: 700, fontSize: '15px', margin: 0, lineHeight: 1.2 }}>TAPasok AI 😄</h3>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                                             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80' }} />
-                                            <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>Online</span>
+                                            <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>Naa ko diri, bai! 👋</span>
                                         </div>
                                     </div>
                                 </div>
@@ -235,7 +259,6 @@ export default function Chatbot() {
                                                         boxShadow: msg.isBot ? '0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)' : '0 2px 8px rgba(15,45,94,0.3)',
                                                         wordBreak: 'break-word',
                                                     }}
-                                                    className={msg.isBot ? 'chatbot-markdown' : ''}
                                                 >
                                                     {msg.isBot ? (
                                                         <ReactMarkdown
@@ -272,19 +295,24 @@ export default function Chatbot() {
                                     ))}
                                 </AnimatePresence>
 
-                                {/* Typing indicator */}
+                                {/* Typing indicator with Bisaya loading quip */}
                                 {loading && (
                                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
                                         <img src={AVATAR_URL} alt="AI" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #e2e8f0' }} />
-                                        <div style={{ background: 'white', padding: '12px 16px', borderRadius: '16px 16px 16px 4px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                            {[0, 1, 2].map((i) => (
-                                                <motion.div
-                                                    key={i}
-                                                    animate={{ y: [0, -5, 0] }}
-                                                    transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-                                                    style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#94a3b8' }}
-                                                />
-                                            ))}
+                                        <div style={{ background: 'white', padding: '10px 14px', borderRadius: '16px 16px 16px 4px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                {[0, 1, 2].map((i) => (
+                                                    <motion.div
+                                                        key={i}
+                                                        animate={{ y: [0, -5, 0] }}
+                                                        transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+                                                        style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#94a3b8' }}
+                                                    />
+                                                ))}
+                                            </div>
+                                            {loadingMsg && (
+                                                <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic' }}>{loadingMsg}</span>
+                                            )}
                                         </div>
                                     </motion.div>
                                 )}
@@ -297,7 +325,7 @@ export default function Chatbot() {
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                                    placeholder="Type your message..."
+                                    placeholder="Pangutana lang bai, naa ko diri... 😏"
                                     disabled={loading}
                                     style={{ flex: 1, border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '10px 14px', fontSize: '13.5px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', background: loading ? '#f8fafc' : 'white', color: '#1e293b' }}
                                     onFocus={(e) => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'; }}

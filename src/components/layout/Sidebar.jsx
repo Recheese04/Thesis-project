@@ -1,12 +1,13 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Building2, Briefcase, Calendar,
   FileText, MessageSquare, ClipboardList, Settings, LogOut,
   ChevronRight, User, Shield, TrendingUp, QrCode, CheckCircle,
-  Bell, Award, X, ClipboardCheck, AlertTriangle, Wallet, BookOpen, Eye,
+  Bell, Award, X, ClipboardCheck, AlertTriangle, Wallet, BookOpen, Eye, CreditCard,
 } from 'lucide-react';
 import bisuLogo from '@/images/bisu-logo.png';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import AvatarImg from '@/components/Avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -63,6 +64,7 @@ const officerMenuBase = [
       { icon: Users, label: 'Members', path: '/officer/members', badge: null, positions: LEADERSHIP },
       { icon: Calendar, label: 'Events', path: '/officer/events', badge: null, positions: ALL_POSITIONS },
       { icon: ClipboardList, label: 'Attendance', path: '/officer/attendance', badge: null, positions: [...LEADERSHIP, 'Secretary', 'Auditor'] },
+      { icon: CreditCard, label: 'RFID Scanner', path: '/officer/rfid-scanner', badge: 'Scan', positions: [...LEADERSHIP, 'Secretary', 'Auditor'] },
       { icon: ClipboardCheck, label: 'Evaluations', path: '/officer/evaluations', badge: null, positions: [...ADMIN_ROLES, 'Auditor'] },
     ],
   },
@@ -170,20 +172,30 @@ export default function Sidebar({ onClose }) {
   const isAdmin = userRole === 'admin';
   const isOfficer = userRole === 'officer';
 
-  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  // Re-read user from localStorage whenever 'userUpdated' is dispatched
+  const [storedUser, setStoredUser] = useState(
+    () => JSON.parse(localStorage.getItem('user') || '{}')
+  );
+  useEffect(() => {
+    const refresh = () => setStoredUser(JSON.parse(localStorage.getItem('user') || '{}'));
+    window.addEventListener('userUpdated', refresh);
+    return () => window.removeEventListener('userUpdated', refresh);
+  }, []);
+
   const storedMember = JSON.parse(localStorage.getItem('membership') || 'null');
   const officerPosition = storedMember?.position || '';
   const membershipRole = storedMember?.role || '';
   const isAdviser = membershipRole === 'adviser';
 
   const currentUser = isAdmin
-    ? { name: 'Admin User', email: storedUser.email ?? '', role: 'System Admin' }
+    ? { name: 'Admin User', email: storedUser.email ?? '', role: 'System Admin', avatarUrl: null }
     : {
       name: `${storedUser.student?.first_name ?? ''} ${storedUser.student?.last_name ?? ''}`.trim() || 'Student',
       email: storedUser.email ?? '',
-      studentId: storedUser.student?.student_number ?? 'Ã¢â‚¬â€',
+      studentId: storedUser.student?.student_number ?? '—',
       role: isOfficer ? (isAdviser ? 'Adviser' : (officerPosition || 'Officer')) : 'Member',
-      yearLevel: storedUser.student?.year_level ?? 'Ã¢â‚¬â€',
+      yearLevel: storedUser.student?.year_level ?? '—',
+      avatarUrl: storedUser.student?.profile_picture_url ?? null,
     };
 
   const getInitials = (name) =>
@@ -324,11 +336,11 @@ export default function Sidebar({ onClose }) {
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors group">
                 <div className="relative shrink-0">
-                  <Avatar className="w-9 h-9 ring-2 ring-white shadow-sm">
-                    <AvatarFallback className={`bg-gradient-to-br ${theme.gradient} text-white text-xs font-bold`}>
-                      {getInitials(currentUser.name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <AvatarImg
+                    src={currentUser.avatarUrl}
+                    name={currentUser.name}
+                    size={36}
+                  />
                   <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full" />
                 </div>
                 <div className="flex-1 text-left min-w-0">

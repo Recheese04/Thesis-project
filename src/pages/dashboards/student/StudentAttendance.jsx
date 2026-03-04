@@ -24,9 +24,10 @@ export default function StudentAttendance() {
   };
 
   const totalEvents = records.length;
-  const attended    = records.filter(r => r.status === 'checked_in' || r.status === 'checked_out').length;
-  const checkedOut  = records.filter(r => r.status === 'checked_out').length;
-  const rate        = totalEvents > 0 ? Math.round((attended / totalEvents) * 100) : 0;
+  const attended = records.filter(r => r.status === 'checked_in' || r.status === 'checked_out').length;
+  const checkedOut = records.filter(r => r.status === 'checked_out').length;
+  const missed = records.filter(r => r.status === 'absent').length;
+  const rate = totalEvents > 0 ? Math.round((attended / totalEvents) * 100) : 0;
 
   const formatTime = (dt) => {
     if (!dt) return '—';
@@ -38,11 +39,11 @@ export default function StudentAttendance() {
     return new Date(dt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const StatusBadge = ({ status }) => (
-    <Badge className={status === 'checked_out' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}>
-      {status === 'checked_out' ? 'Completed' : 'Checked In'}
-    </Badge>
-  );
+  const StatusBadge = ({ status }) => {
+    if (status === 'absent') return <Badge className="bg-red-100 text-red-700">Absent</Badge>;
+    if (status === 'checked_out') return <Badge className="bg-blue-100 text-blue-700">Completed</Badge>;
+    return <Badge className="bg-green-100 text-green-700">Checked In</Badge>;
+  };
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -81,11 +82,11 @@ export default function StudentAttendance() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2 sm:pb-3"><CardDescription className="text-xs sm:text-sm">Completed</CardDescription></CardHeader>
+          <CardHeader className="pb-2 sm:pb-3"><CardDescription className="text-xs sm:text-sm">Missed Events</CardDescription></CardHeader>
           <CardContent className="pt-0">
             <div className="flex items-center gap-2">
-              <XCircle className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
-              <span className="text-2xl sm:text-3xl font-bold text-slate-900">{checkedOut}</span>
+              <XCircle className="w-6 h-6 sm:w-8 sm:h-8 text-red-600" />
+              <span className="text-2xl sm:text-3xl font-bold text-slate-900">{missed}</span>
             </div>
           </CardContent>
         </Card>

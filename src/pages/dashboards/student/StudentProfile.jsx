@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import {
     User, Mail, Phone, GraduationCap, Building2, BookOpen,
     Lock, Eye, EyeOff, Save, Loader2, CheckCircle2,
-    Users, ChevronRight, Clock, XCircle, Shield, UserPlus
+    Users, Clock, Shield, UserPlus, Camera, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import Avatar from "@/components/Avatar";
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
@@ -45,6 +46,8 @@ export default function StudentProfile() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [avatarLoading, setAvatarLoading] = useState(false);
+    const fileInputRef = useRef(null);
 
     // Profile form
     const [profileForm, setProfileForm] = useState({
@@ -67,6 +70,8 @@ export default function StudentProfile() {
         try {
             const res = await axios.get("/api/me", authH());
             setUser(res.data.user);
+            // Keep localStorage in sync so the Sidebar shows the current avatar
+            localStorage.setItem("user", JSON.stringify(res.data.user));
             setProfileForm({
                 contact_number: res.data.user?.student?.contact_number || "",
                 email: res.data.user?.email || "",
@@ -97,6 +102,43 @@ export default function StudentProfile() {
         fetchProfile();
         fetchOrgs();
     }, []);
+
+    // ── Avatar Upload ──
+    const handleAvatarChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append("avatar", file);
+        setAvatarLoading(true);
+        try {
+            await axios.post("/api/profile/avatar", fd, {
+                ...authH(),
+                headers: { ...authH().headers, "Content-Type": "multipart/form-data" },
+            });
+            toast.success("Profile picture updated!");
+            await fetchProfile();
+            window.dispatchEvent(new Event('userUpdated'));
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Upload failed");
+        } finally {
+            setAvatarLoading(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
+    const handleRemoveAvatar = async () => {
+        setAvatarLoading(true);
+        try {
+            await axios.delete("/api/profile/avatar", authH());
+            toast.success("Profile picture removed");
+            await fetchProfile();
+            window.dispatchEvent(new Event('userUpdated'));
+        } catch (err) {
+            toast.error("Failed to remove photo");
+        } finally {
+            setAvatarLoading(false);
+        }
+    };
 
     // ── Save Profile ──
     const handleSaveProfile = async () => {
@@ -172,17 +214,45 @@ export default function StudentProfile() {
         (o) => !myOrgIds.includes(o.id) && !pendingOrgIds.includes(o.id)
     );
 
+    const avatarUrl = student?.profile_picture_url || null;
+    const fullName = [student?.first_name, student?.last_name].filter(Boolean).join(' ');
+
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             {/* Header Card */}
             <Card className="bg-gradient-to-br from-[#0f2d5e] via-[#153d80] to-[#1e4db7] border-0 shadow-xl rounded-2xl p-6 text-white">
                 <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                        <span className="text-2xl font-bold">
-                            {student?.first_name?.[0]}{student?.last_name?.[0]}
-                        </span>
+                    {/* Avatar with camera overlay */}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <Avatar src={avatarUrl} name={fullName} size={72} />
+                        {/* Camera button */}
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={avatarLoading}
+                            title="Change profile picture"
+                            style={{
+                                position: 'absolute', bottom: -4, right: -4,
+                                width: 26, height: 26, borderRadius: '50%',
+                                background: '#2563eb', border: '2px solid white',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: 'pointer', color: 'white',
+                            }}
+                        >
+                            {avatarLoading
+                                ? <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />
+                                : <Camera style={{ width: 12, height: 12 }} />
+                            }
+                        </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            style={{ display: 'none' }}
+                            onChange={handleAvatarChange}
+                        />
                     </div>
-                    <div className="min-w-0">
+
+                    <div className="min-w-0 flex-1">
                         <h1 className="text-xl font-bold truncate">
                             {student?.first_name} {student?.middle_name ? student.middle_name + " " : ""}{student?.last_name}
                         </h1>
@@ -194,6 +264,20 @@ export default function StudentProfile() {
                             <Badge className="bg-white/20 border-white/30 text-white text-[10px]">
                                 {student?.year_level}
                             </Badge>
+                            {avatarUrl && (
+                                <button
+                                    onClick={handleRemoveAvatar}
+                                    disabled={avatarLoading}
+                                    title="Remove photo"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
+                                        borderRadius: 8, padding: '2px 8px', cursor: 'pointer',
+                                        color: 'white', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4,
+                                    }}
+                                >
+                                    <Trash2 style={{ width: 10, height: 10 }} /> Remove photo
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

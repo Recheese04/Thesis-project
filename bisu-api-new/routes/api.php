@@ -86,6 +86,52 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         );
 
+        // ── Profile Picture ──────────────────────────────────────────────────
+        Route::post('/profile/avatar', function (Request $request) {
+            $request->validate([
+                'avatar' => 'required|image|mimes:jpeg,png,webp,jpg|max:2048',
+            ]);
+
+            $user = $request->user();
+            if (!$user->student_id) {
+                return response()->json(['message' => 'Only students can upload a profile picture.'], 403);
+            }
+
+            $student = $user->student;
+
+            // Delete previous file if exists
+            if ($student->profile_picture) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($student->profile_picture);
+            }
+
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $student->update(['profile_picture' => $path]);
+
+            return response()->json([
+            'message' => 'Profile picture updated.',
+            'url' => \Illuminate\Support\Facades\Storage::disk('public')->url($path),
+            ]);
+        }
+        );
+
+        Route::delete('/profile/avatar', function (Request $request) {
+            $user = $request->user();
+            if (!$user->student_id) {
+                return response()->json(['message' => 'Only students have profile pictures.'], 403);
+            }
+
+            $student = $user->student;
+            if ($student->profile_picture) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($student->profile_picture);
+                $student->update(['profile_picture' => null]);
+            }
+
+            return response()->json(['message' => 'Profile picture removed.']);
+        }
+        );
+
+
+
         Route::post('/organizations/{orgId}/join-request', function (Request $request, $orgId) {
             $user = $request->user();
             if (!$user->student_id) {
@@ -188,15 +234,30 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/organizations/{org_id}/members', [MemberOrganizationController::class , 'store']);
                 Route::patch('/organizations/{org_id}/members/{membershipId}/role', [MemberOrganizationController::class , 'updateRole']);
                 Route::delete('/organizations/{org_id}/members/{membershipId}', [MemberOrganizationController::class , 'destroy']);
+                Route::get('/organizations/{org_id}/members/{studentId}/attendance', [MemberOrganizationController::class , 'memberAttendance']);
 
                 // Join Request Approvals
                 Route::post('/organizations/{org_id}/members/{membershipId}/approve', function (Request $request, $orgId, $membershipId) {
+            $user = $request->user();
+            if (!$user->isAdmin()) {
+                $officerOrgId = $user->getOfficerOrganizationId();
+                if (!$officerOrgId || $officerOrgId != $orgId) {
+                    return response()->json(['message' => 'Unauthorized. Only officers of this organization can approve requests.'], 403);
+                }
+            }
             $membership = \App\Models\MemberOrganization::where('organization_id', $orgId)->findOrFail($membershipId);
             $membership->update(['status' => 'active', 'joined_date' => now()->toDateString()]);
             return response()->json(['message' => 'Join request approved.']);
         }
         );
         Route::post('/organizations/{org_id}/members/{membershipId}/reject', function (Request $request, $orgId, $membershipId) {
+            $user = $request->user();
+            if (!$user->isAdmin()) {
+                $officerOrgId = $user->getOfficerOrganizationId();
+                if (!$officerOrgId || $officerOrgId != $orgId) {
+                    return response()->json(['message' => 'Unauthorized. Only officers of this organization can reject requests.'], 403);
+                }
+            }
             $membership = \App\Models\MemberOrganization::where('organization_id', $orgId)->findOrFail($membershipId);
             $membership->update(['status' => 'rejected']); // Or delete it: $membership->delete();
             return response()->json(['message' => 'Join request rejected.']);
@@ -278,8 +339,20 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('attendance/event/{eventId}', [AttendanceController::class , 'getEventAttendance']);
                 Route::post('attendance/manual-checkin', [AttendanceController::class , 'manualCheckIn']);
                 Route::post('attendance/manual-checkout', [AttendanceController::class , 'manualCheckOut']);
-                Route::delete('attendance/{id}', function ($id) {
-            \App\Models\Attendance::findOrFail($id)->delete();
+                Route::post('attendance/rfid-checkin', [AttendanceController::class , 'rfidCheckIn']);
+                Route::post('attendance/rfid-checkout', [AttendanceController::class , 'rfidCheckOut']);
+                Route::post('attendance/rfid-scan', [AttendanceController::class , 'rfidScan']); // smart auto-detect
+                Route::put('/students/{id}/rfid', [UserController::class , 'updateRfidUid']);
+                Route::delete('attendance/{id}', function (\Illuminate\Http\Request $request, $id) {
+            $user = $request->user();
+            $attendance = \App\Models\Attendance::with('event')->findOrFail($id);
+            if (!$user->isAdmin()) {
+                $officerOrgId = $user->getOfficerOrganizationId();
+                if (!$officerOrgId || !$attendance->event || $attendance->event->organization_id != $officerOrgId) {
+                    return response()->json(['message' => 'Unauthorized. You can only delete attendance records for your organization.'], 403);
+                }
+            }
+            $attendance->delete();
             return response()->json(['message' => 'Record deleted.']);
         }
         );

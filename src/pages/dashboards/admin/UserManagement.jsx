@@ -7,7 +7,7 @@ import {
   RefreshCw, Building2, AlertTriangle,
   ChevronRight, Activity, MoreHorizontal, BookOpen, Filter, Upload
 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import AvatarImg from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -392,11 +392,11 @@ export default function UserManagement() {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="relative shrink-0">
-                            <Avatar className="w-9 h-9 ring-2 ring-white shadow-sm">
-                              <AvatarFallback className="bg-gradient-to-br from-[#0f2d5e] to-[#1e4db7] text-white text-xs font-bold">
-                                {getInitials(user)}
-                              </AvatarFallback>
-                            </Avatar>
+                            <AvatarImg
+                              src={user.student?.profile_picture_url || null}
+                              name={getFullName(user)}
+                              size={36}
+                            />
                             <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${user.is_active ? "bg-emerald-400" : "bg-slate-300"}`} />
                           </div>
                           <div className="min-w-0">

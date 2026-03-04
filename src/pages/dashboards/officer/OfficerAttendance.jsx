@@ -1,22 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Users, CheckCircle, XCircle, Clock, Calendar, Download, RefreshCw } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Clock, Calendar, Download, RefreshCw, Search, ListFilter, LayoutGrid } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
 export default function OfficerAttendance() {
-  const [events, setEvents]                       = useState([]);
-  const [selectedEvent, setSelectedEvent]         = useState(null);
-  const [attendance, setAttendance]               = useState([]);
-  const [stats, setStats]                         = useState(null);
-  const [loadingEvents, setLoadingEvents]         = useState(true);
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [attendance, setAttendance] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('grouped'); // 'grouped' or 'flat'
 
   useEffect(() => { fetchEvents(); }, []);
   useEffect(() => { if (selectedEvent) fetchAttendance(selectedEvent.id); }, [selectedEvent]);
@@ -25,7 +28,7 @@ export default function OfficerAttendance() {
     try {
       setLoadingEvents(true);
       const res = await axios.get('/api/events', authH());
-      setEvents(res.data.filter(e => e.status === 'ongoing' || e.status === 'upcoming'));
+      setEvents(res.data);
     } catch { toast.error('Failed to load events'); }
     finally { setLoadingEvents(false); }
   };
@@ -50,7 +53,7 @@ export default function OfficerAttendance() {
 
   const StatusBadge = ({ status }) => {
     if (status === 'checked_out') return <Badge className="bg-blue-100 text-blue-700 text-xs">Completed</Badge>;
-    if (status === 'checked_in')  return <Badge className="bg-green-100 text-green-700 text-xs">Checked In</Badge>;
+    if (status === 'checked_in') return <Badge className="bg-green-100 text-green-700 text-xs">Checked In</Badge>;
     return <Badge className="bg-red-100 text-red-700 text-xs">Absent</Badge>;
   };
 
@@ -64,13 +67,77 @@ export default function OfficerAttendance() {
         r.formatted_duration ?? '—', r.status,
       ])
     ];
-    const csv  = rows.map(r => r.join(',')).join('\n');
+    const csv = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
-    const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement('a'), { href: url, download: `attendance_${selectedEvent?.title ?? 'export'}.csv` });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: `attendance_${selectedEvent?.title ?? 'export'}.csv` });
     a.click(); URL.revokeObjectURL(url);
     toast.success('Exported successfully');
   };
+
+  const filteredAttendance = useMemo(() => {
+    if (!searchQuery.trim()) return attendance;
+    const q = searchQuery.toLowerCase();
+    return attendance.filter(a =>
+      a.student?.name?.toLowerCase().includes(q) ||
+      a.student?.student_number?.toLowerCase().includes(q)
+    );
+  }, [attendance, searchQuery]);
+
+  const AttendanceRow = ({ record }) => (
+    <TableRow>
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <Avatar className="w-9 h-9">
+            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold text-xs">
+              {getInitials(record.student?.name)}
+            </AvatarFallback>
+          </Avatar>
+          <span className="font-medium text-slate-900">{record.student?.name ?? '—'}</span>
+        </div>
+      </TableCell>
+      <TableCell><span className="font-mono text-sm">{record.student?.student_number ?? '—'}</span></TableCell>
+      <TableCell><Badge variant="outline" className="text-xs capitalize">{record.attendance_type}</Badge></TableCell>
+      <TableCell>{formatTime(record.time_in)}</TableCell>
+      <TableCell>{formatTime(record.time_out)}</TableCell>
+      <TableCell>{record.formatted_duration ?? '—'}</TableCell>
+      <TableCell><StatusBadge status={record.status} /></TableCell>
+    </TableRow>
+  );
+
+  const AttendanceMobileCard = ({ record }) => (
+    <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Avatar className="w-8 h-8 shrink-0">
+            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold text-xs">
+              {getInitials(record.student?.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="font-medium text-slate-900 text-sm truncate">{record.student?.name ?? '—'}</p>
+            <p className="text-xs text-slate-500 font-mono">{record.student?.student_number ?? '—'}</p>
+          </div>
+        </div>
+        <StatusBadge status={record.status} />
+      </div>
+      <div className="grid grid-cols-3 gap-1 text-xs">
+        <div>
+          <p className="text-slate-400 mb-0.5">Check In</p>
+          <p className="font-medium text-slate-700">{formatTime(record.time_in)}</p>
+        </div>
+        <div>
+          <p className="text-slate-400 mb-0.5">Check Out</p>
+          <p className="font-medium text-slate-700">{formatTime(record.time_out)}</p>
+        </div>
+        <div>
+          <p className="text-slate-400 mb-0.5">Duration</p>
+          <p className="font-medium text-slate-700">{record.formatted_duration ?? '—'}</p>
+        </div>
+      </div>
+      <Badge variant="outline" className="text-[10px] capitalize">{record.attendance_type}</Badge>
+    </div>
+  );
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -106,14 +173,13 @@ export default function OfficerAttendance() {
           {loadingEvents ? (
             <div className="py-8 text-center text-slate-400 text-sm">Loading events...</div>
           ) : events.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 text-sm">No ongoing or upcoming events.</div>
+            <div className="py-8 text-center text-slate-400 text-sm">No events found.</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {events.map((event) => (
                 <button key={event.id} onClick={() => setSelectedEvent(event)}
-                  className={`p-3 sm:p-4 rounded-xl border-2 transition-all text-left ${
-                    selectedEvent?.id === event.id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'
-                  }`}
+                  className={`p-3 sm:p-4 rounded-xl border-2 transition-all text-left ${selectedEvent?.id === event.id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shrink-0">
@@ -142,9 +208,9 @@ export default function OfficerAttendance() {
           {stats && (
             <div className="grid grid-cols-3 gap-3 sm:gap-4">
               {[
-                { label: 'Total Check-ins', icon: Users,         color: 'text-blue-600',  value: stats.total },
-                { label: 'Currently In',    icon: CheckCircle,   color: 'text-green-600', value: stats.checked_in },
-                { label: 'Checked Out',     icon: XCircle,       color: 'text-blue-600',  value: stats.checked_out },
+                { label: 'Total Check-ins', icon: Users, color: 'text-blue-600', value: stats.total },
+                { label: 'Currently In', icon: CheckCircle, color: 'text-green-600', value: stats.checked_in },
+                { label: 'Checked Out', icon: XCircle, color: 'text-blue-600', value: stats.checked_out },
               ].map(({ label, icon: Icon, color, value }) => (
                 <Card key={label}>
                   <CardHeader className="pb-1 sm:pb-3 pt-3 sm:pt-4 px-3 sm:px-6">
@@ -162,52 +228,104 @@ export default function OfficerAttendance() {
           )}
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base sm:text-lg">Live Attendance — {selectedEvent.title}</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Real-time attendance tracking</CardDescription>
+            <CardHeader className="pb-3 border-b border-slate-100 mb-4 sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-base sm:text-lg">Live Attendance — {selectedEvent.title}</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Real-time attendance tracking</CardDescription>
+              </div>
+
+              {/* Controls */}
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    placeholder="Search name or ID..."
+                    className="pl-9 h-9 text-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center w-full sm:w-auto p-1 bg-slate-100 rounded-lg shrink-0">
+                  <button
+                    onClick={() => setViewMode('flat')}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'flat' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                  >
+                    <ListFilter className="w-3.5 h-3.5" /> View All
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grouped')}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'grouped' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" /> Grouped
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {loadingAttendance ? (
                 <div className="py-12 text-center text-slate-400 text-sm">Loading attendance...</div>
               ) : attendance.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 text-sm">No check-ins recorded yet.</div>
+              ) : filteredAttendance.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm">No records match your search.</div>
+              ) : viewMode === 'grouped' ? (
+                /* GROUPED VIEW */
+                <div className="space-y-10">
+                  {Object.entries(
+                    filteredAttendance.reduce((acc, record) => {
+                      const dept = record.student?.department?.name || 'Unknown Department';
+                      const course = record.student?.course || 'Unknown Course';
+                      const year = record.student?.year_level ? `Year ${record.student.year_level}` : 'Unknown Year';
+                      const key = `${dept} — ${course} (${year})`;
+
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(record);
+                      return acc;
+                    }, {})
+                  ).map(([groupName, groupRecords]) => (
+                    <div key={groupName} className="space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b">
+                        <h3 className="font-semibold text-slate-800 text-sm sm:text-base">{groupName}</h3>
+                        <Badge variant="secondary" className="text-xs bg-slate-100 text-slate-600">
+                          {groupRecords.length} {groupRecords.length === 1 ? 'Student' : 'Students'}
+                        </Badge>
+                      </div>
+
+                      {/* Mobile card list */}
+                      <div className="sm:hidden space-y-3">
+                        {groupRecords.map((record) => <AttendanceMobileCard key={record.id} record={record} />)}
+                      </div>
+
+                      {/* Desktop table */}
+                      <div className="hidden sm:block rounded-lg border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Member</TableHead>
+                              <TableHead>Student ID</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Check In</TableHead>
+                              <TableHead>Check Out</TableHead>
+                              <TableHead>Duration</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {groupRecords.map((record) => <AttendanceRow key={record.id} record={record} />)}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <>
+                /* FLAT VIEW (ALL) */
+                <div className="space-y-4">
                   {/* Mobile card list */}
                   <div className="sm:hidden space-y-3">
-                    {attendance.map((record) => (
-                      <div key={record.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Avatar className="w-8 h-8 shrink-0">
-                              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold text-xs">
-                                {getInitials(record.student?.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                              <p className="font-medium text-slate-900 text-sm truncate">{record.student?.name ?? '—'}</p>
-                              <p className="text-xs text-slate-500 font-mono">{record.student?.student_number ?? '—'}</p>
-                            </div>
-                          </div>
-                          <StatusBadge status={record.status} />
-                        </div>
-                        <div className="grid grid-cols-3 gap-1 text-xs">
-                          <div>
-                            <p className="text-slate-400 mb-0.5">Check In</p>
-                            <p className="font-medium text-slate-700">{formatTime(record.time_in)}</p>
-                          </div>
-                          <div>
-                            <p className="text-slate-400 mb-0.5">Check Out</p>
-                            <p className="font-medium text-slate-700">{formatTime(record.time_out)}</p>
-                          </div>
-                          <div>
-                            <p className="text-slate-400 mb-0.5">Duration</p>
-                            <p className="font-medium text-slate-700">{record.formatted_duration ?? '—'}</p>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="text-[10px] capitalize">{record.attendance_type}</Badge>
-                      </div>
-                    ))}
+                    {filteredAttendance.map((record) => <AttendanceMobileCard key={record.id} record={record} />)}
                   </div>
 
                   {/* Desktop table */}
@@ -225,30 +343,11 @@ export default function OfficerAttendance() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {attendance.map((record) => (
-                          <TableRow key={record.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="w-9 h-9">
-                                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold text-xs">
-                                    {getInitials(record.student?.name)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="font-medium text-slate-900">{record.student?.name ?? '—'}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell><span className="font-mono text-sm">{record.student?.student_number ?? '—'}</span></TableCell>
-                            <TableCell><Badge variant="outline" className="text-xs capitalize">{record.attendance_type}</Badge></TableCell>
-                            <TableCell>{formatTime(record.time_in)}</TableCell>
-                            <TableCell>{formatTime(record.time_out)}</TableCell>
-                            <TableCell>{record.formatted_duration ?? '—'}</TableCell>
-                            <TableCell><StatusBadge status={record.status} /></TableCell>
-                          </TableRow>
-                        ))}
+                        {filteredAttendance.map((record) => <AttendanceRow key={record.id} record={record} />)}
                       </TableBody>
                     </Table>
                   </div>
-                </>
+                </div>
               )}
             </CardContent>
           </Card>

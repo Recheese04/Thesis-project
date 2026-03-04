@@ -11,6 +11,8 @@ class Student extends Model
 
     protected $table = 'students';
 
+    protected $appends = ['profile_picture_url'];
+
     protected $fillable = [
         'student_number',
         'first_name',
@@ -20,28 +22,40 @@ class Student extends Model
         'course',
         'year_level',
         'contact_number',
+        'rfid_uid',
         'department_id',
+        'profile_picture',
     ];
+
+    /**
+     * Returns the full public URL to the student's profile picture, or null.
+     */
+    public function getProfilePictureUrlAttribute(): ?string
+    {
+        if (!$this->profile_picture)
+            return null;
+        return \Illuminate\Support\Facades\Storage::disk('public')->url($this->profile_picture);
+    }
 
     public function user()
     {
-        return $this->hasOne(User::class, 'student_id', 'id');
+        return $this->hasOne(User::class , 'student_id', 'id');
     }
 
     public function department()
     {
-        return $this->belongsTo(Department::class, 'department_id');
+        return $this->belongsTo(Department::class , 'department_id');
     }
 
     public function organizationMemberships()
     {
-        return $this->hasMany(MemberOrganization::class, 'student_id', 'id');
+        return $this->hasMany(MemberOrganization::class , 'student_id', 'id');
     }
 
     public function organizations()
     {
         return $this->belongsToMany(
-            Organization::class,
+            Organization::class ,
             'member_organizations',
             'student_id',
             'organization_id'

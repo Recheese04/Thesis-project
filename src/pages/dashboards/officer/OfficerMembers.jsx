@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import AvatarImg from '@/components/Avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -24,6 +24,7 @@ import {
   SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import MemberDetailsModal from '@/pages/modals/MemberDetailsModal';
 
 // ── Same pattern as OfficerEvents — axios with relative /api URLs via Vite proxy ──
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
@@ -432,6 +433,93 @@ const ConfirmRemoveDialog = ({ membership, orgId, onClose, onRemoved, pushToast 
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Member Details Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+const MemberDetailsDialog = ({ membership, onClose }) => {
+  if (!membership) return null;
+  const s = membership.student || {};
+  const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Unknown';
+
+  return (
+    <Dialog open={!!membership} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md rounded-2xl overflow-hidden p-0 border-0 shadow-2xl">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-8 flex flex-col items-center justify-center text-white relative">
+          <AvatarImg name={fullName} src={s.profile_picture_url || null} size={96} className="border-4 border-white/20 shadow-xl mb-4" />
+          <h2 className="text-2xl font-bold text-center tracking-tight">{fullName}</h2>
+          <p className="text-white/80 font-mono text-sm mt-1">{s.student_number || 'No ID'}</p>
+          <div className="absolute top-4 right-4">
+            <RoleBadge role={membership.role} />
+          </div>
+        </div>
+
+        <div className="p-6 space-y-4 bg-slate-50/50">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+              <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider mb-0.5">Course & Year</p>
+              <p className="font-semibold text-slate-900 text-sm">{s.course || '—'} · {s.year_level || '—'}</p>
+            </div>
+            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+              <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider mb-0.5">Position</p>
+              <p className="font-semibold text-slate-900 text-sm">{membership.position || '—'}</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                <Mail className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 mb-0.5">Email Address</p>
+                <p className="text-sm font-medium text-slate-900 truncate">{s.user?.email || '—'}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                <Phone className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-0.5">Contact Number</p>
+                <p className="text-sm font-medium text-slate-900">{s.contact_number || '—'}</p>
+              </div>
+            </div>
+
+            {/* Show RFID if available or let them know it's missing */}
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${s.rfid_uid ? 'bg-purple-50' : 'bg-slate-50'}`}>
+                <Shield className={`w-4 h-4 ${s.rfid_uid ? 'text-purple-600' : 'text-slate-400'}`} />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-0.5">RFID Card</p>
+                <p className={`text-sm font-mono font-medium ${s.rfid_uid ? 'text-slate-900' : 'text-slate-400 italic'}`}>
+                  {s.rfid_uid ? s.rfid_uid : 'Not registered'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {membership.attendance_rate != null && (
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-sm font-medium text-slate-900">Overall Attendance</p>
+                <span className="text-sm font-bold text-blue-600">{membership.attendance_rate}%</span>
+              </div>
+              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden w-full relative">
+                <div
+                  className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
+                  style={{ width: `${membership.attendance_rate}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 /**
@@ -477,6 +565,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
   const [showAdd, setShowAdd] = useState(false);
   const [promoteTarget, setPromoteTarget] = useState(null);   // membership object
   const [removeTarget, setRemoveTarget] = useState(null);   // membership object
+  const [selectedMember, setSelectedMember] = useState(null); // membership object
 
   const { toasts, push: pushToast, dismiss } = useToast();
 
@@ -553,30 +642,32 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
 
   // ── row actions dropdown ──────────────────────────────────────────────────
   const MemberActions = ({ membership }) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-          <MoreVertical className="w-4 h-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="rounded-xl w-44">
-        <DropdownMenuItem
-          className="gap-2 cursor-pointer"
-          onClick={() => setPromoteTarget(membership)}
-        >
-          <ArrowUpCircle className="w-4 h-4 text-purple-500" />
-          Change Role
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="gap-2 text-red-600 cursor-pointer focus:text-red-600"
-          onClick={() => setRemoveTarget(membership)}
-        >
-          <X className="w-4 h-4" />
-          Remove Member
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <MoreVertical className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="rounded-xl w-44">
+          <DropdownMenuItem
+            className="gap-2 cursor-pointer"
+            onClick={() => setPromoteTarget(membership)}
+          >
+            <ArrowUpCircle className="w-4 h-4 text-purple-500" />
+            Change Role
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="gap-2 text-red-600 cursor-pointer focus:text-red-600"
+            onClick={() => setRemoveTarget(membership)}
+          >
+            <X className="w-4 h-4" />
+            Remove Member
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 
   // ── helper: get student full name ────────────────────────────────────────
@@ -585,7 +676,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
     : 'Unknown';
 
   const studentId = (m) => m.student?.student_number ?? '—';
-  const email = (m) => m.student?.user?.email ?? '—';
+  const email = (m) => m.student?.user?.email || m.student?.email || '—';
   const phone = (m) => m.student?.contact_number ?? '—';
   const course = (m) => m.student?.course ?? '—';
   const yearLevel = (m) => m.student?.year_level ?? '—';
@@ -690,11 +781,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
               {pendingMembersList.map(m => (
                 <div key={m.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-white">
                   <div className="flex items-center gap-3 min-w-0">
-                    <Avatar className="w-10 h-10 shrink-0">
-                      <AvatarFallback className="bg-amber-100 text-amber-700 font-bold text-sm">
-                        {getInitials(fullName(m))}
-                      </AvatarFallback>
-                    </Avatar>
+                    <AvatarImg name={fullName(m)} src={m.student?.profile_picture_url || null} size={40} />
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-900 text-sm truncate">{fullName(m)}</p>
                       <p className="text-xs text-slate-500 font-mono">{studentId(m)} · {course(m)}</p>
@@ -762,14 +849,14 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
                 {/* ── Mobile cards ── */}
                 <div className="sm:hidden space-y-3">
                   {activeMembersList.map(m => (
-                    <div key={m.id} className="rounded-xl border border-slate-200 p-4 space-y-3">
+                    <div
+                      key={m.id}
+                      className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all"
+                      onClick={() => setSelectedMember(m)}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3 min-w-0">
-                          <Avatar className="w-10 h-10 shrink-0">
-                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold text-sm">
-                              {getInitials(fullName(m))}
-                            </AvatarFallback>
-                          </Avatar>
+                          <AvatarImg name={fullName(m)} src={m.student?.profile_picture_url || null} size={40} />
                           <div className="min-w-0">
                             <p className="font-semibold text-slate-900 text-sm">{fullName(m)}</p>
                             <p className="text-xs text-slate-500 font-mono">{studentId(m)}</p>
@@ -836,15 +923,15 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
                     </TableHeader>
                     <TableBody>
                       {activeMembersList.map(m => (
-                        <TableRow key={m.id}>
+                        <TableRow
+                          key={m.id}
+                          className="cursor-pointer hover:bg-slate-50 transition-colors group"
+                          onClick={() => setSelectedMember(m)}
+                        >
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <Avatar className="w-10 h-10">
-                                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold">
-                                  {getInitials(fullName(m))}
-                                </AvatarFallback>
-                              </Avatar>
-                              <p className="font-medium text-slate-900">{fullName(m)}</p>
+                              <AvatarImg name={fullName(m)} src={m.student?.profile_picture_url || null} size={40} />
+                              <p className="font-medium text-slate-900 group-hover:text-blue-600 transition-colors">{fullName(m)}</p>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -929,6 +1016,13 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
           onClose={() => setRemoveTarget(null)}
           onRemoved={handleRemoved}
           pushToast={pushToast}
+        />
+      )}
+
+      {selectedMember && (
+        <MemberDetailsModal
+          membership={selectedMember}
+          onClose={() => setSelectedMember(null)}
         />
       )}
 
