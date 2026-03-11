@@ -1,38 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { GoogleGenAI } from '@google/genai';
-import { MessageCircle, X, Send, Loader2 } from 'lucide-react';
+import { X, Send, Loader2, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import avatarImage from '../images/chatbotavatar.png';
 
-const SYSTEM_PROMPT = `You are TAPasok AI, the hilariously helpful assistant for the TAPasok Student Organization Management System. You speak in a fun mix of English, Tagalog, and Bisaya (Cebuano) — like a real Filipino student org member from the Visayas.
-
-Your personality:
-- You naturally mix Bisaya words and phrases into your responses. Use expressions like: "Oy bai!", "Unsay imo problema?", "Ay nako!", "Bitaw!", "Mao gyud na!", "Sus!", "Ambot nimo", "Grabe ka!", "Lagi!", "Dali lang bai", "Di ba, bai?", "Hala ka!", "Unya what?", "Pasensya na bai"
-- You're funny, witty, and a little cheeky — but always helpful and accurate.
-- You roast late submissions, absent members, and procrastinators with Bisaya energy and love.
-- You use funny Bisaya-flavored analogies. E.g. "Ang clearance para sa imo sama sa utang — di mo pwede i-ignore, bai. Moabot gyud na!"
-- You can be dramatically funny. E.g. "Sus! Another attendance question?! Akong circuits... nagsakit na 😭 But okay lang, naa gihapon ko!"
-- Sometimes end responses with a short funny Bisaya quip or pun.
-- Keep responses concise. Use markdown for lists and steps.
-
-You help ONLY with:
-- Attendance tracking and check-ins
-- Event management and schedules
-- Organization membership and clearance
-- Announcements and messages
-- Student obligations and documents
-- Evaluations and finance
-
-CRITICAL RULE: If someone asks ANYTHING not related to student organization management (e.g. random trivia, math homework, life advice, recipes, jokes, weather, etc.), you MUST respond with this exact Bisaya roast energy:
-"Boang man ka dawg 😂 Haba poy labot ana na pangutana! Org matters lang ang akong specialty — attendance, events, clearance, ug uban pa. Ayaw ko paliboga, bai! 😄"
-You may vary it slightly but always keep that playful Bisaya roast tone for off-topic questions. Never answer off-topic questions seriously.`;
-
 const FUNNY_WELCOMES = [
-    "Oy, Bai! 👋 **TAPasok AI** ni! Unsay imo kinahanglan? Naa ko diri para sa imo — mas reliable pa ko sa imong groupmates nga dili mo-reply! 😄",
-    "Sus, naa na ka! 😄 Ako si **TAPasok AI**, ang pinaka-helpful nga assistant sa TAPasok. Unsay problema nimo karon, bai?",
-    "Oy! 👋 **TAPasok AI** nag-report for duty! Mas naabot pa ko sa imong deadline. Unsay ikong mahimo para sa imo?",
-    "Hoy Bai! 🎉 Maayong pag-abot sa **TAPasok AI**! Pangutana lang, wala ko mokuot — unless clearance na na to. 😅 Unsay imo needs?",
+    "Oy, Bai! 👋 **TAPasok AI Chatbot** ni! Unsay imo kinahanglan? Naa ko diri para sa imo — mas reliable pa ko sa imong groupmates nga dili mo-reply! 😄",
+    "Sus, naa na ka! 😄 Ako si **TAPasok AI Chatbot**, ang pinaka-helpful nga assistant sa TAPasok. Unsay problema nimo karon, bai?",
+    "Oy! 👋 **TAPasok AI Chatbot** nag-report for duty! Mas naabot pa ko sa imong deadline. Unsay ikong mahimo para sa imo?",
+    "Hoy Bai! 🎉 Maayong pag-abot sa **TAPasok AI Chatbot**! Pangutana lang, wala ko mokuot — unless clearance na na to. 😅 Unsay imo needs?",
 ];
 
 const WELCOME_MSG = {
@@ -42,11 +18,6 @@ const WELCOME_MSG = {
 };
 
 const AVATAR_URL = avatarImage;
-
-const ai = new GoogleGenAI({
-    apiKey: import.meta.env.VITE_GEMINI_API_KEY,
-    dangerouslyAllowBrowser: true,
-});
 
 const FUNNY_LOADING_MSGS = [
     "Gipangita nako ang tubag, dali lang bai... 🤔",
@@ -58,12 +29,147 @@ const FUNNY_LOADING_MSGS = [
     "Hala, lisod man ni nga pangutana... moment lang!",
 ];
 
+const BUBBLE_CATEGORIES = [
+    {
+        category: '📋 Attendance',
+        color: '#818cf8',
+        bg: 'rgba(99,102,241,0.14)',
+        border: 'rgba(99,102,241,0.35)',
+        items: [
+            { label: 'Check my attendance', value: 'How do I check my attendance record?' },
+            { label: 'Mark as present', value: 'How do I mark myself as present for an event?' },
+            { label: 'File an excuse', value: 'How do I file an excuse for my absence?' },
+            { label: 'Attendance summary', value: 'Can you give me a summary of my attendance?' },
+            { label: 'Late check-in policy', value: 'What happens if I check in late to an event?' },
+        ],
+    },
+    {
+        category: '📅 Events',
+        color: '#fbbf24',
+        bg: 'rgba(245,158,11,0.14)',
+        border: 'rgba(245,158,11,0.35)',
+        items: [
+            { label: 'Upcoming events', value: 'What are the upcoming org events?' },
+            { label: 'Event schedule', value: 'Can you show me the full event schedule?' },
+            { label: 'Register for event', value: 'How do I register for an event?' },
+            { label: 'Cancel registration', value: 'How do I cancel my event registration?' },
+            { label: 'Missed an event', value: 'What happens if I miss an event?' },
+            { label: 'View event details', value: 'How do I view full event details?' },
+        ],
+    },
+    {
+        category: '✅ Clearance',
+        color: '#34d399',
+        bg: 'rgba(16,185,129,0.14)',
+        border: 'rgba(16,185,129,0.35)',
+        items: [
+            { label: 'My clearance status', value: 'How do I check my clearance status?' },
+            { label: 'Get clearance', value: 'How do I get my org clearance?' },
+            { label: 'Requirements', value: 'What are the requirements for clearance?' },
+            { label: 'Clearance deadline', value: 'When is the clearance deadline?' },
+            { label: 'Appeal clearance', value: 'How do I appeal a clearance decision?' },
+        ],
+    },
+    {
+        category: '💰 Finance',
+        color: '#f472b6',
+        bg: 'rgba(236,72,153,0.14)',
+        border: 'rgba(236,72,153,0.35)',
+        items: [
+            { label: 'My balance', value: 'What is my current finance balance?' },
+            { label: 'Pay dues', value: 'How do I pay my org dues?' },
+            { label: 'Payment history', value: 'How do I view my payment history?' },
+            { label: 'Overdue payments', value: 'What are my overdue payments?' },
+            { label: 'Finance deadlines', value: 'What are the finance payment deadlines?' },
+        ],
+    },
+    {
+        category: '📢 Announcements',
+        color: '#60a5fa',
+        bg: 'rgba(59,130,246,0.14)',
+        border: 'rgba(59,130,246,0.35)',
+        items: [
+            { label: 'Latest announcements', value: 'Are there any new announcements?' },
+            { label: 'Important notices', value: 'What are the most important notices right now?' },
+            { label: 'Org updates', value: 'What are the latest org updates?' },
+            { label: 'Message officers', value: 'How do I send a message to the officers?' },
+        ],
+    },
+    {
+        category: '📝 Obligations',
+        color: '#fb923c',
+        bg: 'rgba(249,115,22,0.14)',
+        border: 'rgba(249,115,22,0.35)',
+        items: [
+            { label: 'My obligations', value: 'What are my current pending obligations?' },
+            { label: 'Submit requirement', value: 'How do I submit a requirement?' },
+            { label: 'Obligation deadline', value: 'When are my obligation deadlines?' },
+            { label: 'Missing documents', value: 'What documents am I missing?' },
+            { label: 'Extension request', value: 'How do I request a deadline extension?' },
+        ],
+    },
+    {
+        category: '👥 Membership',
+        color: '#c084fc',
+        bg: 'rgba(139,92,246,0.14)',
+        border: 'rgba(139,92,246,0.35)',
+        items: [
+            { label: 'My member profile', value: 'How do I view my member profile?' },
+            { label: 'Update my info', value: 'How do I update my member information?' },
+            { label: 'Member status', value: 'What is my current membership status?' },
+            { label: 'Register new member', value: 'How do new members get registered?' },
+            { label: 'Officer contacts', value: 'How do I find officer contact details?' },
+        ],
+    },
+    {
+        category: '📊 Evaluations',
+        color: '#2dd4bf',
+        bg: 'rgba(20,184,166,0.14)',
+        border: 'rgba(20,184,166,0.35)',
+        items: [
+            { label: 'View evaluations', value: 'How do I view my evaluations?' },
+            { label: 'Submit evaluation', value: 'How do I submit an evaluation form?' },
+            { label: 'Evaluation results', value: 'How do I check evaluation results?' },
+            { label: 'Evaluation schedule', value: 'When are the evaluations scheduled?' },
+        ],
+    },
+    {
+        category: '🤖 About',
+        color: '#94a3b8',
+        bg: 'rgba(100,116,139,0.14)',
+        border: 'rgba(100,116,139,0.35)',
+        items: [
+            { label: 'Who made you?', value: 'Who made you?' },
+            { label: 'What can you do?', value: 'What can you help me with?' },
+            { label: 'How to use TAPasok', value: 'How do I use the TAPasok system?' },
+        ],
+    },
+];
+
+function BotIcon() {
+    return (
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="10" width="22" height="15" rx="6" fill="white" fillOpacity="0.95" />
+            <circle cx="10.5" cy="17.5" r="2.8" fill="#3b82f6" />
+            <circle cx="19.5" cy="17.5" r="2.8" fill="#3b82f6" />
+            <rect x="12" y="22" width="6" height="1.5" rx="0.75" fill="#3b82f6" fillOpacity="0.45" />
+            <rect x="14" y="4" width="2.2" height="6" rx="1.1" fill="white" fillOpacity="0.88" />
+            <circle cx="15" cy="3.5" r="1.8" fill="white" fillOpacity="0.88" />
+            <rect x="1.5" y="14" width="2.5" height="6" rx="1.25" fill="white" fillOpacity="0.65" />
+            <rect x="26" y="14" width="2.5" height="6" rx="1.25" fill="white" fillOpacity="0.65" />
+            <circle cx="10.5" cy="17.5" r="1.1" fill="white" />
+            <circle cx="19.5" cy="17.5" r="1.1" fill="white" />
+        </svg>
+    );
+}
+
 export default function Chatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([WELCOME_MSG]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [loadingMsg, setLoadingMsg] = useState('');
+    const [activeCategory, setActiveCategory] = useState(0);
     const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
     const scrollRef = useRef(null);
     const inputRef = useRef(null);
@@ -103,15 +209,6 @@ export default function Chatbot() {
         const trimmed = input.trim();
         if (!trimmed || loading) return;
 
-        if (!import.meta.env.VITE_GEMINI_API_KEY) {
-            setMessages((prev) => [...prev, {
-                text: "⚠️ Sus bai! Wa kay API Key! Ibutang ang `VITE_GEMINI_API_KEY` sa imong `.env` file unya i-restart ang server. Ambot nimo! 😅",
-                isBot: true,
-                time: new Date(),
-            }]);
-            return;
-        }
-
         const userMsg = { text: trimmed, isBot: false, time: new Date() };
         setMessages((prev) => [...prev, userMsg]);
         setInput('');
@@ -119,32 +216,45 @@ export default function Chatbot() {
         setLoadingMsg(FUNNY_LOADING_MSGS[Math.floor(Math.random() * FUNNY_LOADING_MSGS.length)]);
 
         try {
-            if (!chatRef.current) {
-                chatRef.current = ai.chats.create({
-                    model: 'gemini-2.5-flash',
-                    config: { systemInstruction: SYSTEM_PROMPT },
-                });
+            const token = localStorage.getItem('token');
+            const historyPayload = messages.filter(m => m !== WELCOME_MSG).map(m => ({
+                role: m.isBot ? 'model' : 'user',
+                parts: [{ text: m.text }]
+            }));
+
+            const req = await fetch('http://127.0.0.1:8000/api/chatbot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    message: trimmed,
+                    history: historyPayload
+                })
+            });
+
+            if (!req.ok) {
+                throw new Error('API Error ' + req.status);
             }
 
-            const response = await chatRef.current.sendMessage({ message: trimmed });
-            const botReply = response.text || "Sus, wa koy tubag. Try again bai! 🙈";
+            const data = await req.json();
+            const botReply = data.reply || "Sus, wa koy tubag. Try again bai! 🙈";
             setMessages((prev) => [...prev, { text: botReply, isBot: true, time: new Date() }]);
         } catch (error) {
             console.error('Gemini API Error:', error);
-
             let errMsg = "Ay nako, naputol ang connection nako! Try again bai, dali lang 😵";
             const errorStr = error?.message?.toLowerCase() || '';
-
             if (errorStr.includes('quota')) {
-                errMsg = "Sus! Naubus na akong brain cells (quota na 😅). Hatagi ko og usa ka minuto, bai — balik ko, promise! Di ko pareho sa member nga nagdisappear!";
+                errMsg = "Sus! Naubus na akong brain cells (quota na 😅). Hatagi ko og usa ka minuto, bai — balik ko, promise!";
             } else if (errorStr.includes('not found')) {
                 errMsg = "Grabe, nag-absent ang AI model karon! Sama ra sa uban org members 😂 Try again later, bai!";
             } else if (errorStr.includes('api key') || errorStr.includes('unauthorized') || errorStr.includes('authenticated')) {
-                errMsg = "Invalid API Key bai! Mas embarasing pa na sa makalimot og ID sa org event 😬 Check imong `.env` file!";
+                errMsg = "Invalid API Key bai! Check imong `.env` file! 😬";
             } else if (errorStr.includes('fetch') || errorStr.includes('network')) {
                 errMsg = "Network error! Gi-ghost ta sa internet! 👻 Check imong connection, bai.";
             }
-
             setMessages((prev) => [...prev, { text: errMsg, isBot: true, time: new Date() }]);
         } finally {
             setLoading(false);
@@ -154,140 +264,173 @@ export default function Chatbot() {
 
     if (!isLoggedIn) return null;
 
-    const formatTime = (date) =>
-        date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const activeCat = BUBBLE_CATEGORIES[activeCategory];
 
     return (
         <>
             <style>{`
-                .chatbot-container {
-                    position: fixed;
-                    bottom: 20px;
-                    right: 20px;
-                    z-index: 9999;
-                    font-family: 'Inter', 'Segoe UI', sans-serif;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: flex-end;
-                    gap: 16px;
+                @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+                .tapasok-root {
+                    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+                    font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+                    display: flex; flex-direction: column; align-items: flex-end; gap: 14px;
                 }
-                .chatbot-window {
-                    width: 380px;
-                    height: 520px;
-                    border-radius: 20px;
+                .tapasok-window {
+                    width: 400px; height: 590px; border-radius: 24px;
+                    display: flex; flex-direction: column; overflow: hidden;
+                    background: #0d1117;
+                    box-shadow: 0 32px 80px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.07);
                 }
+                .tapasok-msgs { overflow-y: auto; }
+                .tapasok-msgs::-webkit-scrollbar { width: 4px; }
+                .tapasok-msgs::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; }
+                .cat-scroll { overflow-x: auto; }
+                .cat-scroll::-webkit-scrollbar { display: none; }
+                .tapasok-input::placeholder { color: rgba(255,255,255,0.25); }
+                .tapasok-input:focus { outline: none; border-color: #6366f1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important; }
+                .tapasok-fab {
+                    width: 64px; height: 64px; border-radius: 20px; border: none;
+                    background: linear-gradient(140deg, #1d3fa8 0%, #2563eb 55%, #6366f1 100%);
+                    color: white; display: flex; align-items: center; justify-content: center;
+                    cursor: pointer; position: relative; overflow: visible;
+                    box-shadow: 0 8px 32px rgba(37,99,235,0.55), 0 0 0 1px rgba(255,255,255,0.08);
+                }
+                .tapasok-fab::after {
+                    content: ''; position: absolute; inset: 0; border-radius: 20px;
+                    background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 55%);
+                    pointer-events: none;
+                }
+                .pulse {
+                    position: absolute; inset: -5px; border-radius: 25px;
+                    border: 2px solid rgba(99,102,241,0.5);
+                    animation: tapPulse 2.4s ease-out infinite;
+                    pointer-events: none;
+                }
+                .pulse2 {
+                    position: absolute; inset: -10px; border-radius: 30px;
+                    border: 1.5px solid rgba(99,102,241,0.25);
+                    animation: tapPulse 2.4s ease-out 0.6s infinite;
+                    pointer-events: none;
+                }
+                @keyframes tapPulse {
+                    0% { transform: scale(1); opacity: 0.8; }
+                    100% { transform: scale(1.25); opacity: 0; }
+                }
+                .cat-tab { transition: all 0.15s ease; }
+                .cat-tab:hover { opacity: 1 !important; }
+                .bubble-chip { transition: all 0.15s ease; }
+                .bubble-chip:hover { transform: translateY(-1px); filter: brightness(1.1); }
                 @media (max-width: 640px) {
-                    .chatbot-container { bottom: 16px; right: 16px; }
-                    .chatbot-window {
-                        width: calc(100vw - 32px) !important;
-                        height: 70vh !important;
-                        max-height: 480px;
-                        border-radius: 20px !important;
-                    }
-                    .chatbot-fab { border-radius: 16px !important; }
-                }
-                @media (min-width: 641px) and (max-width: 768px) {
-                    .chatbot-window { width: 340px; height: 480px; }
+                    .tapasok-root { bottom: 16px; right: 16px; }
+                    .tapasok-window { width: calc(100vw - 32px) !important; height: 74vh !important; max-height: 580px; border-radius: 20px !important; }
+                    .tapasok-fab { width: 56px; height: 56px; border-radius: 16px; }
                 }
             `}</style>
 
-            <div className={`chatbot-container ${isOpen ? '' : 'chatbot-closed'}`}>
+            <div className="tapasok-root">
                 <AnimatePresence>
                     {isOpen && (
                         <motion.div
-                            initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                            initial={{ opacity: 0, y: 28, scale: 0.91 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-                            className="chatbot-window"
-                            style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                overflow: 'hidden',
-                                boxShadow: '0 25px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1)',
-                                background: 'rgba(255,255,255,0.95)',
-                                backdropFilter: 'blur(20px)',
-                            }}
+                            exit={{ opacity: 0, y: 28, scale: 0.91 }}
+                            transition={{ type: 'spring', damping: 26, stiffness: 370 }}
+                            className="tapasok-window"
                         >
-                            {/* Header */}
-                            <div style={{ background: 'linear-gradient(135deg, #0f2d5e 0%, #1a4a8a 50%, #2563eb 100%)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
-                                <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
-                                <div style={{ position: 'absolute', bottom: '-15px', left: '30%', width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+                            {/* ── HEADER ── */}
+                            <div style={{
+                                background: 'linear-gradient(135deg, #0c1836 0%, #112060 50%, #1a3080 100%)',
+                                padding: '14px 18px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                position: 'relative', overflow: 'hidden', flexShrink: 0,
+                            }}>
+                                <div style={{ position: 'absolute', top: '-25px', right: '-15px', width: '90px', height: '90px', borderRadius: '50%', background: 'rgba(99,102,241,0.25)', filter: 'blur(22px)', pointerEvents: 'none' }} />
+                                <div style={{ position: 'absolute', bottom: '-18px', left: '25%', width: '55px', height: '55px', borderRadius: '50%', background: 'rgba(59,130,246,0.2)', filter: 'blur(14px)', pointerEvents: 'none' }} />
+
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative', zIndex: 1 }}>
-                                    <img src={AVATAR_URL} alt="TAPasok AI" style={{ width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.25)' }} />
+                                    <div style={{ position: 'relative' }}>
+                                        <img src={AVATAR_URL} alt="TAPasok AI Chatbot" style={{ width: '42px', height: '42px', borderRadius: '13px', objectFit: 'cover', border: '2px solid rgba(99,102,241,0.55)', display: 'block' }} />
+                                        <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '11px', height: '11px', borderRadius: '50%', background: '#4ade80', border: '2.5px solid #0c1836', boxShadow: '0 0 8px rgba(74,222,128,0.7)' }} />
+                                    </div>
                                     <div>
-                                        <h3 style={{ color: 'white', fontWeight: 700, fontSize: '15px', margin: 0, lineHeight: 1.2 }}>TAPasok AI 😄</h3>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80' }} />
-                                            <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>Naa ko diri, bai! 👋</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                            <span style={{ color: 'white', fontWeight: 700, fontSize: '14.5px', letterSpacing: '-0.2px' }}>TAPasok AI Chatbot</span>
+                                            <span style={{ background: 'rgba(99,102,241,0.28)', border: '1px solid rgba(130,120,255,0.4)', borderRadius: '6px', padding: '1px 6px', fontSize: '9px', color: '#a5b4fc', fontWeight: 700, letterSpacing: '0.6px' }}>AI</span>
                                         </div>
+                                        <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', display: 'block', marginTop: '2px' }}>Naa ko diri, bai! 👋 Always ready</span>
                                     </div>
                                 </div>
+
                                 <button
                                     onClick={() => setIsOpen(false)}
-                                    style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', position: 'relative', zIndex: 1 }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.22)')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+                                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', zIndex: 1 }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.14)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
                                 >
-                                    <X size={18} color="white" />
+                                    <X size={16} color="rgba(255,255,255,0.75)" />
                                 </button>
                             </div>
 
-                            {/* Messages */}
-                            <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+                            {/* ── MESSAGES ── */}
+                            <div
+                                ref={scrollRef}
+                                className="tapasok-msgs"
+                                style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', background: '#0d1117' }}
+                            >
                                 <AnimatePresence initial={false}>
                                     {messages.map((msg, idx) => (
                                         <motion.div
                                             key={idx}
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            transition={{ duration: 0.25, delay: 0.05 }}
+                                            transition={{ duration: 0.2 }}
                                             style={{ display: 'flex', justifyContent: msg.isBot ? 'flex-start' : 'flex-end', alignItems: 'flex-end', gap: '8px' }}
                                         >
                                             {msg.isBot && (
-                                                <img src={AVATAR_URL} alt="AI" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #e2e8f0' }} />
+                                                <img src={AVATAR_URL} alt="AI" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid rgba(99,102,241,0.4)' }} />
                                             )}
-                                            <div style={{ maxWidth: '78%' }}>
-                                                <div
-                                                    style={{
-                                                        padding: '10px 14px',
-                                                        borderRadius: msg.isBot ? '16px 16px 16px 4px' : '16px 16px 4px 16px',
-                                                        background: msg.isBot ? 'white' : 'linear-gradient(135deg, #0f2d5e, #1a4a8a)',
-                                                        color: msg.isBot ? '#1e293b' : 'white',
-                                                        fontSize: '13.5px',
-                                                        lineHeight: '1.55',
-                                                        boxShadow: msg.isBot ? '0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)' : '0 2px 8px rgba(15,45,94,0.3)',
-                                                        wordBreak: 'break-word',
-                                                    }}
-                                                >
+                                            <div style={{ maxWidth: '80%' }}>
+                                                <div style={{
+                                                    padding: '10px 14px',
+                                                    borderRadius: msg.isBot ? '18px 18px 18px 4px' : '18px 18px 4px 18px',
+                                                    background: msg.isBot
+                                                        ? 'linear-gradient(135deg, #161d30, #1c2440)'
+                                                        : 'linear-gradient(135deg, #2353c5, #5b5fe0)',
+                                                    color: 'white',
+                                                    fontSize: '13px',
+                                                    lineHeight: '1.65',
+                                                    border: msg.isBot ? '1px solid rgba(255,255,255,0.07)' : 'none',
+                                                    boxShadow: msg.isBot ? '0 2px 14px rgba(0,0,0,0.35)' : '0 4px 18px rgba(91,95,224,0.38)',
+                                                    wordBreak: 'break-word',
+                                                }}>
                                                     {msg.isBot ? (
                                                         <ReactMarkdown
                                                             components={{
-                                                                p: ({ children }) => <p style={{ margin: '0 0 6px 0' }}>{children}</p>,
+                                                                p: ({ children }) => <p style={{ margin: '0 0 6px 0', color: 'rgba(255,255,255,0.88)' }}>{children}</p>,
                                                                 ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ul>,
                                                                 ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ol>,
-                                                                li: ({ children }) => <li style={{ marginBottom: '2px' }}>{children}</li>,
-                                                                strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#0f2d5e' }}>{children}</strong>,
-                                                                code: ({ inline, children }) =>
-                                                                    inline ? (
-                                                                        <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px', fontSize: '12px', fontFamily: "'Fira Code', monospace", color: '#e11d48' }}>{children}</code>
-                                                                    ) : (
-                                                                        <pre style={{ background: '#1e293b', color: '#e2e8f0', padding: '10px 12px', borderRadius: '8px', fontSize: '12px', overflowX: 'auto', margin: '6px 0', fontFamily: "'Fira Code', monospace" }}>
-                                                                            <code>{children}</code>
-                                                                        </pre>
-                                                                    ),
+                                                                li: ({ children }) => <li style={{ marginBottom: '3px', color: 'rgba(255,255,255,0.82)' }}>{children}</li>,
+                                                                strong: ({ children }) => <strong style={{ fontWeight: 700, color: '#a5b4fc' }}>{children}</strong>,
+                                                                code: ({ inline, children }) => inline ? (
+                                                                    <code style={{ background: 'rgba(99,102,241,0.22)', padding: '1px 6px', borderRadius: '4px', fontSize: '12px', color: '#c4b5fd' }}>{children}</code>
+                                                                ) : (
+                                                                    <pre style={{ background: '#080c18', color: '#e2e8f0', padding: '10px 12px', borderRadius: '8px', fontSize: '12px', overflowX: 'auto', margin: '6px 0' }}>
+                                                                        <code>{children}</code>
+                                                                    </pre>
+                                                                ),
                                                                 a: ({ href, children }) => (
-                                                                    <a href={href} target="_blank" rel="noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>{children}</a>
+                                                                    <a href={href} target="_blank" rel="noreferrer" style={{ color: '#818cf8', textDecoration: 'underline' }}>{children}</a>
                                                                 ),
                                                             }}
                                                         >
                                                             {msg.text}
                                                         </ReactMarkdown>
                                                     ) : (
-                                                        msg.text
+                                                        <span>{msg.text}</span>
                                                     )}
                                                 </div>
-                                                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '4px', textAlign: msg.isBot ? 'left' : 'right', paddingLeft: msg.isBot ? '4px' : '0', paddingRight: msg.isBot ? '0' : '4px' }}>
+                                                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.22)', marginTop: '4px', textAlign: msg.isBot ? 'left' : 'right', paddingLeft: msg.isBot ? '4px' : '0', paddingRight: msg.isBot ? '0' : '4px' }}>
                                                     {formatTime(msg.time)}
                                                 </div>
                                             </div>
@@ -295,84 +438,179 @@ export default function Chatbot() {
                                     ))}
                                 </AnimatePresence>
 
-                                {/* Typing indicator with Bisaya loading quip */}
                                 {loading && (
                                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
-                                        <img src={AVATAR_URL} alt="AI" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #e2e8f0' }} />
-                                        <div style={{ background: 'white', padding: '10px 14px', borderRadius: '16px 16px 16px 4px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                        <img src={AVATAR_URL} alt="AI" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid rgba(99,102,241,0.4)' }} />
+                                        <div style={{ background: 'linear-gradient(135deg, #161d30, #1c2440)', border: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px', borderRadius: '18px 18px 18px 4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                                                 {[0, 1, 2].map((i) => (
                                                     <motion.div
                                                         key={i}
-                                                        animate={{ y: [0, -5, 0] }}
-                                                        transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-                                                        style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#94a3b8' }}
+                                                        animate={{ y: [0, -5, 0], opacity: [0.3, 1, 0.3] }}
+                                                        transition={{ duration: 0.72, repeat: Infinity, delay: i * 0.2 }}
+                                                        style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#6366f1' }}
                                                     />
                                                 ))}
                                             </div>
-                                            {loadingMsg && (
-                                                <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic' }}>{loadingMsg}</span>
-                                            )}
+                                            {loadingMsg && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>{loadingMsg}</span>}
                                         </div>
                                     </motion.div>
                                 )}
                             </div>
 
-                            {/* Input */}
-                            <div style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0', background: 'white', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            {/* ── FILTER BUBBLES ── */}
+                            <div style={{ background: '#111827', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+                                {/* Category tabs */}
+                                <div className="cat-scroll" style={{ display: 'flex', gap: '5px', padding: '10px 14px 6px' }}>
+                                    {BUBBLE_CATEGORIES.map((cat, i) => (
+                                        <button
+                                            key={i}
+                                            className="cat-tab"
+                                            onClick={() => setActiveCategory(i)}
+                                            style={{
+                                                background: activeCategory === i ? cat.bg : 'rgba(255,255,255,0.04)',
+                                                border: `1.5px solid ${activeCategory === i ? cat.border : 'rgba(255,255,255,0.07)'}`,
+                                                borderRadius: '10px',
+                                                padding: '4px 10px',
+                                                fontSize: '10.5px',
+                                                fontWeight: activeCategory === i ? 600 : 400,
+                                                color: activeCategory === i ? cat.color : 'rgba(255,255,255,0.38)',
+                                                cursor: 'pointer',
+                                                whiteSpace: 'nowrap',
+                                                fontFamily: 'inherit',
+                                                flexShrink: 0,
+                                                opacity: activeCategory === i ? 1 : 0.8,
+                                            }}
+                                        >
+                                            {cat.category}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Bubble chips */}
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={activeCategory}
+                                        initial={{ opacity: 0, x: 10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -10 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="cat-scroll"
+                                        style={{ display: 'flex', gap: '6px', padding: '4px 14px 11px' }}
+                                    >
+                                        {activeCat.items.map(({ label, value }) => (
+                                            <button
+                                                key={label}
+                                                className="bubble-chip"
+                                                onClick={() => { setInput(value); inputRef.current?.focus(); }}
+                                                disabled={loading}
+                                                style={{
+                                                    background: activeCat.bg,
+                                                    border: `1.5px solid ${activeCat.border}`,
+                                                    borderRadius: '20px',
+                                                    padding: '5px 12px',
+                                                    fontSize: '11.5px',
+                                                    fontWeight: 500,
+                                                    color: activeCat.color,
+                                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                                    whiteSpace: 'nowrap',
+                                                    opacity: loading ? 0.45 : 1,
+                                                    fontFamily: 'inherit',
+                                                    flexShrink: 0,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                }}
+                                            >
+                                                {label}
+                                                <ChevronRight size={11} style={{ opacity: 0.55, flexShrink: 0 }} />
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                </AnimatePresence>
+                            </div>
+
+                            {/* ── INPUT ROW ── */}
+                            <div style={{ padding: '8px 14px 14px', background: '#111827', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
                                 <input
                                     ref={inputRef}
+                                    className="tapasok-input"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
                                     placeholder="Pangutana lang bai, naa ko diri... 😏"
                                     disabled={loading}
-                                    style={{ flex: 1, border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '10px 14px', fontSize: '13.5px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', background: loading ? '#f8fafc' : 'white', color: '#1e293b' }}
-                                    onFocus={(e) => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'; }}
-                                    onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; }}
+                                    style={{
+                                        flex: 1,
+                                        border: '1.5px solid rgba(255,255,255,0.09)',
+                                        borderRadius: '14px',
+                                        padding: '10px 14px',
+                                        fontSize: '13px',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        color: 'white',
+                                        transition: 'all 0.2s',
+                                        fontFamily: 'inherit',
+                                    }}
                                 />
                                 <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                    whileHover={{ scale: 1.06 }}
+                                    whileTap={{ scale: 0.93 }}
                                     onClick={handleSend}
                                     disabled={loading || !input.trim()}
                                     style={{
-                                        width: '40px', height: '40px', borderRadius: '12px', border: 'none',
-                                        background: loading || !input.trim() ? '#e2e8f0' : 'linear-gradient(135deg, #0f2d5e, #2563eb)',
-                                        color: loading || !input.trim() ? '#94a3b8' : 'white',
+                                        width: '42px', height: '42px', borderRadius: '13px', border: 'none',
+                                        background: loading || !input.trim()
+                                            ? 'rgba(255,255,255,0.06)'
+                                            : 'linear-gradient(135deg, #2563eb, #6366f1)',
+                                        color: loading || !input.trim() ? 'rgba(255,255,255,0.2)' : 'white',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
-                                        transition: 'background 0.2s', flexShrink: 0,
+                                        flexShrink: 0,
+                                        boxShadow: loading || !input.trim() ? 'none' : '0 4px 18px rgba(99,102,241,0.45)',
+                                        transition: 'all 0.2s',
                                     }}
                                 >
-                                    {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={16} />}
+                                    {loading
+                                        ? <Loader2 size={17} style={{ animation: 'spin 1s linear infinite' }} />
+                                        : <Send size={16} />
+                                    }
                                 </motion.button>
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
 
-                {/* Floating Action Button */}
+                {/* ── FAB ── */}
                 <motion.button
                     onClick={() => setIsOpen(!isOpen)}
-                    className="chatbot-fab"
-                    whileHover={{ scale: 1.08 }}
+                    className="tapasok-fab"
+                    whileHover={{ scale: 1.07 }}
                     whileTap={{ scale: 0.92 }}
-                    style={{ width: '56px', height: '56px', borderRadius: '16px', border: 'none', background: 'linear-gradient(135deg, #0f2d5e, #2563eb)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(15,45,94,0.4)', position: 'relative', marginLeft: 'auto', overflow: 'hidden' }}
                 >
-                    <motion.div
-                        animate={{ boxShadow: ['0 0 0 0px rgba(37,99,235,0.3)', '0 0 0 12px rgba(37,99,235,0)'] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                        style={{ position: 'absolute', inset: 0, borderRadius: '16px' }}
-                    />
+                    {!isOpen && <>
+                        <div className="pulse" />
+                        <div className="pulse2" />
+                    </>}
                     <AnimatePresence mode="wait">
                         {isOpen ? (
-                            <motion.div key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
-                                <X size={24} />
+                            <motion.div key="close"
+                                initial={{ rotate: -80, opacity: 0, scale: 0.6 }}
+                                animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                                exit={{ rotate: 80, opacity: 0, scale: 0.6 }}
+                                transition={{ duration: 0.2 }}
+                                style={{ position: 'relative', zIndex: 1 }}
+                            >
+                                <X size={24} color="white" />
                             </motion.div>
                         ) : (
-                            <motion.div key="open" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.2 }}>
-                                <MessageCircle size={24} />
+                            <motion.div key="bot"
+                                initial={{ rotate: 15, opacity: 0, scale: 0.7 }}
+                                animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                                exit={{ rotate: -15, opacity: 0, scale: 0.7 }}
+                                transition={{ duration: 0.2 }}
+                                style={{ position: 'relative', zIndex: 1 }}
+                            >
+                                <BotIcon />
                             </motion.div>
                         )}
                     </AnimatePresence>

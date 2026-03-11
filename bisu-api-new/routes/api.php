@@ -408,6 +408,8 @@ Route::middleware('auth:sanctum')->group(function () {
             catch (\Exception $e) {
                 return response()->json(['error' => $e->getMessage()], 500);
             }
-        }
-        );
+        });
+
+        // AI Chatbot
+        Route::post('/chatbot', [\App\Http\Controllers\Api\ChatbotController::class, 'handleChat']);
     });
