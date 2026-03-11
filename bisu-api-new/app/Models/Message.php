@@ -13,6 +13,7 @@ class Message extends Model
         'receiver_id',
         'message',
         'image_path',
+        'is_edited',
     ];
 
     public function sender()

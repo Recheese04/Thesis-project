@@ -376,6 +376,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/messages/members', [MessageController::class , 'members']);
         Route::get('/messages', [MessageController::class , 'index']);
         Route::post('/messages', [MessageController::class , 'store']);
+        Route::patch('/messages/{message}', [MessageController::class , 'update']);
+        Route::delete('/messages/{message}', [MessageController::class , 'destroy']);
 
         // Group Chats (custom groups)
         Route::prefix('group-chats')->group(function () {

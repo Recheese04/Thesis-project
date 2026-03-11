@@ -150,6 +150,40 @@ export default function useGroupChats() {
     return () => clearInterval(pollRef.current);
   }, []);
 
+  const editMessage = useCallback(async (groupId, messageId, newText, removeImage) => {
+    try {
+      const payload = {};
+      if (newText !== undefined) payload.message = newText;
+      if (removeImage) payload.remove_image = true;
+
+      const { data } = await axios.patch(`/api/messages/${messageId}`, payload, { headers: authHeaders() });
+      
+      if (data.message === 'deleted') {
+        setMsgMap(prev => ({
+          ...prev,
+          [groupId]: (prev[groupId] ?? []).filter(m => m.id !== messageId),
+        }));
+      } else {
+        setMsgMap(prev => ({
+          ...prev,
+          [groupId]: (prev[groupId] ?? []).map(m => m.id === messageId ? data.message : m),
+        }));
+      }
+      return true;
+    } catch { return false; }
+  }, []);
+
+  const deleteMessage = useCallback(async (groupId, messageId) => {
+    try {
+      await axios.delete(`/api/messages/${messageId}`, { headers: authHeaders() });
+      setMsgMap(prev => ({
+        ...prev,
+        [groupId]: (prev[groupId] ?? []).filter(m => m.id !== messageId),
+      }));
+      return true;
+    } catch { return false; }
+  }, []);
+
   return {
     groups,
     loading,
@@ -163,5 +197,7 @@ export default function useGroupChats() {
     addMembers,
     removeMember,
     sendMessage,
+    editMessage,
+    deleteMessage,
   };
 }

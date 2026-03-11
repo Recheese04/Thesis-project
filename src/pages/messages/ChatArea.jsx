@@ -61,9 +61,10 @@ function ImagePreview({ file, onRemove, dark }) {
   );
 }
 
-export default function ChatArea({ chat, messages, loading, sending, error, members, activeGroup, onSend, onRetry, onClearError, onBack, onOpenGroupSettings }) {
+export default function ChatArea({ chat, messages, loading, sending, error, members, activeGroup, onSend, onEdit, onDelete, onRetry, onClearError, onBack, onOpenGroupSettings }) {
   const [text, setText]   = useState('');
   const [image, setImage] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
   const endRef            = useRef(null);
   const textareaRef       = useRef(null);
   const fileInputRef      = useRef(null);
@@ -92,12 +93,47 @@ export default function ChatArea({ chat, messages, loading, sending, error, memb
 
   const handleSend = useCallback(async () => {
     if ((!text.trim() && !image) || sending) return;
+    
+    if (editingMessage) {
+       const hasTextChanged = text.trim() !== editingMessage.message;
+       // Only call onEdit if we actually changed the text
+       if (hasTextChanged) {
+          const ok = await onEdit(chat, editingMessage.id, text.trim());
+          if (ok) {
+            setEditingMessage(null);
+            setText('');
+            if (textareaRef.current) { textareaRef.current.style.height = 'auto'; textareaRef.current.focus(); }
+          }
+       } else {
+          // If no change, just cancel edit
+          setEditingMessage(null);
+          setText('');
+       }
+       return;
+    }
+
     const ok = await onSend(chat, text, image);
     if (ok) {
       setText(''); setImage(null);
       if (textareaRef.current) { textareaRef.current.style.height = 'auto'; textareaRef.current.focus(); }
     }
-  }, [text, image, sending, onSend, chat]);
+  }, [text, image, sending, onSend, onEdit, chat, editingMessage]);
+
+  const initiateEdit = (msg) => {
+    setEditingMessage(msg);
+    setText(msg.message || '');
+    setImage(null);
+    if (textareaRef.current) {
+        textareaRef.current.focus();
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingMessage(null);
+    setText('');
+    setImage(null);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+  };
 
   const handleKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } };
   const handleTextChange = (e) => {
@@ -185,7 +221,18 @@ export default function ChatArea({ chat, messages, loading, sending, error, memb
                   const { isFirst, isLast } = runInfo(grouped, i);
                   return (
                     <div key={item.key} className={isFirst ? 'mt-3' : 'mt-0.5'}>
-                      <MessageBubble msg={msg} isMine={isMine} showAvatar={!isMine && isLast} showName={!isMine && isFirst} isFirst={isFirst} isLast={isLast} isGroup={isGroup} />
+                      <MessageBubble 
+                        msg={msg} 
+                        isMine={isMine} 
+                        showAvatar={!isMine && isLast} 
+                        showName={!isMine && isFirst} 
+                        isFirst={isFirst} 
+                        isLast={isLast} 
+                        isGroup={isGroup} 
+                        onEdit={initiateEdit}
+                        onDelete={(m) => onDelete(chat, m.id)}
+                        onRemoveImage={(m) => onEdit(chat, m.id, undefined, true)}
+                      />
                     </div>
                   );
                 })}
@@ -196,8 +243,19 @@ export default function ChatArea({ chat, messages, loading, sending, error, memb
       }
 
       {/* INPUT */}
-      <div className={`shrink-0 px-3 pb-3 pt-2 border-t ${border_col} ${dark ? 'bg-[#13131f]' : 'bg-white'}`}>
-        {image && (
+      <div className={`shrink-0 px-3 pb-3 pt-2 border-t flex flex-col ${border_col} ${dark ? 'bg-[#13131f]' : 'bg-white'}`}>
+        
+        {/* EDIT STATE BANNER */}
+        {editingMessage && (
+          <div className="flex items-center justify-between px-3 py-1.5 mb-2 bg-violet-500/10 text-violet-500 rounded-lg text-xs font-medium border border-violet-500/20">
+            <span>Editing message...</span>
+            <button onClick={cancelEdit} className="hover:text-violet-700 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {image && !editingMessage && (
           <div className="flex items-center gap-3 mb-2.5 px-1">
             <ImagePreview file={image} onRemove={() => setImage(null)} dark={dark} />
             <div className="min-w-0">
@@ -208,13 +266,17 @@ export default function ChatArea({ chat, messages, loading, sending, error, memb
         )}
 
         <div className="flex items-end gap-2">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors ${dark ? 'bg-white/8 hover:bg-violet-500/20 text-white/40 hover:text-violet-400' : 'bg-slate-100 hover:bg-violet-50 text-slate-400 hover:text-violet-500'}`}
-          >
-            <ImagePlus style={{ width: 18, height: 18 }} />
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/jpg,image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={handleImagePick} />
+          {!editingMessage && (
+            <>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors ${dark ? 'bg-white/8 hover:bg-violet-500/20 text-white/40 hover:text-violet-400' : 'bg-slate-100 hover:bg-violet-50 text-slate-400 hover:text-violet-500'}`}
+              >
+                <ImagePlus style={{ width: 18, height: 18 }} />
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/jpg,image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={handleImagePick} />
+            </>
+          )}
 
           <div className={`flex-1 flex items-end gap-2 border rounded-2xl px-4 py-2.5 min-h-[44px] transition-all duration-200 ${input_bg}`}>
             <textarea
@@ -235,9 +297,9 @@ export default function ChatArea({ chat, messages, loading, sending, error, memb
 
           <button
             onClick={handleSend}
-            disabled={!canSend}
+            disabled={!canSend && !(editingMessage && text.trim() !== editingMessage.message)}
             className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 ${
-              canSend
+              (canSend || (editingMessage && text.trim() !== editingMessage.message))
                 ? 'bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg shadow-violet-500/30 hover:scale-105'
                 : dark ? 'bg-white/6 text-white/20 cursor-not-allowed' : 'bg-slate-100 text-slate-300 cursor-not-allowed'
             }`}

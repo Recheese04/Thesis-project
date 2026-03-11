@@ -22,14 +22,14 @@ function MessagesLayout() {
   // ── Hooks ──────────────────────────────────────────────────────────────────
   const {
     members, loading: dmLoading, sending: dmSending, error: dmError,
-    getMessages: getDmMessages, loadChat, sendMessage: sendDm, clearError: clearDmError,
+    getMessages: getDmMessages, loadChat, sendMessage: sendDm, editMessage: editDm, deleteMessage: deleteDm, clearError: clearDmError,
   } = useMessages();
 
   const {
     groups, loading: gcLoading,
     loadGroupMessages, getGroupMessages, setActiveGroup,
     createGroup, updateGroup, addMembers, removeMember,
-    sendMessage: sendGcMessage,
+    sendMessage: sendGcMessage, editMessage: editGcMessage, deleteMessage: deleteGcMessage,
   } = useGroupChats();
 
   // ── Derived state ──────────────────────────────────────────────────────────
@@ -85,6 +85,16 @@ function MessagesLayout() {
     return sendDm(chat, text, image);
   }, [isGc, sendGcMessage, sendDm]);
 
+  const handleEdit = useCallback(async (chat, messageId, newText, removeImage) => {
+    if (isGc) return editGcMessage(chat.groupId, messageId, newText, removeImage);
+    return editDm(chat, messageId, newText, removeImage);
+  }, [isGc, editGcMessage, editDm]);
+
+  const handleDelete = useCallback(async (chat, messageId) => {
+    if (isGc) return deleteGcMessage(chat.groupId, messageId);
+    return deleteDm(chat, messageId);
+  }, [isGc, deleteGcMessage, deleteDm]);
+
   const handleCreateGroup = useCallback(async (name, memberIds, color) => {
     const group = await createGroup(name, memberIds, color);
     if (group) {
@@ -126,6 +136,8 @@ function MessagesLayout() {
           members={members}
           activeGroup={activeGroup}
           onSend={handleSend}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
           onRetry={handleRetry}
           onClearError={clearDmError}
           onBack={() => setMobileView('sidebar')}

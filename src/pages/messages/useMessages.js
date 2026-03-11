@@ -132,9 +132,51 @@ export default function useMessages() {
 
   const getMessages = (chat) => chats[chatKey(chat)] ?? [];
 
+  const editMessage = useCallback(async (chat, messageId, newText, removeImage) => {
+    try {
+      const key = chatKey(chat);
+      const payload = {};
+      if (newText !== undefined) payload.message = newText;
+      if (removeImage) payload.remove_image = true;
+
+      const { data } = await axios.patch(`/api/messages/${messageId}`, payload, { headers: authHeaders() });
+      
+      if (data.message === 'deleted') {
+        setChats(prev => ({
+          ...prev,
+          [key]: (prev[key] ?? []).filter(m => m.id !== messageId),
+        }));
+      } else {
+        setChats(prev => ({
+          ...prev,
+          [key]: (prev[key] ?? []).map(m => m.id === messageId ? data.message : m),
+        }));
+      }
+      return true;
+    } catch {
+      setError('Failed to edit message.');
+      return false;
+    }
+  }, []);
+
+  const deleteMessage = useCallback(async (chat, messageId) => {
+    try {
+      const key = chatKey(chat);
+      await axios.delete(`/api/messages/${messageId}`, { headers: authHeaders() });
+      setChats(prev => ({
+        ...prev,
+        [key]: (prev[key] ?? []).filter(m => m.id !== messageId),
+      }));
+      return true;
+    } catch {
+      setError('Failed to unsend message.');
+      return false;
+    }
+  }, []);
+
   return {
     members, loading, sending, error,
-    getMessages, loadChat, sendMessage,
+    getMessages, loadChat, sendMessage, editMessage, deleteMessage,
     refetchMembers: fetchMembers,
     clearError: () => setError(null),
   };

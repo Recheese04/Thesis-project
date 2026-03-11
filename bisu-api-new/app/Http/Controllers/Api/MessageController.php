@@ -52,6 +52,7 @@ class MessageController extends Controller
                                 ? trim($student->first_name . ' ' . $student->last_name)
                                 : 'Admin',
             'created_at'  => $m->created_at->toIso8601String(),
+            'is_edited'   => (bool) $m->is_edited,
         ];
     }
 
@@ -128,6 +129,61 @@ class MessageController extends Controller
         $msg->load('sender.student');
 
         return response()->json(['message' => $this->fmt($msg)], 201);
+    }
+
+    // ── PATCH /api/messages/{message} ─────────────────────────────────────────
+    public function update(Request $request, Message $message): JsonResponse
+    {
+        if ($message->sender_id !== Auth::id()) {
+            return response()->json(['message' => 'Unauthorized to edit this message.'], 403);
+        }
+
+        $request->validate([
+            'message'      => ['nullable', 'string', 'max:2000'],
+            'remove_image' => ['nullable', 'boolean'],
+        ]);
+
+        $changes = [];
+
+        if ($request->has('message') && $request->input('message') !== $message->message) {
+            $changes['message'] = $request->input('message');
+            $changes['is_edited'] = true;
+        }
+
+        if ($request->boolean('remove_image') && $message->image_path) {
+            Storage::disk('public')->delete($message->image_path);
+            $changes['image_path'] = null;
+        }
+
+        if (empty($changes)) {
+            return response()->json(['message' => $this->fmt($message)]);
+        }
+
+        $message->update($changes);
+
+        // If message is completely empty after removing image and text, just delete it
+        if (empty($message->message) && empty($message->image_path)) {
+            $message->delete();
+            return response()->json(['message' => 'deleted']);
+        }
+
+        return response()->json(['message' => $this->fmt($message)]);
+    }
+
+    // ── DELETE /api/messages/{message} ────────────────────────────────────────
+    public function destroy(Message $message): JsonResponse
+    {
+        if ($message->sender_id !== Auth::id()) {
+            return response()->json(['message' => 'Unauthorized to delete this message.'], 403);
+        }
+
+        if ($message->image_path) {
+            Storage::disk('public')->delete($message->image_path);
+        }
+
+        $message->delete();
+
+        return response()->json(['message' => 'deleted']);
     }
 
     // ── GET /api/messages/members ─────────────────────────────────────────────

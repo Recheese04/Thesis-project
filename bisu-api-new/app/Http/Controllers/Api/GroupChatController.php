@@ -237,6 +237,7 @@ class GroupChatController extends Controller
                 ? asset('storage/' . $m->image_path)
                 : null,
             'created_at' => $m->created_at,
+            'is_edited'  => (bool) $m->is_edited,
             'sender_id'  => $m->sender_id,
             'sender'     => $m->sender ? [
                 'id'   => $m->sender->id,

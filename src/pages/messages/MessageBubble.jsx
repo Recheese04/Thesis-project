@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getInitials, avatarColor, formatFullTime } from './messageHelpers';
 import { useTheme } from './ThemeContext';
+import ImagePreviewModal from './ImagePreviewModal';
 
 // ─── Date separator ───────────────────────────────────────────────────────────
 export function DateSep({ label }) {
@@ -18,7 +19,7 @@ export function DateSep({ label }) {
 }
 
 // ─── Image bubble ─────────────────────────────────────────────────────────────
-function ImageMsg({ url, isMine, isFirst, isLast, hasText }) {
+function ImageMsg({ url, isMine, isFirst, isLast, hasText, onRemoveImage }) {
   const [open, setOpen]       = useState(false);
   const [loaded, setLoaded]   = useState(false);
   const [errored, setErrored] = useState(false);
@@ -68,27 +69,12 @@ function ImageMsg({ url, isMine, isFirst, isLast, hasText }) {
       </div>
 
       {open && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-8"
-          style={{ background: 'rgba(0,0,0,0.92)', animation: 'fadeIn .15s ease' }}
-          onClick={() => setOpen(false)}
-        >
-          <button
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-            onClick={() => setOpen(false)}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <img
-            src={url}
-            alt="Full size"
-            className="rounded-2xl shadow-2xl object-contain"
-            style={{ animation: 'scaleIn .18s ease', maxHeight: '90vh', maxWidth: '90vw' }}
-            onClick={e => e.stopPropagation()}
-          />
-        </div>
+        <ImagePreviewModal
+          url={url}
+          isMine={isMine}
+          onClose={() => setOpen(false)}
+          onRemoveImage={onRemoveImage}
+        />
       )}
     </>
   );
@@ -97,8 +83,10 @@ function ImageMsg({ url, isMine, isFirst, isLast, hasText }) {
 // ─── Bubble ───────────────────────────────────────────────────────────────────
 export default function MessageBubble({
   msg, isMine, showAvatar, showName, isFirst, isLast, isGroup,
+  onEdit, onDelete, onRemoveImage
 }) {
   const { dark } = useTheme();
+  const [showOptions, setShowOptions] = useState(false);
   const color   = avatarColor(msg.sender_name);
   const hasText = !!msg.message;
   const hasImg  = !!msg.image_url;
@@ -128,8 +116,9 @@ export default function MessageBubble({
 
   return (
     <div
-      className={`flex items-end gap-2 group/bubble ${isMine ? 'flex-row-reverse' : 'flex-row'}`}
+      className={`flex items-end gap-2 group/bubble relative ${isMine ? 'flex-row-reverse' : 'flex-row'}`}
       style={{ animation: 'msgPop .16s cubic-bezier(.34,1.4,.64,1) both' }}
+      onMouseLeave={() => setShowOptions(false)}
     >
       {/* Avatar slot */}
       <div className="w-7 shrink-0 self-end mb-0.5">
@@ -158,18 +147,24 @@ export default function MessageBubble({
             isFirst={isFirst}
             isLast={isLast && !hasText}
             hasText={hasText}
+            onRemoveImage={onRemoveImage ? () => onRemoveImage(msg) : undefined}
           />
         )}
 
         {hasText && (
           <div className={`
-            px-4 py-2.5 text-sm leading-relaxed break-words select-text
+            px-4 py-2.5 text-sm leading-relaxed break-words select-text relative
             ${isMine
               ? `${myBubble} ${hasImg ? 'rounded-[20px] rounded-tr-[6px]' : myRadius}`
               : `${theirBubble} ${hasImg ? 'rounded-[20px] rounded-tl-[6px]' : theirRadius}`
             }
           `}>
             {msg.message}
+            {msg.is_edited && (
+              <span className={`text-[10px] ml-1.5 opacity-70 italic ${isMine ? 'text-blue-100' : (dark ? 'text-white/40' : 'text-slate-400')}`}>
+                (edited)
+              </span>
+            )}
           </div>
         )}
 
@@ -180,7 +175,47 @@ export default function MessageBubble({
         )}
       </div>
 
-      {isMine && <div className="w-1 shrink-0" />}
+      {/* Options Menu Context (only for my messages) */}
+      {isMine && (
+        <div className="relative self-center opacity-0 group-hover/bubble:opacity-100 transition-opacity duration-200 mx-1">
+          <button 
+            onClick={() => setShowOptions(!showOptions)}
+            className={`p-1.5 rounded-full transition-colors ${dark ? 'hover:bg-white/10 text-white/40 hover:text-white/80' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            </svg>
+          </button>
+
+          {showOptions && (
+            <div className={`absolute z-10 right-0 top-full mt-1 w-36 rounded-xl shadow-lg border overflow-hidden text-sm ${dark ? 'bg-[#1a1a2e] border-white/10' : 'bg-white border-slate-200'}`} style={{ animation: 'fadeIn .15s ease' }}>
+              <button 
+                onClick={() => { setShowOptions(false); onEdit?.(msg); }}
+                className={`w-full text-left px-4 py-2 hover:bg-black/5 ${dark ? 'text-white hover:bg-white/5' : 'text-slate-700 hover:bg-slate-50'}`}
+              >
+                Edit Message
+              </button>
+              {hasImg && (
+                <button 
+                  onClick={() => { setShowOptions(false); onRemoveImage?.(msg); }}
+                  className={`w-full text-left px-4 py-2 hover:bg-black/5 ${dark ? 'text-white hover:bg-white/5' : 'text-slate-700 hover:bg-slate-50'}`}
+                >
+                  Remove Image
+                </button>
+              )}
+              <div className={`h-px w-full ${dark ? 'bg-white/10' : 'bg-slate-100'}`} />
+              <button 
+                onClick={() => { setShowOptions(false); onDelete?.(msg); }}
+                className={`w-full text-left px-4 py-2 text-red-500 hover:bg-red-50 focus:bg-red-50 ${dark ? 'hover:bg-red-500/10' : ''}`}
+              >
+                Unsend
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isMine && !showOptions && <div className="w-1 shrink-0" />}
     </div>
   );
 }
