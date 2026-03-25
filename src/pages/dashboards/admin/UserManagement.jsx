@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import UserFormModal from "../../modals/UserFormModal";
 import ImportStudentsModal from "../../modals/ImportStudentsModal";
+import { useSchoolYear } from "@/context/SchoolYearContext";
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
 const ROLE_META = {
@@ -113,6 +114,8 @@ export default function UserManagement() {
   const [editUser, setEditUser] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
+  const { selectedYearId, schoolYears } = useSchoolYear();
+  const selectedYear = schoolYears.find(y => y.id === selectedYearId);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -202,7 +205,9 @@ export default function UserManagement() {
             </div>
             <div>
               <h1 className="text-xl font-extrabold text-[#0f2d5e] tracking-tight">User Management</h1>
-              <p className="text-slate-500 text-xs mt-0.5">Manage system accounts, roles &amp; student profiles</p>
+              <p className="text-slate-500 text-xs mt-0.5">
+                Managing {selectedYear?.name || "Active"} Academic Year
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle, Clock, XCircle, Search, ChevronDown, ChevronUp,
-  Loader2, RefreshCw, AlertTriangle, Plus, DollarSign, FileText, ClipboardList,
+  Loader2, RefreshCw, AlertTriangle, Plus, DollarSign, FileText, ClipboardList, Calendar, Settings,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,11 @@ import { Progress } from '@/components/ui/progress';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import axios from 'axios';
+import { useSchoolYear } from '@/context/SchoolYearContext';
 
 const api = () =>
   axios.create({
@@ -53,17 +57,25 @@ export default function OfficerClearance() {
   const emptyReq = { name: '', type: 'manual', category: 'other', description: '', amount: '' };
   const [newReq, setNewReq] = useState(emptyReq);
 
-  const schoolYear = '2025-2026';
-  const semester = '2nd';
+  // ── Manage Requirements form state ────────────────────────────────────────
+  const [showManageRequirements, setShowManageRequirements] = useState(false);
+  const [requirementsList, setRequirementsList] = useState([]);
+  const [loadingReqs, setLoadingReqs] = useState(false);
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
+  const { selectedYearId, setSelectedYearId, schoolYears } = useSchoolYear();
+  const selectedYear = schoolYears.find(y => String(y.id) === String(selectedYearId));
+  const [semester, setSemester] = useState('1st');
+
   const fetchClearance = useCallback(async () => {
-    if (!orgId) return;
+    if (!orgId || !selectedYearId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const { data } = await api().get(`/organizations/${orgId}/clearance`, {
-        params: { school_year: schoolYear, semester },
+        params: { school_year_id: selectedYearId, semester },
       });
       setMembers(data);
     } catch (err) {
@@ -71,9 +83,29 @@ export default function OfficerClearance() {
     } finally {
       setLoading(false);
     }
-  }, [orgId]);
+  }, [orgId, selectedYearId]);
 
-  useEffect(() => { fetchClearance(); }, [fetchClearance]);
+  useEffect(() => { fetchClearance(); }, [fetchClearance, selectedYearId, semester]);
+
+  // ── Fetch Requirements List for Management Modal ────────────────────────
+  const fetchRequirementsList = useCallback(async () => {
+    if (!orgId || !selectedYearId) return;
+    setLoadingReqs(true);
+    try {
+      const { data } = await api().get(`/organizations/${orgId}/clearance-requirements`, {
+        params: { school_year_id: selectedYearId, semester }
+      });
+      setRequirementsList(data);
+    } catch (err) {
+      console.error('Failed to fetch requirements list:', err);
+    } finally {
+      setLoadingReqs(false);
+    }
+  }, [orgId, selectedYearId, semester]);
+
+  useEffect(() => {
+    if (showManageRequirements) fetchRequirementsList();
+  }, [showManageRequirements, fetchRequirementsList]);
 
   // ── Add Requirement ─────────────────────────────────────────────────────
   const handleAddRequirement = async (e) => {
@@ -87,7 +119,7 @@ export default function OfficerClearance() {
         type: newReq.category === 'attendance' ? 'auto' : 'manual',
         description: newReq.description.trim() || null,
         amount: isPayment && newReq.amount ? parseFloat(newReq.amount) : null,
-        school_year: schoolYear,
+        school_year_id: selectedYearId,
         semester,
       });
       setNewReq(emptyReq);
@@ -106,7 +138,7 @@ export default function OfficerClearance() {
     setActionLoading(key);
     try {
       await api().post(`/clearance/${requirementId}/students/${studentId}/clear`, {
-        school_year: schoolYear,
+        school_year_id: selectedYearId,
         semester,
         notes: notes || null,
       });
@@ -133,7 +165,7 @@ export default function OfficerClearance() {
     setActionLoading(key);
     try {
       await api().post(`/clearance/${requirementId}/students/${studentId}/reject`, {
-        school_year: schoolYear,
+        school_year_id: selectedYearId,
         semester,
       });
       setMembers((prev) =>
@@ -179,30 +211,114 @@ export default function OfficerClearance() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start flex-wrap gap-3">
+      <div className="flex justify-between items-start flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Clearance Management</h1>
-          <p className="text-slate-600 mt-1">{schoolYear} — {semester} Semester</p>
+          <p className="text-slate-600 mt-1">Track and manage member requirements</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowAddForm(true)} className="bg-violet-600 hover:bg-violet-700 text-white gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Professional SY & Semester Selectors */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+            <Select value={selectedYearId?.toString()} onValueChange={(val) => setSelectedYearId(parseInt(val))}>
+              <SelectTrigger className="h-8 border-0 bg-transparent text-sm font-semibold text-[#0f2d5e] focus:ring-0 shadow-none w-[140px] px-3 hover:bg-slate-50 rounded-lg">
+                <SelectValue placeholder="School Year" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-slate-200 shadow-xl">
+                {schoolYears.map((year) => (
+                  <SelectItem key={year.id} value={year.id.toString()} className="text-sm font-medium focus:bg-blue-50 focus:text-[#0f2d5e] rounded-lg">
+                    S.Y. {year.name}
+                    {year.is_active && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Active</span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="w-px h-5 bg-slate-200" />
+
+            <Select value={semester} onValueChange={setSemester}>
+              <SelectTrigger className="h-8 border-0 bg-transparent text-sm font-semibold text-[#0f2d5e] focus:ring-0 shadow-none w-[130px] px-3 hover:bg-slate-50 rounded-lg">
+                <SelectValue placeholder="Semester" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-slate-200 shadow-xl">
+                <SelectItem value="1st" className="text-sm font-medium rounded-lg">1st Semester</SelectItem>
+                <SelectItem value="2nd" className="text-sm font-medium rounded-lg">2nd Semester</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button onClick={() => setShowManageRequirements(true)} variant="outline" className="border-violet-200 text-violet-700 hover:bg-violet-50 gap-2 rounded-xl">
+            <Settings className="w-4 h-4" />
+            Manage Requirements
+          </Button>
+
+          <Button onClick={() => setShowAddForm(true)} className="bg-violet-600 hover:bg-violet-700 text-white gap-2 rounded-xl shadow-md">
             <Plus className="w-4 h-4" />
             Add Requirement
           </Button>
-          <Button variant="outline" onClick={fetchClearance} disabled={loading} className="gap-2">
+          <Button variant="outline" onClick={fetchClearance} disabled={loading} className="gap-2 rounded-xl">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </div>
 
+      {/* Manage Requirements Modal */}
+      <Dialog open={showManageRequirements} onOpenChange={setShowManageRequirements}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Manage Clearance Requirements</DialogTitle>
+            <DialogDescription>
+              Active requirements for <strong className="font-semibold text-violet-900 mx-1">S.Y. {selectedYear?.name}</strong> • <strong className="font-semibold text-violet-900 ml-1">{semester} Semester</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto mt-2 space-y-3 pr-2">
+            {loadingReqs ? (
+              <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-violet-500" /></div>
+            ) : requirementsList.length === 0 ? (
+              <div className="text-center p-8 text-slate-500 border rounded-xl border-dashed">
+                No requirements created for this period yet.
+              </div>
+            ) : (
+              requirementsList.map(req => (
+                <div key={req.id} className="p-4 border border-slate-200 rounded-xl flex items-center justify-between gap-4 bg-white hover:border-violet-200 transition-colors shadow-sm">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-semibold text-slate-900 truncate pr-4">{req.name}</h4>
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                      <Badge variant="outline" className="text-xs capitalize font-medium text-slate-600 border-slate-200 bg-slate-50">
+                        {req.type === 'auto' ? 'Auto (Attendance)' : req.type}
+                      </Badge>
+                      {req.amount > 0 && (
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50">₱{req.amount}</Badge>
+                      )}
+                      {req.description && (
+                        <span className="text-xs text-slate-500 truncate max-w-[200px] sm:max-w-xs">{req.description}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Requirement Modal */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add Clearance Requirement</DialogTitle>
-            <DialogDescription>
-              Create a new requirement that all members need to fulfill.
+            <DialogDescription asChild>
+              <div className="space-y-3 mt-1.5">
+                <p>Create a new requirement that all members need to fulfill.</p>
+                <div className="flex items-center gap-2.5 p-3 bg-violet-50/80 rounded-xl border border-violet-100 text-violet-800 text-sm">
+                  <Calendar className="w-4 h-4 flex-shrink-0 text-violet-500" />
+                  <p>
+                    Adding to: <strong className="font-semibold text-violet-900 mx-1">S.Y. {selectedYear?.name}</strong> • <strong className="font-semibold text-violet-900 ml-1">{semester} Semester</strong>
+                  </p>
+                </div>
+              </div>
             </DialogDescription>
           </DialogHeader>
 

@@ -1,46 +1,61 @@
 import { useState, useEffect } from 'react';
-import { Users, Calendar, ClipboardList, TrendingUp, Plus, Bell } from 'lucide-react';
+import { Users, Calendar, ClipboardList, TrendingUp, Plus, Bell, Loader2, CalendarRange, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import axios from 'axios';
+import { useSchoolYear } from '@/context/SchoolYearContext';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 
-const API_URL = 'http://localhost:8000/api';
+const authH = () => ({
+  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+});
 
 export default function OfficerDashboard() {
+  const { selectedYearId, setSelectedYearId, schoolYears } = useSchoolYear();
+  const selectedYear = schoolYears.find(y => String(y.id) === String(selectedYearId));
   const [stats, setStats] = useState({
     totalMembers: 0,
     activeMembers: 0,
     upcomingEvents: 0,
     pendingTasks: 0,
+    totalAttendance: 0,
+    totalEvents: 0,
   });
   const [recentEvents, setRecentEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (selectedYearId) {
+      fetchDashboardData();
+    } else {
+      setLoading(false);
+    }
+  }, [selectedYearId]);
 
   const fetchDashboardData = async () => {
+    setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      
-      // Fetch events and member stats
-      const eventsResponse = await axios.get(`${API_URL}/events`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // Fetch stats
+      const statsResponse = await axios.get(`/api/dashboard/officer-stats?school_year_id=${selectedYearId}`, authH());
+      const officerStats = statsResponse.data;
 
+      // Fetch events for list
+      const eventsResponse = await axios.get(`/api/events?school_year_id=${selectedYearId}`, authH());
       const events = eventsResponse.data;
-      const upcoming = events.filter(e => e.status === 'upcoming').length;
       
       setStats({
-        totalMembers: 45, // TODO: Replace with actual API call
-        activeMembers: 38,
-        upcomingEvents: upcoming,
-        pendingTasks: 5,
+        totalMembers: officerStats.total_members || 0,
+        activeMembers: officerStats.total_members || 0, // Simplified for now
+        upcomingEvents: events.filter(e => e.status === 'upcoming').length,
+        pendingTasks: 0, // Placeholder
+        totalAttendance: officerStats.total_attendance || 0,
+        totalEvents: officerStats.total_events || 0,
       });
 
-      setRecentEvents(events.slice(0, 3));
+      setRecentEvents(events.slice(0, 5));
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -51,82 +66,129 @@ export default function OfficerDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-wrap justify-between items-start gap-3">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Officer Dashboard</h1>
           <p className="text-slate-600 mt-1">Manage your organization</p>
         </div>
-        <Button className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700">
-          <Plus className="w-4 h-4" />
-          Create Event
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select
+            value={selectedYearId?.toString()}
+            onValueChange={(val) => setSelectedYearId(parseInt(val))}
+          >
+            <SelectTrigger className="h-9 w-[180px] bg-white border-slate-200 rounded-xl text-sm font-semibold text-[#0f2d5e] shadow-sm focus:ring-[#0f2d5e]">
+              <div className="flex items-center gap-2">
+                <CalendarRange className="w-4 h-4 text-[#0f2d5e] shrink-0" />
+                <span>S.Y. {selectedYear?.name || 'Select'}</span>
+              </div>
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-slate-200 shadow-xl">
+              {schoolYears.map((year) => (
+                <SelectItem
+                  key={year.id}
+                  value={year.id.toString()}
+                  className="text-sm font-medium focus:bg-blue-50 focus:text-[#0f2d5e] rounded-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    <span>S.Y. {year.name}</span>
+                    {year.is_active && (
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-md">
+            <Plus className="w-4 h-4" />
+            Create Event
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Total Members</CardDescription>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Members</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-600" />
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                <Users className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <div className="text-3xl font-bold text-slate-900">{stats.totalMembers}</div>
-                <div className="text-sm text-green-600">+3 this month</div>
+                {loading ? (
+                  <div className="h-7 bg-slate-200 rounded-lg w-12 animate-pulse" />
+                ) : (
+                  <div className="text-2xl font-bold text-slate-900">{stats.totalMembers}</div>
+                )}
+                <div className="text-[10px] text-slate-500 font-medium">Active memberships</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Active Members</CardDescription>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500">Events (S.Y.)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-600" />
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
+                <CalendarRange className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <div className="text-3xl font-bold text-slate-900">{stats.activeMembers}</div>
-                <div className="text-sm text-slate-600">{Math.round((stats.activeMembers / stats.totalMembers) * 100)}% active</div>
+                {loading ? (
+                  <div className="h-7 bg-slate-200 rounded-lg w-12 animate-pulse" />
+                ) : (
+                  <div className="text-2xl font-bold text-slate-900">{stats.totalEvents}</div>
+                )}
+                <div className="text-[10px] text-blue-600 font-medium">{stats.upcomingEvents} upcoming</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Upcoming Events</CardDescription>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500">Attendances</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-purple-600" />
+              <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
+                <TrendingUp className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <div className="text-3xl font-bold text-slate-900">{stats.upcomingEvents}</div>
-                <div className="text-sm text-slate-600">this month</div>
+                {loading ? (
+                  <div className="h-7 bg-slate-200 rounded-lg w-12 animate-pulse" />
+                ) : (
+                  <div className="text-2xl font-bold text-slate-900">{stats.totalAttendance}</div>
+                )}
+                <div className="text-[10px] text-slate-500 font-medium">Yearly scan records</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Pending Tasks</CardDescription>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pending Actions</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
-                <ClipboardList className="w-6 h-6 text-amber-600" />
+              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                <ClipboardList className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <div className="text-3xl font-bold text-slate-900">{stats.pendingTasks}</div>
-                <div className="text-sm text-slate-600">need attention</div>
+                {loading ? (
+                  <div className="h-7 bg-slate-200 rounded-lg w-12 animate-pulse" />
+                ) : (
+                  <div className="text-2xl font-bold text-slate-900">{stats.pendingTasks}</div>
+                )}
+                <div className="text-[10px] text-amber-600 font-medium">Needs attention</div>
               </div>
             </div>
           </CardContent>

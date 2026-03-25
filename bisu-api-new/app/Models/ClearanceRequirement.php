@@ -17,6 +17,7 @@ class ClearanceRequirement extends Model
         'school_year',
         'semester',
         'is_active',
+        'school_year_id',
     ];
 
     public function organization()
@@ -27,5 +28,10 @@ class ClearanceRequirement extends Model
     public function studentClearances()
     {
         return $this->hasMany(StudentClearance::class , 'requirement_id');
+    }
+
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class, 'school_year_id');
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use App\Models\SchoolYear;
 
 class EventController extends Controller
 {
@@ -66,6 +67,16 @@ class EventController extends Controller
                 }
             }
 
+            if ($request->has('school_year_id') && $request->school_year_id != 'all') {
+                $query->where('school_year_id', $request->school_year_id);
+            } else {
+                // Default to active year if no filter is provided
+                $activeYear = SchoolYear::where('is_active', true)->first();
+                if ($activeYear) {
+                    $query->where('school_year_id', $activeYear->id);
+                }
+            }
+
             return response()->json($query->get());
         } catch (\Exception $e) {
             Log::error('Event index error: ' . $e->getMessage());
@@ -105,7 +116,15 @@ class EventController extends Controller
                 'end_time'    => 'nullable|date_format:H:i|after:event_time',
                 'location'    => 'nullable|string|max:255',
                 'status'      => 'nullable|in:upcoming,ongoing,completed,cancelled',
+                'school_year_id' => 'nullable|exists:school_years,id',
             ]);
+
+            if (empty($data['school_year_id'])) {
+                $activeYear = SchoolYear::where('is_active', true)->first();
+                if ($activeYear) {
+                    $data['school_year_id'] = $activeYear->id;
+                }
+            }
 
             $data['organization_id'] = $orgId;
             $data['status']          = $data['status'] ?? 'upcoming';
@@ -148,6 +167,7 @@ class EventController extends Controller
                 'end_time'    => 'nullable|date_format:H:i|after:event_time',
                 'location'    => 'nullable|string|max:255',
                 'status'      => 'nullable|in:upcoming,ongoing,completed,cancelled',
+                'school_year_id' => 'nullable|exists:school_years,id',
             ]);
 
             $event->update($data);
@@ -196,7 +216,7 @@ class EventController extends Controller
         }
     }
 
-    public function upcoming()
+    public function upcoming(Request $request)
     {
         try {
             $this->syncEventStatuses();
@@ -211,6 +231,15 @@ class EventController extends Controller
                 $orgId = $user->getOfficerOrganizationId();
                 if ($orgId) {
                     $query->where('organization_id', $orgId);
+                }
+            }
+
+            if ($request->has('school_year_id') && $request->school_year_id != 'all') {
+                $query->where('school_year_id', $request->school_year_id);
+            } else {
+                $activeYear = SchoolYear::where('is_active', true)->first();
+                if ($activeYear) {
+                    $query->where('school_year_id', $activeYear->id);
                 }
             }
 

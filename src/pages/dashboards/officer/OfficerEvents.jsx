@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import EvaluationModal from "../../modals/EvaluationModal";
+import { useSchoolYear } from "@/context/SchoolYearContext";
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
@@ -26,8 +27,8 @@ const EMPTY_FORM = {
 };
 
 const STATUS_COLORS = {
-  upcoming:  "bg-blue-50 text-blue-700 border-blue-200",
-  ongoing:   "bg-green-50 text-green-700 border-green-200",
+  upcoming: "bg-blue-50 text-blue-700 border-blue-200",
+  ongoing: "bg-green-50 text-green-700 border-green-200",
   completed: "bg-slate-100 text-slate-600 border-slate-200",
   cancelled: "bg-red-50 text-red-700 border-red-200",
 };
@@ -52,7 +53,7 @@ const formatTime = (s) => {
 /** Shows "9:00 AM – 11:00 AM" or just "9:00 AM" when there is no end time */
 const formatTimeRange = (startTime, endTime) => {
   const start = formatTime(startTime);
-  const end   = formatTime(endTime);
+  const end = formatTime(endTime);
   if (!start) return "—";
   return end ? `${start} – ${end}` : start;
 };
@@ -80,20 +81,20 @@ function StatCard({ icon: Icon, label, value, sub, grad }) {
 // ── Event Form Modal ───────────────────────────────────────────────────────
 function EventFormModal({ open, onClose, onSaved, editEvent }) {
   const isEdit = Boolean(editEvent);
-  const [form, setForm]     = useState(EMPTY_FORM);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     if (editEvent) {
       setForm({
-        title:       editEvent.title        ?? "",
-        description: editEvent.description  ?? "",
-        event_date:  editEvent.event_date   ? String(editEvent.event_date).substring(0, 10) : "",
-        event_time:  editEvent.event_time   ? String(editEvent.event_time).substring(0, 5)  : "",
-        end_time:    editEvent.end_time     ? String(editEvent.end_time).substring(0, 5)    : "",
-        location:    editEvent.location     ?? "",
-        status:      editEvent.status       ?? "upcoming",
+        title: editEvent.title ?? "",
+        description: editEvent.description ?? "",
+        event_date: editEvent.event_date ? String(editEvent.event_date).substring(0, 10) : "",
+        event_time: editEvent.event_time ? String(editEvent.event_time).substring(0, 5) : "",
+        end_time: editEvent.end_time ? String(editEvent.end_time).substring(0, 5) : "",
+        location: editEvent.location ?? "",
+        status: editEvent.status ?? "upcoming",
       });
     } else {
       setForm(EMPTY_FORM);
@@ -132,9 +133,9 @@ function EventFormModal({ open, onClose, onSaved, editEvent }) {
     const s = formatTime(form.event_time);
     const e = formatTime(form.end_time);
     if (!s && !e) return null;
-    if (s && e)  return <>Will auto-set to <strong>ongoing</strong> at {s} and <strong>completed</strong> at {e}.</>;
-    if (s)       return <>Will auto-set to <strong>ongoing</strong> at {s}. Add an end time for auto-completion.</>;
-    return          <>Will auto-set to <strong>completed</strong> at {e}.</>;
+    if (s && e) return <>Will auto-set to <strong>ongoing</strong> at {s} and <strong>completed</strong> at {e}.</>;
+    if (s) return <>Will auto-set to <strong>ongoing</strong> at {s}. Add an end time for auto-completion.</>;
+    return <>Will auto-set to <strong>completed</strong> at {e}.</>;
   })();
 
   return (
@@ -402,27 +403,34 @@ function QRCodeDialog({ open, onClose, event }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function OfficerEvents() {
-  const [events, setEvents]             = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [search, setSearch]             = useState("");
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [formOpen, setFormOpen]         = useState(false);
-  const [editEvent, setEditEvent]       = useState(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editEvent, setEditEvent] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [qrEvent, setQrEvent]           = useState(null);
-  const [evalEvent, setEvalEvent]       = useState(null);
+  const [qrEvent, setQrEvent] = useState(null);
+  const [evalEvent, setEvalEvent] = useState(null);
+  const { selectedYearId } = useSchoolYear();
 
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("/api/events", authH());
+      const res = await axios.get(`/api/events?school_year_id=${selectedYearId}`, authH());
       setEvents(res.data);
     } catch (err) {
       toast.error("Error", { description: err.response?.data?.message || "Failed to load events." });
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchEvents(); }, []);
+  useEffect(() => {
+    if (selectedYearId) {
+      fetchEvents();
+    } else {
+      setLoading(false);
+    }
+  }, [selectedYearId]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -436,13 +444,13 @@ export default function OfficerEvents() {
     }
   };
 
-  const total     = events.length;
-  const upcoming  = events.filter((e) => e.status === "upcoming").length;
-  const ongoing   = events.filter((e) => e.status === "ongoing").length;
+  const total = events.length;
+  const upcoming = events.filter((e) => e.status === "upcoming").length;
+  const ongoing = events.filter((e) => e.status === "ongoing").length;
   const completed = events.filter((e) => e.status === "completed").length;
 
   const filtered = events.filter((e) => {
-    const q           = search.toLowerCase();
+    const q = search.toLowerCase();
     const matchSearch = !search
       || e.title?.toLowerCase().includes(q)
       || e.location?.toLowerCase().includes(q)
@@ -526,10 +534,10 @@ export default function OfficerEvents() {
 
         {/* ── Stat Cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard icon={Calendar}     label="Total Events" value={total}     sub={`${upcoming} upcoming`} grad="from-[#0f2d5e] to-[#1a4a8a]" />
-          <StatCard icon={Clock}        label="Upcoming"     value={upcoming}  sub="Scheduled"              grad="from-[#1e4db7] to-[#3b6fd4]" />
-          <StatCard icon={Activity}     label="Ongoing"      value={ongoing}   sub="Active now"             grad="from-[#10b981] to-[#34d399]" />
-          <StatCard icon={CheckCircle2} label="Completed"    value={completed} sub="Past events"            grad="from-[#6366f1] to-[#818cf8]" />
+          <StatCard icon={Calendar} label="Total Events" value={total} sub={`${upcoming} upcoming`} grad="from-[#0f2d5e] to-[#1a4a8a]" />
+          <StatCard icon={Clock} label="Upcoming" value={upcoming} sub="Scheduled" grad="from-[#1e4db7] to-[#3b6fd4]" />
+          <StatCard icon={Activity} label="Ongoing" value={ongoing} sub="Active now" grad="from-[#10b981] to-[#34d399]" />
+          <StatCard icon={CheckCircle2} label="Completed" value={completed} sub="Past events" grad="from-[#6366f1] to-[#818cf8]" />
         </div>
 
         {/* ── Table Card ── */}

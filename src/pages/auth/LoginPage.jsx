@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, AlertCircle, QrCode, Users, BarChart3, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
+import { useSchoolYear } from '@/context/SchoolYearContext';
 
 const features = [
   { icon: QrCode, title: 'QR Code Check-In', desc: 'Instant attendance marking via QR scan' },
@@ -10,12 +11,13 @@ const features = [
   { icon: ShieldCheck, title: 'Clearance System', desc: 'Automated clearance based on attendance' },
 ];
 
-export default function Login() {
+export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { fetchSchoolYears } = useSchoolYear();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,6 +46,9 @@ export default function Login() {
       localStorage.setItem('user_role', role);                          // 'admin' | 'officer' | 'member'
       localStorage.setItem('membership', JSON.stringify(membership));    // OrganizationMember row or null
       localStorage.setItem('organization_id', organization_id ?? '');        // org they manage, or ''
+
+      // Fetch the global school years specifically for this new session
+      await fetchSchoolYears();
 
       // Route based on role returned by the server
       if (role === 'admin') {

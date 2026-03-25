@@ -7,10 +7,10 @@ import {
   LogIn, LogOut, Timer, Trash2, BarChart3, Activity,
   Filter, BookOpen, Building2, GraduationCap,
 } from "lucide-react";
-import { Button }   from "@/components/ui/button";
-import { Badge }    from "@/components/ui/badge";
-import { Input }    from "@/components/ui/input";
-import { Label }    from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogTitle, DialogDescription,
@@ -32,6 +32,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useSchoolYear } from "@/context/SchoolYearContext";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const authH = () => ({
@@ -47,14 +48,14 @@ const fmt = (ts) => {
 };
 
 const TYPE_COLORS = {
-  QR:     "bg-blue-50   text-blue-700   border-blue-200",
-  RFID:   "bg-violet-50 text-violet-700 border-violet-200",
+  QR: "bg-blue-50   text-blue-700   border-blue-200",
+  RFID: "bg-violet-50 text-violet-700 border-violet-200",
   manual: "bg-amber-50  text-amber-700  border-amber-200",
 };
 const TYPE_ICONS = { QR: QrCode, RFID: CreditCard, manual: Hand };
 
 const STATUS_COLORS = {
-  checked_in:  "bg-emerald-50 text-emerald-700 border-emerald-200",
+  checked_in: "bg-emerald-50 text-emerald-700 border-emerald-200",
   checked_out: "bg-slate-100  text-slate-500   border-slate-200",
 };
 
@@ -80,23 +81,23 @@ function StatCard({ icon: Icon, label, value, sub, grad }) {
 
 // ── Manual Check-In Modal ──────────────────────────────────────────────────
 function ManualCheckInModal({ open, onClose, onSaved, events, students, defaultEventId }) {
-  const [form, setForm]     = useState({ event_id: "", student_id: "", time_in: "", remarks: "" });
+  const [form, setForm] = useState({ event_id: "", student_id: "", time_in: "", remarks: "" });
   const [saving, setSaving] = useState(false);
-  
+
   // Student filters
   const [studentSearch, setStudentSearch] = useState("");
-  const [yearFilter, setYearFilter]       = useState("all");
-  const [deptFilter, setDeptFilter]       = useState("all");
-  const [progFilter, setProgFilter]       = useState("all");
-  const [showFilters, setShowFilters]     = useState(false);
+  const [yearFilter, setYearFilter] = useState("all");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [progFilter, setProgFilter] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setForm({
-      event_id:   defaultEventId ?? "",
+      event_id: defaultEventId ?? "",
       student_id: "",
-      time_in:    new Date().toISOString().slice(0, 16),
-      remarks:    "",
+      time_in: new Date().toISOString().slice(0, 16),
+      remarks: "",
     });
     // Reset filters
     setStudentSearch("");
@@ -109,15 +110,15 @@ function ManualCheckInModal({ open, onClose, onSaved, events, students, defaultE
 
   // Filter students based on search and filters
   const filteredStudents = students.filter(s => {
-    const matchSearch = !studentSearch 
+    const matchSearch = !studentSearch
       || s.name?.toLowerCase().includes(studentSearch.toLowerCase())
       || s.student_id?.toLowerCase().includes(studentSearch.toLowerCase())
       || s.email?.toLowerCase().includes(studentSearch.toLowerCase());
-    
+
     const matchYear = yearFilter === "all" || String(s.year_level) === yearFilter;
     const matchDept = deptFilter === "all" || String(s.department_id) === deptFilter;
     const matchProg = progFilter === "all" || String(s.program_id) === progFilter;
-    
+
     return matchSearch && matchYear && matchDept && matchProg;
   });
 
@@ -130,7 +131,7 @@ function ManualCheckInModal({ open, onClose, onSaved, events, students, defaultE
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.event_id)   { toast.error("Please select an event.");  return; }
+    if (!form.event_id) { toast.error("Please select an event."); return; }
     if (!form.student_id) { toast.error("Please select a student."); return; }
 
     setSaving(true);
@@ -138,10 +139,10 @@ function ManualCheckInModal({ open, onClose, onSaved, events, students, defaultE
       const res = await axios.post(
         "/api/attendance/manual-checkin",
         {
-          event_id:   form.event_id,
+          event_id: form.event_id,
           student_id: form.student_id,
-          time_in:    form.time_in || undefined,
-          remarks:    form.remarks || undefined,
+          time_in: form.time_in || undefined,
+          remarks: form.remarks || undefined,
         },
         authH(),
       );
@@ -195,7 +196,7 @@ function ManualCheckInModal({ open, onClose, onSaved, events, students, defaultE
                     <SelectItem key={ev.id} value={String(ev.id)}>
                       <div className="flex items-center gap-2">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        {ev.name}
+                        {ev.title}
                       </div>
                     </SelectItem>
                   ))}
@@ -422,7 +423,7 @@ function ManualCheckInModal({ open, onClose, onSaved, events, students, defaultE
 function ManualCheckOutModal({ open, onClose, onSaved, record }) {
   const [timeOut, setTimeOut] = useState("");
   const [remarks, setRemarks] = useState("");
-  const [saving, setSaving]   = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -438,8 +439,8 @@ function ManualCheckOutModal({ open, onClose, onSaved, record }) {
         "/api/attendance/manual-checkout",
         {
           attendance_id: record.id,
-          time_out:      timeOut || undefined,
-          remarks:       remarks || undefined,
+          time_out: timeOut || undefined,
+          remarks: remarks || undefined,
         },
         authH(),
       );
@@ -471,7 +472,7 @@ function ManualCheckOutModal({ open, onClose, onSaved, record }) {
             <div>
               <DialogTitle className="text-lg font-bold text-white">Manual Check-Out</DialogTitle>
               <DialogDescription className="text-emerald-100 text-xs mt-0.5">
-                {record?.student?.name ?? "Student"} — {record?.event?.name ?? "Event"}
+                {record?.student?.name ?? "Student"} — {record?.event?.title ?? "Event"}
               </DialogDescription>
             </div>
           </div>
@@ -561,42 +562,47 @@ function DeleteDialog({ open, onClose, onConfirm, record }) {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function AttendanceManagement() {
   // Data
-  const [events,   setEvents]   = useState([]);
+  const [events, setEvents] = useState([]);
   const [students, setStudents] = useState([]);
-  const [records,  setRecords]  = useState([]);
-  const [stats,    setStats]    = useState(null);
+  const [records, setRecords] = useState([]);
+  const [stats, setStats] = useState(null);
 
   // UI
-  const [selectedEvent,  setSelectedEvent]  = useState("");
-  const [loadingBase,    setLoadingBase]    = useState(true);
-  const [loadingAtt,     setLoadingAtt]     = useState(false);
-  const [search,         setSearch]         = useState("");
-  const [filterType,     setFilterType]     = useState("all");
-  const [filterStatus,   setFilterStatus]   = useState("all");
+  const [selectedEvent, setSelectedEvent] = useState("");
+  const [loadingBase, setLoadingBase] = useState(true);
+  const [loadingAtt, setLoadingAtt] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
 
   // Modals
-  const [checkInOpen,  setCheckInOpen]  = useState(false);
-  const [checkOutRec,  setCheckOutRec]  = useState(null);
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const [checkOutRec, setCheckOutRec] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const { selectedYearId } = useSchoolYear();
 
-  // ── Bootstrap ──────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
+      if (!selectedYearId) {
+        setLoadingBase(false);
+        return;
+      }
       try {
         const [evRes, stuRes] = await Promise.all([
-          axios.get("/api/events",   authH()),
+          axios.get(`/api/events?school_year_id=${selectedYearId}`, authH()),
           axios.get("/api/students", authH()),
         ]);
         setEvents(evRes.data);
         setStudents(stuRes.data);
         if (evRes.data.length) setSelectedEvent(String(evRes.data[0].id));
+        else setSelectedEvent("");
       } catch {
         toast.error("Failed to load events / students.");
       } finally {
         setLoadingBase(false);
       }
     })();
-  }, []);
+  }, [selectedYearId]);
 
   // ── Fetch attendance per event ─────────────────────────────────────────
   const fetchAttendance = useCallback(async () => {
@@ -629,11 +635,11 @@ export default function AttendanceManagement() {
   };
 
   // ── Derived stats ──────────────────────────────────────────────────────
-  const total      = stats?.total       ?? records.length;
-  const checkedIn  = stats?.checked_in  ?? records.filter(r => r.status === "checked_in").length;
+  const total = stats?.total ?? records.length;
+  const checkedIn = stats?.checked_in ?? records.filter(r => r.status === "checked_in").length;
   const checkedOut = stats?.checked_out ?? records.filter(r => r.status === "checked_out").length;
-  const qrCount     = records.filter(r => r.attendance_type === "QR").length;
-  const rfidCount   = records.filter(r => r.attendance_type === "RFID").length;
+  const qrCount = records.filter(r => r.attendance_type === "QR").length;
+  const rfidCount = records.filter(r => r.attendance_type === "RFID").length;
   const manualCount = records.filter(r => r.attendance_type === "manual").length;
 
   // ── Filter ─────────────────────────────────────────────────────────────
@@ -642,7 +648,7 @@ export default function AttendanceManagement() {
     const matchSearch = !search
       || r.student?.name?.toLowerCase().includes(q)
       || r.remarks?.toLowerCase().includes(q);
-    const matchType   = filterType   === "all" || r.attendance_type === filterType;
+    const matchType = filterType === "all" || r.attendance_type === filterType;
     const matchStatus = filterStatus === "all" || r.status === filterStatus;
     return matchSearch && matchType && matchStatus;
   });
@@ -703,7 +709,7 @@ export default function AttendanceManagement() {
                       <SelectItem key={ev.id} value={String(ev.id)}>
                         <div className="flex items-center gap-2">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          {ev.name}
+                          {ev.title}
                         </div>
                       </SelectItem>
                     ))}
@@ -724,7 +730,7 @@ export default function AttendanceManagement() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={ClipboardList} label="Total Records" value={total}
-            sub={selectedEventObj?.name ?? "All events"}
+            sub={selectedEventObj?.title ?? "All events"}
             grad="from-[#0f2d5e] to-[#1a4a8a]"
           />
           <StatCard
@@ -748,9 +754,9 @@ export default function AttendanceManagement() {
         {/* Type breakdown tiles */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { Icon: QrCode,     label: "QR Code", count: qrCount,     bg: "bg-blue-50",   ic: "text-blue-600"   },
-            { Icon: CreditCard, label: "RFID",    count: rfidCount,   bg: "bg-violet-50", ic: "text-violet-600" },
-            { Icon: Hand,       label: "Manual",  count: manualCount, bg: "bg-amber-50",  ic: "text-amber-600"  },
+            { Icon: QrCode, label: "QR Code", count: qrCount, bg: "bg-blue-50", ic: "text-blue-600" },
+            { Icon: CreditCard, label: "RFID", count: rfidCount, bg: "bg-violet-50", ic: "text-violet-600" },
+            { Icon: Hand, label: "Manual", count: manualCount, bg: "bg-amber-50", ic: "text-amber-600" },
           ].map(({ Icon, label, count, bg, ic }) => (
             <div key={label} className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
               <div className="flex items-center gap-3">
@@ -938,7 +944,7 @@ export default function AttendanceManagement() {
                       <td className="px-5 py-4">
                         <Badge className={`${STATUS_COLORS[rec.status]} border text-xs font-semibold px-2.5 py-1 flex items-center gap-1 w-fit`}>
                           {rec.status === "checked_in"
-                            ? <LogIn  className="w-3 h-3" />
+                            ? <LogIn className="w-3 h-3" />
                             : <LogOut className="w-3 h-3" />}
                           {rec.status?.replace("_", " ")}
                         </Badge>

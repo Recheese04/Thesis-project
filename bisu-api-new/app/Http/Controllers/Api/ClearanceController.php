@@ -8,6 +8,7 @@ use App\Models\StudentClearance;
 use App\Models\MemberOrganization;
 use App\Models\Attendance;
 use App\Models\Event;
+use App\Models\SchoolYear;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -37,13 +38,27 @@ class ClearanceController extends Controller
         return $m && in_array($m->role, ['officer', 'adviser']);
     }
     // GET /api/organizations/{orgId}/clearance-requirements
-    public function getRequirements($orgId)
+    public function getRequirements(Request $request, $orgId)
     {
-        $requirements = ClearanceRequirement::where('organization_id', $orgId)
-            ->where('is_active', 1)
-            ->get();
+        $schoolYearId = $request->query('school_year_id');
+        $semester = $request->query('semester', '1st');
 
-        return response()->json($requirements);
+        if (!$schoolYearId) {
+            $activeYear = SchoolYear::where('is_active', true)->first();
+            $schoolYearId = $activeYear ? $activeYear->id : null;
+        }
+
+        $query = ClearanceRequirement::where('organization_id', $orgId)
+            ->where('is_active', 1);
+
+        if ($schoolYearId) {
+            $query->where('school_year_id', $schoolYearId);
+        }
+        if ($semester) {
+            $query->where('semester', $semester);
+        }
+
+        return response()->json($query->get());
     }
 
     // POST /api/organizations/{orgId}/clearance-requirements
@@ -58,9 +73,16 @@ class ClearanceController extends Controller
             'type' => 'required|in:auto,manual',
             'description' => 'nullable|string',
             'amount' => 'nullable|numeric|min:0',
-            'school_year' => 'nullable|string',
+            'school_year_id' => 'nullable|exists:school_years,id',
             'semester' => 'nullable|in:1st,2nd,summer',
         ]);
+
+        if (empty($validated['school_year_id'])) {
+            $activeYear = SchoolYear::where('is_active', true)->first();
+            if ($activeYear) {
+                $validated['school_year_id'] = $activeYear->id;
+            }
+        }
 
         $req = ClearanceRequirement::create([
             ...$validated,
@@ -74,16 +96,22 @@ class ClearanceController extends Controller
     public function getStudentClearance(Request $request, $studentId)
     {
         $orgId = $request->query('org_id');
-        $schoolYear = $request->query('school_year', '2025-2026');
+        $schoolYearId = $request->query('school_year_id');
         $semester = $request->query('semester', '2nd');
+
+        if (!$schoolYearId) {
+            $activeYear = SchoolYear::where('is_active', true)->first();
+            $schoolYearId = $activeYear ? $activeYear->id : null;
+        }
 
         $requirements = ClearanceRequirement::where('organization_id', $orgId)
             ->where('is_active', 1)
+            ->where('school_year_id', $schoolYearId)
             ->get();
 
         $clearances = StudentClearance::where('student_id', $studentId)
             ->where('organization_id', $orgId)
-            ->where('school_year', $schoolYear)
+            ->where('school_year_id', $schoolYearId)
             ->where('semester', $semester)
             ->get()
             ->keyBy('requirement_id');
@@ -126,8 +154,13 @@ class ClearanceController extends Controller
     // GET /api/organizations/{orgId}/clearance?school_year=X&semester=X
     public function getOrgClearance(Request $request, $orgId)
     {
-        $schoolYear = $request->query('school_year', '2025-2026');
+        $schoolYearId = $request->query('school_year_id');
         $semester = $request->query('semester', '2nd');
+
+        if (!$schoolYearId) {
+            $activeYear = SchoolYear::where('is_active', true)->first();
+            $schoolYearId = $activeYear ? $activeYear->id : null;
+        }
 
         $members = MemberOrganization::with('student')
             ->where('organization_id', $orgId)
@@ -136,10 +169,11 @@ class ClearanceController extends Controller
 
         $requirements = ClearanceRequirement::where('organization_id', $orgId)
             ->where('is_active', 1)
+            ->where('school_year_id', $schoolYearId)
             ->get();
 
         $allClearances = StudentClearance::where('organization_id', $orgId)
-            ->where('school_year', $schoolYear)
+            ->where('school_year_id', $schoolYearId)
             ->where('semester', $semester)
             ->get()
             ->groupBy('student_id');
@@ -193,9 +227,16 @@ class ClearanceController extends Controller
     {
         $validated = $request->validate([
             'notes' => 'nullable|string|max:255',
-            'school_year' => 'required|string',
+            'school_year_id' => 'nullable|exists:school_years,id',
             'semester' => 'required|in:1st,2nd,summer',
         ]);
+
+        if (empty($validated['school_year_id'])) {
+            $activeYear = SchoolYear::where('is_active', true)->first();
+            if ($activeYear) {
+                $validated['school_year_id'] = $activeYear->id;
+            }
+        }
 
         $req = ClearanceRequirement::findOrFail($requirementId);
 
@@ -209,7 +250,7 @@ class ClearanceController extends Controller
             'student_id' => $studentId,
             'organization_id' => $req->organization_id,
             'requirement_id' => $requirementId,
-            'school_year' => $validated['school_year'],
+            'school_year_id' => $validated['school_year_id'],
             'semester' => $validated['semester'],
         ],
         [
@@ -228,9 +269,16 @@ class ClearanceController extends Controller
     {
         $validated = $request->validate([
             'notes' => 'nullable|string|max:255',
-            'school_year' => 'required|string',
+            'school_year_id' => 'nullable|exists:school_years,id',
             'semester' => 'required|in:1st,2nd,summer',
         ]);
+
+        if (empty($validated['school_year_id'])) {
+            $activeYear = SchoolYear::where('is_active', true)->first();
+            if ($activeYear) {
+                $validated['school_year_id'] = $activeYear->id;
+            }
+        }
 
         $req = ClearanceRequirement::findOrFail($requirementId);
 
@@ -244,7 +292,7 @@ class ClearanceController extends Controller
             'student_id' => $studentId,
             'organization_id' => $req->organization_id,
             'requirement_id' => $requirementId,
-            'school_year' => $validated['school_year'],
+            'school_year_id' => $validated['school_year_id'],
             'semester' => $validated['semester'],
         ],
         [

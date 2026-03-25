@@ -3,11 +3,13 @@ import { Toaster } from 'sonner';
 import Login from './pages/auth/LoginPage';
 import LandingPage from './pages/LandingPage';
 import Chatbot from './components/Chatbot';
+import { SchoolYearProvider } from './context/SchoolYearContext';
 
 // Admin
 import AdminLayout from './components/layout/AdminLayout';
 import Dashboard from './pages/dashboards/admin/Dashboard';
 import UserManagement from './pages/dashboards/admin/UserManagement';
+import SchoolYearManagement from "./pages/dashboards/admin/SchoolYearManagement";
 import DepartmentManagement from './pages/dashboards/admin/DepartmentManagement';
 import OrganizationManagement from './pages/dashboards/admin/OrganizationManagement';
 import EventManagement from './pages/dashboards/admin/EventManagement';
@@ -70,7 +72,8 @@ function PublicRoute({ children }) {
 function App() {
   return (
     <Router>
-      <Routes>
+      <SchoolYearProvider>
+        <Routes>
 
 
         <Route path="/" element={<LandingPage />} />
@@ -83,7 +86,8 @@ function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="users" element={<UserManagement />} />
-          <Route path="departments" element={<DepartmentManagement />} />
+            <Route path="school-years" element={<SchoolYearManagement />} />
+            <Route path="departments" element={<DepartmentManagement />} />
           <Route path="organizations" element={<OrganizationManagement />} />
           <Route path="events" element={<EventManagement />} />
           <Route path="attendance" element={<AttendanceManagement />} />
@@ -140,6 +144,7 @@ function App() {
       </Routes>
       <Toaster position="top-center" richColors />
       <Chatbot />
+      </SchoolYearProvider>
     </Router>
   );
 }

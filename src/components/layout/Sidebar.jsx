@@ -22,6 +22,7 @@ const adminMenuSections = [
     label: 'Overview',
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard', badge: null },
+      { icon: Calendar, label: 'School Year', path: '/admin/school-years', badge: 'Active' },
     ],
   },
   {

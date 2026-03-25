@@ -19,6 +19,7 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
+import SchoolYearSelector from './SchoolYearSelector';
 
 // Mock data - replace with real data
 const NOTIFICATIONS = [
@@ -138,6 +139,7 @@ export default function Navbar({ onMenuClick, isSidebarOpen }) {
               <Activity className="w-4 h-4 text-[#0f2d5e]" />
               <span className="text-sm font-semibold text-slate-700">{currentPage}</span>
             </div>
+            <SchoolYearSelector />
           </div>
 
           {/* Search Bar - Desktop */}

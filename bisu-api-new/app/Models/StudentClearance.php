@@ -17,6 +17,7 @@ class StudentClearance extends Model
         'cleared_at',
         'school_year',
         'semester',
+        'school_year_id',
     ];
 
     public function student()
@@ -32,6 +33,11 @@ class StudentClearance extends Model
     public function clearedBy()
     {
         return $this->belongsTo(User::class, 'cleared_by');
+    }
+
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class, 'school_year_id');
     }
 }
 

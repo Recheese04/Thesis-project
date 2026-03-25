@@ -16,10 +16,13 @@ use App\Http\Controllers\Api\GroupChatController;
 use App\Http\Controllers\Api\ConsequenceRuleController;
 use App\Http\Controllers\Api\ClearanceController;
 use App\Http\Controllers\Api\TaskController;
+use App\Http\Controllers\Api\SchoolYearController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Models\Student;
 use App\Models\MemberOrganization;
 
 Route::post('/login', [AuthController::class , 'login'])->middleware('throttle:5,1');
+
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -154,14 +157,26 @@ Route::middleware('auth:sanctum')->group(function () {
             return response()->json(['message' => 'Join request sent! Waiting for officer approval.']);
         }
         );
-
         // User Management
         Route::get('/users', [UserController::class , 'index']);
         Route::get('/users/{id}', [UserController::class , 'show']);
         Route::post('/users', [UserController::class , 'store']);
         Route::put('/users/{id}', [UserController::class , 'update']);
         Route::delete('/users/{id}', [UserController::class , 'destroy']);
+
+        Route::delete('/users/{id}', [UserController::class , 'destroy']);
         Route::post('/users/import', [UserController::class , 'importStudents']);
+
+        // School Years
+        Route::get('/school-years', [SchoolYearController::class, 'index']);
+        Route::get('/school-years/active', [SchoolYearController::class, 'getActive']);
+        Route::post('/school-years', [SchoolYearController::class, 'store']);
+        Route::post('/school-years/{id}/mark-active', [SchoolYearController::class, 'markActive']);
+        Route::delete('/school-years/{id}', [SchoolYearController::class, 'destroy']);
+
+        // Dashboard Stats
+        Route::get('/dashboard/admin-stats', [DashboardController::class, 'adminStats']);
+        Route::get('/dashboard/officer-stats', [DashboardController::class, 'officerStats']);
 
         // Students
         Route::get('/students', function () {
@@ -169,7 +184,11 @@ Route::middleware('auth:sanctum')->group(function () {
                 $query = Student::with([
                     'department:id,name,code',
                     'user:id,email,is_active'
-                ])->select('id', 'student_id', 'first_name', 'last_name', 'year_level', 'department_id', 'course');
+                ])->select('id', 'student_number', 'first_name', 'last_name', 'year_level', 'department_id', 'course');
+
+                if (request()->has('year_level') && request()->year_level != 'all') {
+                    $query->where('year_level', request()->year_level);
+                }
 
                 return $query
                 ->orderBy('last_name')
@@ -181,7 +200,7 @@ Route::middleware('auth:sanctum')->group(function () {
                             'name' => trim($student->first_name . ' ' . $student->last_name),
                             'first_name' => $student->first_name,
                             'last_name' => $student->last_name,
-                            'student_id' => $student->student_id,
+                            'student_id' => $student->student_number,
                             'email' => $student->user->email ?? null,
                             'year_level' => $student->year_level,
                             'department_id' => $student->department_id,
@@ -202,7 +221,7 @@ Route::middleware('auth:sanctum')->group(function () {
                         );
                     }
                     catch (\Exception $e) {
-                        \Log::error('Students API error: ' . $e->getMessage());
+                        \Illuminate\Support\Facades\Log::error('Students API error: ' . $e->getMessage());
                         return response()->json([
                         'error' => 'Failed to load students',
                         'message' => $e->getMessage()
@@ -388,8 +407,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{gc}/messages', [GroupChatController::class , 'sendMessage']);
             Route::post('/{gc}/members', [GroupChatController::class , 'addMembers']);
             Route::delete('/{gc}/members/{userId}', [GroupChatController::class , 'removeMember']);
-        }
-        );
+        });
 
         // AI Summarize
         Route::post('/summarize', function (Request $request) {

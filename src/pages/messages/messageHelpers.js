@@ -33,11 +33,11 @@ export const formatDateLabel = (iso) => {
 
 export const groupByDate = (messages) => {
   const items = []; let last = null;
-  for (const msg of messages) {
+  messages.forEach((msg, idx) => {
     const label = formatDateLabel(msg.created_at);
-    if (label !== last) { items.push({ type:'sep', label, key:`s${msg.id}` }); last = label; }
-    items.push({ type:'msg', data: msg, key:`m${msg.id}` });
-  }
+    if (label !== last) { items.push({ type:'sep', label, key:`s${msg.id || 'no_id'}-${idx}` }); last = label; }
+    items.push({ type:'msg', data: msg, key:`m${msg.id || 'no_id'}-${idx}` });
+  });
   return items;
 };
 

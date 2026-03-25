@@ -22,6 +22,7 @@ class Event extends Model
         'qr_code',
         'status',
         'created_by',
+        'school_year_id',
     ];
 
     protected $casts = [
@@ -43,9 +44,14 @@ class Event extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class, 'school_year_id');
+    }
+
     public function attendances()
     {
-        return $this->hasMany(EventAttendance::class, 'event_id');
+        return $this->hasMany(Attendance::class, 'event_id');
     }
 
     public function evaluation()

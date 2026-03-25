@@ -1,36 +1,37 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import {
-  Calendar, Loader2, Trash2, Pencil, Search, X,
-  RefreshCw, MoreHorizontal, Clock, AlertTriangle,
-  CheckCircle2, TrendingUp, MapPin, FileText, Activity,
-  Building2, Globe, QrCode,
+  Calendar, Search, Plus, Filter, MoreHorizontal,
+  Pencil, Trash2, RefreshCw, X, Clock, Activity,
+  CheckCircle2, MapPin, Users, Info, ChevronRight,
+  TrendingUp, Star, Loader2, AlertTriangle, ExternalLink,
+  Download, Archive, ArrowRight, QrCode, Building2, Globe, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogDescription, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useSchoolYear } from "@/context/SchoolYearContext";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const authH = () => ({
@@ -38,15 +39,15 @@ const authH = () => ({
 });
 
 const STATUS_COLORS = {
-  upcoming:  "bg-blue-50 text-blue-700 border-blue-200",
-  ongoing:   "bg-green-50 text-green-700 border-green-200",
+  upcoming: "bg-blue-50 text-blue-700 border-blue-200",
+  ongoing: "bg-green-50 text-green-700 border-green-200",
   completed: "bg-slate-100 text-slate-600 border-slate-200",
   cancelled: "bg-red-50 text-red-700 border-red-200",
 };
 
 const STATUS_ICONS = {
-  upcoming:  Clock,
-  ongoing:   Activity,
+  upcoming: Clock,
+  ongoing: Activity,
   completed: CheckCircle2,
   cancelled: X,
 };
@@ -79,12 +80,12 @@ function EditEventModal({ open, onClose, onSaved, editEvent }) {
   useEffect(() => {
     if (!open || !editEvent) return;
     setForm({
-      title:       editEvent.title       ?? "",
+      title: editEvent.title ?? "",
       description: editEvent.description ?? "",
-      event_date:  editEvent.event_date  ?? "",
-      event_time:  editEvent.event_time  ?? "",
-      location:    editEvent.location    ?? "",
-      status:      editEvent.status      ?? "upcoming",
+      event_date: editEvent.event_date ?? "",
+      event_time: editEvent.event_time ?? "",
+      location: editEvent.location ?? "",
+      status: editEvent.status ?? "upcoming",
     });
   }, [open, editEvent]);
 
@@ -101,7 +102,7 @@ function EditEventModal({ open, onClose, onSaved, editEvent }) {
       onClose();
     } catch (err) {
       const errs = err.response?.data?.errors;
-      const msg  = errs
+      const msg = errs
         ? Object.values(errs).flat().join("\n")
         : err.response?.data?.message ?? "An error occurred.";
       toast.error("Error", { description: msg });
@@ -274,11 +275,11 @@ function QRCodeDialog({ open, onClose, event }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
     JSON.stringify({
       event_id: event.id,
-      title:    event.title,
-      date:     event.event_date,
-      time:     event.event_time,
+      title: event.title,
+      date: event.event_date,
+      time: event.event_time,
       location: event.location,
-      qr_code:  event.qr_code,
+      qr_code: event.qr_code,
     })
   )}`;
 
@@ -373,35 +374,45 @@ function QRCodeDialog({ open, onClose, event }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function EventManagement() {
-  const [events, setEvents]             = useState([]);
+  const [events, setEvents] = useState([]);
   const [organizations, setOrganizations] = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [search, setSearch]             = useState("");
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [filterOrg, setFilterOrg]       = useState("all");
-  const [editEvent, setEditEvent]       = useState(null);
+  const [filterOrg, setFilterOrg] = useState("all");
+  const [editEvent, setEditEvent] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [qrEvent, setQrEvent]           = useState(null);
+  const [qrEvent, setQrEvent] = useState(null);
+  const { selectedYearId } = useSchoolYear();
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const [eventsRes, orgsRes] = await Promise.all([
-        axios.get("/api/events", authH()),
+        axios.get(`/api/events?school_year_id=${selectedYearId}`, authH()),
         axios.get("/api/organizations", authH()),
       ]);
       setEvents(eventsRes.data);
       setOrganizations(orgsRes.data);
     } catch (err) {
       toast.error("Error", {
-        description: err.response?.data?.message || "Failed to load data.",
+        description: err.response?.data?.message || err.message || "Failed to load data.",
       });
+      console.error("Event fetch error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    // If selectedYearId is null (but not undefined from initial render), we can stop loading.
+    // This happens when there are no school years, or one hasn't been selected yet.
+    if (selectedYearId) {
+      fetchData();
+    } else {
+      setLoading(false);
+    }
+  }, [selectedYearId]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -415,20 +426,20 @@ export default function EventManagement() {
     }
   };
 
-  const total     = events.length;
-  const upcoming  = events.filter((e) => e.status === "upcoming").length;
-  const ongoing   = events.filter((e) => e.status === "ongoing").length;
+  const total = events.length;
+  const upcoming = events.filter((e) => e.status === "upcoming").length;
+  const ongoing = events.filter((e) => e.status === "ongoing").length;
   const completed = events.filter((e) => e.status === "completed").length;
   const cancelled = events.filter((e) => e.status === "cancelled").length;
 
   const filtered = events.filter((e) => {
-    const q           = search.toLowerCase();
+    const q = search.toLowerCase();
     const matchSearch = !search
       || e.title?.toLowerCase().includes(q)
       || e.organization?.name?.toLowerCase().includes(q)
       || e.location?.toLowerCase().includes(q);
     const matchStatus = filterStatus === "all" || e.status === filterStatus;
-    const matchOrg    = filterOrg === "all" || String(e.organization_id) === filterOrg;
+    const matchOrg = filterOrg === "all" || String(e.organization_id) === filterOrg;
     return matchSearch && matchStatus && matchOrg;
   });
 
@@ -472,10 +483,10 @@ export default function EventManagement() {
 
         {/* Stat Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={Calendar}     label="Total Events" value={total}     sub={`${upcoming} upcoming`} grad="from-[#0f2d5e] to-[#1a4a8a]" />
-          <StatCard icon={Clock}        label="Upcoming"     value={upcoming}  sub="Scheduled"              grad="from-[#1e4db7] to-[#3b6fd4]" />
-          <StatCard icon={Activity}     label="Ongoing"      value={ongoing}   sub="Active now"             grad="from-[#10b981] to-[#34d399]" />
-          <StatCard icon={CheckCircle2} label="Completed"    value={completed} sub="Past events"            grad="from-[#6366f1] to-[#818cf8]" />
+          <StatCard icon={Calendar} label="Total Events" value={total} sub={`${upcoming} upcoming`} grad="from-[#0f2d5e] to-[#1a4a8a]" />
+          <StatCard icon={Clock} label="Upcoming" value={upcoming} sub="Scheduled" grad="from-[#1e4db7] to-[#3b6fd4]" />
+          <StatCard icon={Activity} label="Ongoing" value={ongoing} sub="Active now" grad="from-[#10b981] to-[#34d399]" />
+          <StatCard icon={CheckCircle2} label="Completed" value={completed} sub="Past events" grad="from-[#6366f1] to-[#818cf8]" />
         </div>
 
         {/* Table Card */}
@@ -572,8 +583,8 @@ export default function EventManagement() {
                   </tr>
                 ) : filtered.map((event) => {
                   const StatusIcon = STATUS_ICONS[event.status] || Clock;
-                  const orgScope   = event.organization?.scope || "department";
-                  const OrgIcon    = orgScope === "location" ? MapPin : orgScope === "global" ? Globe : Building2;
+                  const orgScope = event.organization?.scope || "department";
+                  const OrgIcon = orgScope === "location" ? MapPin : orgScope === "global" ? Globe : Building2;
 
                   return (
                     <tr key={event.id} className="hover:bg-blue-50/30 transition-colors group">
