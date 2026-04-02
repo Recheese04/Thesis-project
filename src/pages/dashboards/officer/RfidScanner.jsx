@@ -99,7 +99,7 @@ export default function RfidScanner() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await axios.get("/api/events", authH());
+                const res = await axios.get("/api/events?role=officer", authH());
                 setEvents(res.data);
                 if (res.data.length) setSelectedEvent(String(res.data[0].id));
             } catch {

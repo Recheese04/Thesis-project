@@ -7,7 +7,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserTypeController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\OrganizationController;
-use App\Http\Controllers\Api\MemberOrganizationController;
+use App\Http\Controllers\Api\DesignationController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\EvaluationController;
@@ -15,11 +15,13 @@ use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\GroupChatController;
 use App\Http\Controllers\Api\ConsequenceRuleController;
 use App\Http\Controllers\Api\ClearanceController;
-use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\SchoolYearController;
 use App\Http\Controllers\Api\DashboardController;
-use App\Models\Student;
-use App\Models\MemberOrganization;
+use App\Http\Controllers\Api\AnnouncementController;
+use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\ChatbotController;
+use App\Models\Designation;
+use App\Models\User;
 
 Route::post('/login', [AuthController::class , 'login'])->middleware('throttle:5,1');
 
@@ -37,10 +39,10 @@ Route::middleware('auth:sanctum')->group(function () {
                 'email' => "required|email|unique:users,email,{$user->id}",
                 'contact_number' => 'nullable|string|max:20',
             ]);
-            $user->update(['email' => $data['email']]);
-            if ($user->student) {
-                $user->student->update(['contact_number' => $data['contact_number'] ?? null]);
-            }
+            $user->update([
+                'email' => $data['email'],
+                'contact_number' => $data['contact_number'] ?? null,
+            ]);
             return response()->json(['message' => 'Profile updated successfully.']);
         }
         );
@@ -59,7 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 'is_valid' => \Illuminate\Support\Facades\Hash::check($data['current_password'], $user->getAuthPassword())
             ]);
 
-            if (!\Illuminate\Support\Facades\Hash::check($data['current_password'], $user->getAuthPassword())) { // Corrected check
+            if (!\Illuminate\Support\Facades\Hash::check($data['current_password'], $user->getAuthPassword())) {
                 return response()->json(['message' => 'Current password is incorrect.'], 422);
             }
             $user->update(['password_hash' => \Illuminate\Support\Facades\Hash::make($data['new_password'])]);
@@ -69,10 +71,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/profile/my-organizations', function (Request $request) {
             $user = $request->user();
-            if (!$user->student_id)
+            if (!$user->student_number)
                 return response()->json([]);
-            return MemberOrganization::with('organization')
-            ->where('student_id', $user->student_id)
+            return Designation::with('organization')
+            ->where('user_id', $user->id)
             ->where('status', 'active')
             ->get();
         }
@@ -80,10 +82,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/profile/join-requests', function (Request $request) {
             $user = $request->user();
-            if (!$user->student_id)
+            if (!$user->student_number)
                 return response()->json([]);
-            return MemberOrganization::with('organization')
-            ->where('student_id', $user->student_id)
+            return Designation::with('organization')
+            ->where('user_id', $user->id)
             ->where('status', 'pending')
             ->get();
         }
@@ -96,19 +98,17 @@ Route::middleware('auth:sanctum')->group(function () {
             ]);
 
             $user = $request->user();
-            if (!$user->student_id) {
+            if (!$user->student_number) {
                 return response()->json(['message' => 'Only students can upload a profile picture.'], 403);
             }
 
-            $student = $user->student;
-
             // Delete previous file if exists
-            if ($student->profile_picture) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($student->profile_picture);
+            if ($user->profile_picture) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_picture);
             }
 
             $path = $request->file('avatar')->store('avatars', 'public');
-            $student->update(['profile_picture' => $path]);
+            $user->update(['profile_picture' => $path]);
 
             return response()->json([
             'message' => 'Profile picture updated.',
@@ -119,38 +119,91 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::delete('/profile/avatar', function (Request $request) {
             $user = $request->user();
-            if (!$user->student_id) {
+            if (!$user->student_number) {
                 return response()->json(['message' => 'Only students have profile pictures.'], 403);
             }
 
-            $student = $user->student;
-            if ($student->profile_picture) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($student->profile_picture);
-                $student->update(['profile_picture' => null]);
+            if ($user->profile_picture) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_picture);
+                $user->update(['profile_picture' => null]);
             }
 
             return response()->json(['message' => 'Profile picture removed.']);
         }
         );
 
+        Route::post('/profile/join-by-code', function (Request $request) {
+            $user = $request->user();
+            if (!$user->student_number) {
+                return response()->json(['message' => 'Only students can join organizations.'], 403);
+            }
+            
+            $request->validate(['invite_code' => 'required|string']);
+            
+            $org = \App\Models\Organization::where('invite_code', strtoupper($request->invite_code))->first();
+            if (!$org) {
+                return response()->json(['message' => 'Invalid or expired invite code.'], 404);
+            }
 
+            $exists = \App\Models\Designation::where('user_id', $user->id)
+                ->where('organization_id', $org->id)
+                ->whereIn('status', ['active', 'pending'])
+                ->exists();
+                
+            if ($exists) {
+                return response()->json(['message' => 'You already have an active or pending membership in this organization.'], 422);
+            }
+            
+            \App\Models\Designation::create([
+                'user_id' => $user->id,
+                'organization_id' => $org->id,
+                'designation' => 'Member',
+                'status' => 'active', 
+                'joined_date' => now()->toDateString(),
+            ]);
+            
+            return response()->json([
+                'message' => 'Successfully joined ' . $org->name . '!',
+                'organization' => $org
+            ]);
+        });
+
+        Route::delete('/profile/organizations/{orgId}/leave', function (Request $request, $orgId) {
+            $user = $request->user();
+            if (!$user->student_number) {
+                return response()->json(['message' => 'Only students can leave organizations.'], 403);
+            }
+
+            $membership = \App\Models\Designation::where('user_id', $user->id)
+                ->where('organization_id', $orgId)
+                ->first();
+
+            if (!$membership) {
+                return response()->json(['message' => 'You are not a member of this organization.'], 404);
+            }
+
+            // Delete the membership record entirely to cleanly leave the organization
+            $membership->delete();
+
+            return response()->json(['message' => 'You have successfully left the organization.']);
+        });
 
         Route::post('/organizations/{orgId}/join-request', function (Request $request, $orgId) {
             $user = $request->user();
-            if (!$user->student_id) {
+            if (!$user->student_number) {
                 return response()->json(['message' => 'Only students can join organizations.'], 403);
             }
-            $exists = MemberOrganization::where('student_id', $user->student_id)
+            $exists = Designation::where('user_id', $user->id)
                 ->where('organization_id', $orgId)
                 ->whereIn('status', ['active', 'pending'])
                 ->exists();
             if ($exists) {
                 return response()->json(['message' => 'You already have an active or pending membership.'], 422);
             }
-            MemberOrganization::create([
-                'student_id' => $user->student_id,
+            Designation::create([
+                'user_id' => $user->id,
                 'organization_id' => $orgId,
-                'role' => 'member',
+                'designation' => 'Member',
                 'status' => 'pending',
                 'joined_date' => now()->toDateString(),
             ]);
@@ -181,10 +234,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Students
         Route::get('/students', function () {
             try {
-                $query = Student::with([
-                    'department:id,name,code',
-                    'user:id,email,is_active'
-                ])->select('id', 'student_number', 'first_name', 'last_name', 'year_level', 'department_id', 'course');
+                $query = User::whereNotNull('student_number')
+                    ->with('department:id,name,code')
+                    ->select('id', 'student_number', 'first_name', 'last_name', 'year_level', 'department_id', 'course', 'email', 'is_active');
 
                 if (request()->has('year_level') && request()->year_level != 'all') {
                     $query->where('year_level', request()->year_level);
@@ -194,26 +246,26 @@ Route::middleware('auth:sanctum')->group(function () {
                 ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->get()
-                ->map(function ($student) {
+                ->map(function ($user) {
                             return [
-                            'id' => $student->id,
-                            'name' => trim($student->first_name . ' ' . $student->last_name),
-                            'first_name' => $student->first_name,
-                            'last_name' => $student->last_name,
-                            'student_id' => $student->student_number,
-                            'email' => $student->user->email ?? null,
-                            'year_level' => $student->year_level,
-                            'department_id' => $student->department_id,
-                            'course' => $student->course ?? null,
-                            'is_active' => $student->user->is_active ?? true,
-                            'department' => $student->department ? [
-                            'id' => $student->department->id,
-                            'name' => $student->department->name,
-                            'code' => $student->department->code ?? null,
+                            'id' => $user->id,
+                            'name' => trim($user->first_name . ' ' . $user->last_name),
+                            'first_name' => $user->first_name,
+                            'last_name' => $user->last_name,
+                            'student_id' => $user->student_number,
+                            'email' => $user->email,
+                            'year_level' => $user->year_level,
+                            'department_id' => $user->department_id,
+                            'course' => $user->course ?? null,
+                            'is_active' => $user->is_active ?? true,
+                            'department' => $user->department ? [
+                            'id' => $user->department->id,
+                            'name' => $user->department->name,
+                            'code' => $user->department->code ?? null,
                             ] : null,
-                            'program' => $student->course ? [
+                            'program' => $user->course ? [
                             'id' => null,
-                            'name' => $student->course,
+                            'name' => $user->course,
                             'code' => null,
                             ] : null,
                             ];
@@ -247,38 +299,33 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::put('/organizations/{id}', [OrganizationController::class , 'update']);
                 Route::delete('/organizations/{id}', [OrganizationController::class , 'destroy']);
 
-                // Organization Members
-                Route::get('/organizations/{org_id}/students/search', [MemberOrganizationController::class , 'searchStudents']);
-                Route::get('/organizations/{org_id}/members', [MemberOrganizationController::class , 'index']);
-                Route::post('/organizations/{org_id}/members', [MemberOrganizationController::class , 'store']);
-                Route::patch('/organizations/{org_id}/members/{membershipId}/role', [MemberOrganizationController::class , 'updateRole']);
-                Route::delete('/organizations/{org_id}/members/{membershipId}', [MemberOrganizationController::class , 'destroy']);
-                Route::get('/organizations/{org_id}/members/{studentId}/attendance', [MemberOrganizationController::class , 'memberAttendance']);
+                // Organization Members (Designations)
+                Route::get('/organizations/{org_id}/students/search', [DesignationController::class , 'searchStudents']);
+                Route::get('/organizations/{org_id}/members', [DesignationController::class , 'index']);
+                Route::post('/organizations/{org_id}/members', [DesignationController::class , 'store']);
+                Route::patch('/organizations/{org_id}/members/{designationId}/role', [DesignationController::class , 'updateDesignation']);
+                Route::put('/organizations/{org_id}/members/{designationId}', [DesignationController::class , 'updateDesignation']);
+                Route::delete('/organizations/{org_id}/members/{designationId}', [DesignationController::class , 'destroy']);
+                Route::get('/organizations/{org_id}/members/{userId}/attendance', [DesignationController::class , 'memberAttendance']);
 
                 // Join Request Approvals
-                Route::post('/organizations/{org_id}/members/{membershipId}/approve', function (Request $request, $orgId, $membershipId) {
+                Route::post('/organizations/{org_id}/members/{designationId}/approve', function (Request $request, $orgId, $designationId) {
             $user = $request->user();
-            if (!$user->isAdmin()) {
-                $officerOrgId = $user->getOfficerOrganizationId();
-                if (!$officerOrgId || $officerOrgId != $orgId) {
-                    return response()->json(['message' => 'Unauthorized. Only officers of this organization can approve requests.'], 403);
-                }
+            if (!$user->isOfficerOf($orgId)) {
+                return response()->json(['message' => 'Unauthorized. Only officers of this organization can approve requests.'], 403);
             }
-            $membership = \App\Models\MemberOrganization::where('organization_id', $orgId)->findOrFail($membershipId);
-            $membership->update(['status' => 'active', 'joined_date' => now()->toDateString()]);
+            $designation = Designation::where('organization_id', $orgId)->findOrFail($designationId);
+            $designation->update(['status' => 'active', 'joined_date' => now()->toDateString()]);
             return response()->json(['message' => 'Join request approved.']);
         }
         );
-        Route::post('/organizations/{org_id}/members/{membershipId}/reject', function (Request $request, $orgId, $membershipId) {
+        Route::post('/organizations/{org_id}/members/{designationId}/reject', function (Request $request, $orgId, $designationId) {
             $user = $request->user();
-            if (!$user->isAdmin()) {
-                $officerOrgId = $user->getOfficerOrganizationId();
-                if (!$officerOrgId || $officerOrgId != $orgId) {
-                    return response()->json(['message' => 'Unauthorized. Only officers of this organization can reject requests.'], 403);
-                }
+            if (!$user->isOfficerOf($orgId)) {
+                return response()->json(['message' => 'Unauthorized. Only officers of this organization can reject requests.'], 403);
             }
-            $membership = \App\Models\MemberOrganization::where('organization_id', $orgId)->findOrFail($membershipId);
-            $membership->update(['status' => 'rejected']); // Or delete it: $membership->delete();
+            $designation = Designation::where('organization_id', $orgId)->findOrFail($designationId);
+            $designation->update(['status' => 'rejected']);
             return response()->json(['message' => 'Join request rejected.']);
         }
         );
@@ -289,24 +336,37 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/consequence-rules/{id}', [ConsequenceRuleController::class , 'update']);
         Route::delete('/consequence-rules/{id}', [ConsequenceRuleController::class , 'destroy']);
 
-        // Clearance Requirements
-        Route::get('/organizations/{orgId}/clearance-requirements', [ClearanceController::class , 'getRequirements']);
-        Route::post('/organizations/{orgId}/clearance-requirements', [ClearanceController::class , 'storeRequirement']);
+        // Membership Fees
+        Route::get('/organizations/{orgId}/membership-fees', [\App\Http\Controllers\Api\MembershipFeeController::class, 'index']);
+        Route::post('/organizations/{orgId}/membership-fees', [\App\Http\Controllers\Api\MembershipFeeController::class, 'store']);
+        Route::put('/membership-fees/{feeId}/status', [\App\Http\Controllers\Api\MembershipFeeController::class, 'updateStatus']);
+
+        // Announcements
+        Route::get('/organizations/{orgId}/announcements', [AnnouncementController::class, 'index']);
+        Route::post('/organizations/{orgId}/announcements', [AnnouncementController::class, 'store']);
+        Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
+        Route::patch('/announcements/{id}/pin', [AnnouncementController::class, 'togglePin']);
+        Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
+
+        // Documents
+        Route::get('/organizations/{orgId}/documents', [DocumentController::class, 'index']);
+        Route::post('/organizations/{orgId}/documents', [DocumentController::class, 'store']);
+        Route::delete('/documents/{id}', [DocumentController::class, 'destroy']);
+        Route::get('/documents/{id}/download', [DocumentController::class, 'download']);
 
         // Clearance Status
-        Route::get('/students/{studentId}/organizations', function ($studentId) {
+        Route::get('/students/{userId}/organizations', function ($userId) {
             try {
-                $studentId = (int)$studentId;
-                $memberships = \App\Models\MemberOrganization::with(['organization'])
-                    ->where('student_id', $studentId)
+                $userId = (int)$userId;
+                $designations = Designation::with(['organization'])
+                    ->where('user_id', $userId)
                     ->where('status', 'active')
                     ->get();
-                $orgs = $memberships->map(function ($m) {
+                $orgs = $designations->map(function ($d) {
                             return [
-                            'organization_id' => $m->organization_id,
-                            'name' => $m->organization->name,
-                            'role' => $m->role,
-                            'position' => $m->position,
+                            'organization_id' => $d->organization_id,
+                            'name' => $d->organization->name,
+                            'designation' => $d->designation,
                             ];
                         }
                         );
@@ -318,17 +378,7 @@ Route::middleware('auth:sanctum')->group(function () {
                     }
                 }
                 );
-                Route::get('/students/{studentId}/clearance', [ClearanceController::class , 'getStudentClearance']);
-                Route::get('/organizations/{orgId}/clearance', [ClearanceController::class , 'getOrgClearance']);
-                Route::post('/clearance/{requirementId}/students/{studentId}/clear', [ClearanceController::class , 'clearRequirement']);
-                Route::post('/clearance/{requirementId}/students/{studentId}/reject', [ClearanceController::class , 'rejectRequirement']);
 
-                // Tasks
-                Route::get('/organizations/{orgId}/tasks', [TaskController::class , 'index']);
-                Route::post('/organizations/{orgId}/tasks', [TaskController::class , 'store']);
-                Route::put('/tasks/{id}/complete', [TaskController::class , 'markComplete']);
-                Route::put('/tasks/{id}', [TaskController::class , 'update']);
-                Route::delete('/tasks/{id}', [TaskController::class , 'destroy']);
 
                 // Event Management
                 // ⚠️ Static routes MUST come before {id} wildcard routes
@@ -342,7 +392,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/events/{eventId}/evaluation/submit', [EvaluationController::class , 'submit']);
 
                 // Event close
-                Route::post('/events/{eventId}/close', [TaskController::class , 'closeEvent']);
+                Route::post('/events/{eventId}/close', [EventController::class , 'closeEvent']);
 
                 // Event CRUD (wildcard — must be after static routes)
                 Route::get('/events/{id}', [EventController::class , 'show']);
@@ -365,11 +415,8 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::delete('attendance/{id}', function (\Illuminate\Http\Request $request, $id) {
             $user = $request->user();
             $attendance = \App\Models\Attendance::with('event')->findOrFail($id);
-            if (!$user->isAdmin()) {
-                $officerOrgId = $user->getOfficerOrganizationId();
-                if (!$officerOrgId || !$attendance->event || $attendance->event->organization_id != $officerOrgId) {
-                    return response()->json(['message' => 'Unauthorized. You can only delete attendance records for your organization.'], 403);
-                }
+            if (!$attendance->event || !$user->isOfficerOf($attendance->event->organization_id)) {
+                return response()->json(['message' => 'Unauthorized. You can only delete attendance records for your organization.'], 403);
             }
             $attendance->delete();
             return response()->json(['message' => 'Record deleted.']);
@@ -389,14 +436,16 @@ Route::middleware('auth:sanctum')->group(function () {
         // Officer & Student specific
         Route::get('/officer/events', [EvaluationController::class , 'officerEvents']);
         Route::get('/student/evaluations', [EvaluationController::class , 'studentEvaluations']);
+        Route::get('/student/announcements', [AnnouncementController::class, 'studentIndex']);
+        Route::get('/student/documents', [DocumentController::class, 'studentIndex']);
 
         // Messages (DMs + Org group chat)
         // ⚠️ /messages/members MUST come before /messages
         Route::get('/messages/members', [MessageController::class , 'members']);
         Route::get('/messages', [MessageController::class , 'index']);
         Route::post('/messages', [MessageController::class , 'store']);
-        Route::patch('/messages/{message}', [MessageController::class , 'update']);
-        Route::delete('/messages/{message}', [MessageController::class , 'destroy']);
+        Route::patch('/messages/{id}', [MessageController::class , 'update']);
+        Route::delete('/messages/{id}', [MessageController::class , 'destroy']);
 
         // Group Chats (custom groups)
         Route::prefix('group-chats')->group(function () {
@@ -409,27 +458,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/{gc}/members/{userId}', [GroupChatController::class , 'removeMember']);
         });
 
-        // AI Summarize
-        Route::post('/summarize', function (Request $request) {
-            try {
-                $response = \Illuminate\Support\Facades\Http::withHeaders([
-                    'Authorization' => 'Bearer ' . env('HF_TOKEN'),
-                    'Content-Type' => 'application/json',
-                ])->timeout(30)->post('https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn', [
-                    'inputs' => $request->input('inputs'),
-                    'parameters' => [
-                        'max_length' => 180,
-                        'min_length' => 60,
-                        'do_sample' => false,
-                    ],
-                ]);
-                return response()->json($response->json());
-            }
-            catch (\Exception $e) {
-                return response()->json(['error' => $e->getMessage()], 500);
-            }
-        });
+        // AI Summarize (Gemini 1.5 Flash)
+        Route::post('/summarize', [EvaluationController::class, 'summarize']);
 
         // AI Chatbot
-        Route::post('/chatbot', [\App\Http\Controllers\Api\ChatbotController::class, 'handleChat']);
+        Route::post('/chatbot', [ChatbotController::class, 'handleChat']);
     });

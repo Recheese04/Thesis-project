@@ -35,13 +35,14 @@ function MessagesLayout() {
   // ── Derived state ──────────────────────────────────────────────────────────
   const isGc      = activeChat?.type === 'gc';
   const isDm      = activeChat?.type === 'pm';
-  const isOrgChat = !activeChat;
 
   const messages = isGc
     ? getGroupMessages(activeChat.groupId)
-    : getDmMessages(activeChat);
+    : isDm
+      ? getDmMessages(activeChat)
+      : [];
 
-  const loading = isGc ? gcLoading : dmLoading;
+  const loading = isGc ? gcLoading : isDm ? dmLoading : false;
   const sending = isDm ? dmSending : false;
   const error   = isDm ? dmError   : null;
 
@@ -62,7 +63,7 @@ function MessagesLayout() {
     setActiveChat(chat);
     setMobileView('chat');
 
-    if (!chat) return; // org group chat — already loaded
+    if (!chat) return; // no chat selected — ChatArea will show NoChat prompt
 
     if (chat.type === 'pm') {
       const key = `pm-${chat.userId}`;

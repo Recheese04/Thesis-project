@@ -7,35 +7,24 @@ use Illuminate\Database\Eloquent\Model;
 class Message extends Model
 {
     protected $fillable = [
-        'organization_id',
         'group_chat_id',
         'sender_id',
-        'receiver_id',
         'message',
         'image_path',
         'is_edited',
     ];
 
+    protected $casts = [
+        'is_edited' => 'boolean',
+    ];
+
     public function sender()
     {
-        return $this->belongsTo(User::class, 'sender_id')->with('student');
+        return $this->belongsTo(User::class, 'sender_id');
     }
 
-    public function receiver()
+    public function groupChat()
     {
-        return $this->belongsTo(User::class, 'receiver_id');
-    }
-
-    public function scopeGroup($query)
-    {
-        return $query->whereNull('receiver_id')->whereNull('group_chat_id');
-    }
-
-    public function scopePmThread($query, int $userA, int $userB)
-    {
-        return $query->where(function ($q) use ($userA, $userB) {
-            $q->where(fn($s) => $s->where('sender_id', $userA)->where('receiver_id', $userB))
-              ->orWhere(fn($s) => $s->where('sender_id', $userB)->where('receiver_id', $userA));
-        });
+        return $this->belongsTo(GroupChat::class, 'group_chat_id');
     }
 }

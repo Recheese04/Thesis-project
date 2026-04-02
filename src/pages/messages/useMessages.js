@@ -17,16 +17,16 @@ export const getCurrentUser = () => {
   catch { return null; }
 };
 
-// chat key: 'group' | 'pm-<userId>'
-const chatKey = (chat) => chat?.type === 'pm' ? `pm-${chat.userId}` : 'group';
+// chat key: 'pm-<userId>'
+const chatKey = (chat) => chat?.type === 'pm' ? `pm-${chat.userId}` : null;
 
 export default function useMessages() {
-  const [chats, setChats] = useState({}); // { 'group': [...], 'pm-3': [...] }
+  const [chats, setChats] = useState({}); // { 'pm-3': [...] }
   const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
-  const lastIds = useRef({});  // { 'group': 5, 'pm-3': 12 }
+  const lastIds = useRef({});  // { 'pm-3': 12 }
   const activeChat = useRef(null);
 
   const fetchMembers = useCallback(async () => {
@@ -37,16 +37,16 @@ export default function useMessages() {
   }, []);
 
   const loadChat = useCallback(async (chat) => {
+    // Only load PM chats — org group chat is no longer supported via this hook
+    if (!chat || chat.type !== 'pm') return;
     setLoading(true);
     setError(null);
     activeChat.current = chat;
     const key = chatKey(chat);
     try {
-      const params = chat?.type === 'pm'
-        ? { type: 'pm', with: chat.userId }
-        : { type: 'group' };
       const { data } = await axios.get('/api/messages', {
-        headers: authHeaders(), params,
+        headers: authHeaders(),
+        params: { type: 'pm', with: chat.userId },
       });
       const msgs = data.messages ?? [];
       setChats(prev => ({ ...prev, [key]: msgs }));
@@ -60,31 +60,28 @@ export default function useMessages() {
 
   const pollActive = useCallback(async () => {
     const chat = activeChat.current;
-    // FIX: 'undefined' guard was broken (!chat && chat !== null is always false when chat=null)
-    // activeChat.current is always null (group) or a chat object — never undefined
-    // so we just proceed; null = group chat, object = PM
+    // Only poll PM chats
+    if (!chat || chat.type !== 'pm') return;
     const key = chatKey(chat);
     const lastId = lastIds.current[key] ?? 0;
     try {
-      const params = chat?.type === 'pm'
-        ? { type: 'pm', with: chat.userId, after_id: lastId }
-        : { type: 'group', after_id: lastId };
       const { data } = await axios.get('/api/messages', {
-        headers: authHeaders(), params,
+        headers: authHeaders(),
+        params: { type: 'pm', with: chat.userId, after_id: lastId },
       });
       const newMsgs = data.messages ?? [];
       if (newMsgs.length) {
         setChats(prev => ({ ...prev, [key]: [...(prev[key] ?? []), ...newMsgs] }));
         lastIds.current[key] = newMsgs[newMsgs.length - 1].id;
-        // Refresh member list to update last-message previews
         fetchMembers();
       }
     } catch { /* silent */ }
   }, [fetchMembers]);
 
-  // Send text or image
+  // Send text or image — only supports PM chats
   const sendMessage = useCallback(async (chat, text, imageFile) => {
     if ((!text?.trim() && !imageFile) || sending) return false;
+    if (!chat || chat.type !== 'pm') return false; // guard: must be a DM
     setSending(true);
     setError(null);
     try {
@@ -92,12 +89,7 @@ export default function useMessages() {
       const form = new FormData();
       if (text?.trim()) form.append('message', text.trim());
       if (imageFile) form.append('image', imageFile);
-      if (chat?.type === 'pm') {
-        form.append('type', 'pm');
-        form.append('receiver_id', String(chat.userId));
-      } else {
-        form.append('type', 'group');
-      }
+      form.append('receiver_id', String(chat.userId));
 
       const { data } = await axios.post('/api/messages', form, {
         headers: { ...authHeaders(), 'Content-Type': 'multipart/form-data' },
@@ -116,21 +108,21 @@ export default function useMessages() {
 
   useEffect(() => {
     fetchMembers();
-    // Load group chat by default
-    loadChat(null);
+    // No longer auto-loading org group chat on mount (backend no longer supports it)
   }, []);
 
-  // FIX: Use a stable ref so the interval is never recreated when pollActive
-  // gets a new reference (which happened on every fetchMembers re-render cycle).
   const pollActiveRef = useRef(pollActive);
   useEffect(() => { pollActiveRef.current = pollActive; }, [pollActive]);
 
   useEffect(() => {
     const id = setInterval(() => pollActiveRef.current(), 4000);
     return () => clearInterval(id);
-  }, []); // runs once — no dependency churn
+  }, []);
 
-  const getMessages = (chat) => chats[chatKey(chat)] ?? [];
+  const getMessages = (chat) => {
+    const key = chatKey(chat);
+    return key ? (chats[key] ?? []) : [];
+  };
 
   const editMessage = useCallback(async (chat, messageId, newText, removeImage) => {
     try {

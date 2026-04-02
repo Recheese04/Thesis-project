@@ -9,16 +9,23 @@ import axios from 'axios';
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
 const roleConfig = {
-    officer: { label: 'Officer', bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', Icon: Shield },
-    adviser: { label: 'Adviser', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200', Icon: Briefcase },
-    member: { label: 'Member', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', Icon: User },
+    Officer: { label: 'Officer', bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', Icon: Shield },
+    Adviser: { label: 'Adviser', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200', Icon: Briefcase },
+    Member: { label: 'Member', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', Icon: User },
 };
 
-const RoleBadge = ({ role }) => {
-    const cfg = roleConfig[role] ?? roleConfig.member;
+const getRoleConfig = (designation) => {
+    if (!designation) return roleConfig.Member;
+    if (roleConfig[designation]) return roleConfig[designation];
+    if (designation !== 'Member') return roleConfig.Officer; // Default fallback for custom officer roles
+    return roleConfig.Member;
+};
+
+const RoleBadge = ({ designation }) => {
+    const cfg = getRoleConfig(designation);
     return (
         <Badge variant="outline" className={`text-xs px-3 py-1 font-semibold ${cfg.bg} ${cfg.text} ${cfg.border}`}>
-            {cfg.label}
+            {designation || 'Member'}
         </Badge>
     );
 };
@@ -38,7 +45,7 @@ export default function MemberDetailsModal({ membership, onClose }) {
     }, [membership]);
 
     if (!membership) return null;
-    const s = membership.student || {};
+    const s = membership.user || {};
     const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Unknown';
 
     return (
@@ -53,7 +60,7 @@ export default function MemberDetailsModal({ membership, onClose }) {
                 <div className="bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 p-8 flex flex-col items-center justify-center text-white relative shrink-0 overflow-hidden">
                     <div className="absolute inset-0 bg-white/5 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at top right, rgba(255,255,255,0.2), transparent 50%)' }}></div>
                     <div className="absolute top-4 left-4 text-white/90 z-10">
-                        <RoleBadge role={membership.role} />
+                        <RoleBadge designation={membership.designation} />
                     </div>
 
                     <AvatarImg name={fullName} src={s.profile_picture_url || null} size={96} className="border-4 border-white/20 shadow-2xl mb-4 relative z-10" />
@@ -76,8 +83,8 @@ export default function MemberDetailsModal({ membership, onClose }) {
                             <p className="font-semibold text-slate-900 text-sm">{s.year_level || '—'}</p>
                         </div>
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
-                            <p className="text-[11px] text-slate-500 uppercase font-bold tracking-wider mb-1">Position</p>
-                            <p className="font-semibold text-slate-900 text-sm truncate w-full">{membership.position || '—'}</p>
+                            <p className="text-[11px] text-slate-500 uppercase font-bold tracking-wider mb-1">Designation</p>
+                            <p className="font-semibold text-slate-900 text-sm truncate w-full">{membership.designation || '—'}</p>
                         </div>
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
                             <p className="text-[11px] text-slate-500 uppercase font-bold tracking-wider mb-1">Joined</p>
@@ -101,7 +108,7 @@ export default function MemberDetailsModal({ membership, onClose }) {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <p className="text-[11px] text-slate-500 uppercase font-semibold tracking-wider">Email Address</p>
-                                    <p className="text-sm font-medium text-slate-900 truncate">{s.user?.email || s.email || '—'}</p>
+                                    <p className="text-sm font-medium text-slate-900 truncate">{s.email || '—'}</p>
                                 </div>
                             </div>
 
@@ -111,7 +118,7 @@ export default function MemberDetailsModal({ membership, onClose }) {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <p className="text-[11px] text-slate-500 uppercase font-semibold tracking-wider">Phone</p>
-                                    <p className="text-sm font-medium text-slate-900">{membership.student?.contact_number || '—'}</p>
+                                    <p className="text-sm font-medium text-slate-900">{membership.user?.contact_number || '—'}</p>
                                 </div>
                             </div>
 

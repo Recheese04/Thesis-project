@@ -417,7 +417,7 @@ export default function OfficerEvents() {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`/api/events?school_year_id=${selectedYearId}`, authH());
+      const res = await axios.get(`/api/events?school_year_id=${selectedYearId}&role=officer`, authH());
       setEvents(res.data);
     } catch (err) {
       toast.error("Error", { description: err.response?.data?.message || "Failed to load events." });

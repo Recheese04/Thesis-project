@@ -37,7 +37,11 @@ function AISummaryBox({ question, responses }) {
     try {
       const res  = await fetch("/api/summarize", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { 
+          "Content-Type": "application/json", 
+          "Accept": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}` 
+        },
         body: JSON.stringify({ inputs: `Question: "${question}". Responses: ${responses.map((r, i) => `(${i + 1}) ${r}`).join(" ")}` }),
       });
       const data = await res.json();

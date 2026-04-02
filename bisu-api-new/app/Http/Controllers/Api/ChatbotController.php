@@ -16,7 +16,7 @@ class ChatbotController extends Controller
             'history' => 'array',
         ]);
 
-        $apiKey = env('GEMINI_API_KEY');
+        $apiKey = config('services.gemini.key');
         if (!$apiKey) {
             return response()->json(['error' => 'API Key not configured on the server.'], 500);
         }
@@ -59,9 +59,9 @@ PROMPT;
         ];
 
         try {
-            $response = Http::withoutVerifying()->timeout(30)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
+            $response = Http::withoutVerifying()->timeout(60)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={$apiKey}", [
                 'system_instruction' => [
-                    'parts' => ['text' => $systemPrompt]
+                    'parts' => [['text' => $systemPrompt]]
                 ],
                 'contents' => $contents,
                 'generationConfig' => [

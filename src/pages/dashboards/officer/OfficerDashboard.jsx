@@ -43,7 +43,7 @@ export default function OfficerDashboard() {
       const officerStats = statsResponse.data;
 
       // Fetch events for list
-      const eventsResponse = await axios.get(`/api/events?school_year_id=${selectedYearId}`, authH());
+      const eventsResponse = await axios.get(`/api/events?school_year_id=${selectedYearId}&role=officer`, authH());
       const events = eventsResponse.data;
       
       setStats({

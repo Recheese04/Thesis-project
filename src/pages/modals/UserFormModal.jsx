@@ -87,17 +87,15 @@ function PwdInput({ value, onChange, required, hint }) {
 // ── Add Org Row ────────────────────────────────────────────────────────────
 function AddOrgRow({ organizations, existingIds, onAdd, isOfficer }) {
   const [orgId, setOrgId]  = useState("");
-  const [orgRole, setRole] = useState("officer");
-  const [position, setPos] = useState("");
+  const [designation, setDesignation] = useState(isOfficer ? "Officer" : "Member");
 
   const available = organizations.filter(o => !existingIds.includes(String(o.id)));
 
   const handleAdd = () => {
     if (!orgId) return;
-    onAdd({ organization_id: orgId, org_role: orgRole, position });
+    onAdd({ organization_id: orgId, designation: designation || (isOfficer ? "Officer" : "Member") });
     setOrgId("");
-    setRole("officer");
-    setPos("");
+    setDesignation(isOfficer ? "Officer" : "Member");
   };
 
   return (
@@ -125,35 +123,18 @@ function AddOrgRow({ organizations, existingIds, onAdd, isOfficer }) {
         </div>
 
         {isOfficer && (
-          <div className="w-24 shrink-0 space-y-1">
-            <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Role</Label>
-            <Select value={orgRole} onValueChange={setRole}>
-              <SelectTrigger className="h-8 text-xs border-slate-200 bg-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-lg">
-                <SelectItem value="officer" className="text-xs">
-                  <div className="flex items-center gap-1.5"><Star className="w-3 h-3 text-[#1e4db7]" />Officer</div>
-                </SelectItem>
-                <SelectItem value="adviser" className="text-xs">
-                  <div className="flex items-center gap-1.5"><ShieldCheck className="w-3 h-3 text-emerald-600" />Adviser</div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex-1 min-w-0 space-y-1">
+            <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">
+              Designation <span className="normal-case font-normal text-slate-400">(optional)</span>
+            </Label>
+            <Input
+              value={designation}
+              onChange={e => setDesignation(e.target.value)}
+              placeholder="e.g. President, Secretary, Adviser"
+              className="h-8 text-xs border-slate-200 bg-white w-full"
+            />
           </div>
         )}
-
-        <div className="flex-1 min-w-0 space-y-1">
-          <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">
-            Position <span className="normal-case font-normal text-slate-400">(optional)</span>
-          </Label>
-          <Input
-            value={position}
-            onChange={e => setPos(e.target.value)}
-            placeholder={isOfficer ? "President…" : "Member…"}
-            className="h-8 text-xs border-slate-200 bg-white w-full"
-          />
-        </div>
 
         <Button type="button" onClick={handleAdd} disabled={!orgId || available.length === 0}
           className="h-8 px-3 bg-[#0f2d5e] hover:bg-[#1e4db7] text-white text-xs shrink-0 self-end">
@@ -179,12 +160,12 @@ function OrgMembershipList({ memberships, organizations, onRemove, isOfficer }) 
     <div className="space-y-2">
       {memberships.map((m, i) => {
         const orgName   = organizations.find(o => String(o.id) === m.organization_id)?.name ?? "—";
-        const roleBadge = isOfficer
-          ? m.org_role === "adviser"
+        const isOfficerRole = m.designation && m.designation !== 'Member';
+        const roleBadge = isOfficerRole
+          ? m.designation === "Adviser"
             ? "bg-emerald-50 text-emerald-700 border-emerald-200"
             : "bg-[#1e4db7]/10 text-[#1e4db7] border-[#1e4db7]/20"
           : "bg-blue-50 text-blue-600 border-blue-200";
-        const roleLabel = isOfficer ? (m.org_role ?? "officer") : "member";
 
         return (
           <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm min-w-0 overflow-hidden">
@@ -193,10 +174,9 @@ function OrgMembershipList({ memberships, organizations, onRemove, isOfficer }) 
             </div>
             <div className="flex-1 min-w-0 overflow-hidden">
               <p className="text-xs font-semibold text-slate-700 truncate">{orgName}</p>
-              {m.position && <p className="text-[11px] text-slate-400 truncate">{m.position}</p>}
             </div>
-            <Badge className={`${roleBadge} border text-[10px] font-semibold px-2 capitalize shrink-0`}>
-              {roleLabel}
+            <Badge className={`${roleBadge} border text-[10px] font-semibold px-2 shrink-0`}>
+              {m.designation || 'Member'}
             </Badge>
             <button type="button" onClick={() => onRemove(i)}
               className="text-slate-300 hover:text-red-500 shrink-0 ml-1 transition-colors">
@@ -236,18 +216,17 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, depart
         password:        "",
         user_type_id:    typeId,
         is_active:       editUser.is_active ? "1" : "0",
-        student_number:  editUser.student?.student_number ?? "",
-        first_name:      editUser.student?.first_name     ?? "",
-        middle_name:     editUser.student?.middle_name    ?? "",
-        last_name:       editUser.student?.last_name      ?? "",
-        department_id:   String(editUser.student?.department_id ?? ""),
-        year_level:      editUser.student?.year_level     ?? "",
-        contact_number:  editUser.student?.contact_number ?? "",
-        course:          editUser.student?.course         ?? "",
+        student_number:  editUser.student_number ?? "",
+        first_name:      editUser.first_name     ?? "",
+        middle_name:     editUser.middle_name    ?? "",
+        last_name:       editUser.last_name      ?? "",
+        department_id:   String(editUser.department_id ?? ""),
+        year_level:      editUser.year_level     ?? "",
+        contact_number:  editUser.contact_number ?? "",
+        course:          editUser.course         ?? "",
         org_memberships: (editUser.all_memberships ?? []).map(m => ({
           organization_id: String(m.organization_id),
-          org_role:        m.role ?? "officer",
-          position:        m.position ?? "",
+          designation:     m.designation ?? "Member",
         })),
       });
       setStep(typeId === "2" || typeId === "3" ? 3 : 1);
@@ -397,7 +376,7 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, depart
                   <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
                     <Star className="w-3.5 h-3.5 text-[#1e4db7] shrink-0 mt-0.5" />
                     <p className="text-xs text-slate-600">
-                      Officers can manage multiple organizations. Assign their role and position per org in step 3.
+                      Officers can manage multiple organizations. Assign their designation per org in step 3.
                     </p>
                   </div>
                 )}
@@ -539,7 +518,7 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, depart
                   }
                   <p className="text-xs text-slate-600">
                     {isOfficer
-                      ? <><strong>Officers</strong> can be assigned to multiple organizations with a specific role and position per org.</>
+                      ? <><strong>Officers</strong> can be assigned to multiple organizations with a specific designation per org.</>
                       : <><strong>Students</strong> can belong to multiple organizations. This is optional.</>
                     }
                   </p>
@@ -571,7 +550,7 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, depart
                           <span className="truncate">
                             {organizations.find(o => String(o.id) === m.organization_id)?.name ?? "—"}
                           </span>
-                          {isOfficer && <span className="text-slate-400 capitalize shrink-0"> · {m.org_role}</span>}
+                          {isOfficer && <span className="text-slate-400 capitalize shrink-0"> · {m.designation || 'Member'}</span>}
                         </span>
                       ))}
                     </div>

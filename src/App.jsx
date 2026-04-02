@@ -22,7 +22,6 @@ import StudentDashboard from './pages/dashboards/student/StudentDashboard';
 import StudentCheckIn from './pages/dashboards/student/StudentCheckin';
 import StudentEvents from './pages/dashboards/student/StudentEvents';
 import StudentAttendance from './pages/dashboards/student/StudentAttendance';
-import StudentClearance from './pages/dashboards/student/StudentClearance';
 import StudentAnnouncements from './pages/dashboards/student/StudentAnnouncements';
 import StudentMessages from './pages/dashboards/student/StudentMessages';
 import StudentDocuments from './pages/dashboards/student/StudentDocuments';
@@ -36,15 +35,14 @@ import OfficerDashboard from './pages/dashboards/officer/OfficerDashboard';
 import OfficerMembers from './pages/dashboards/officer/OfficerMembers';
 import OfficerEvents from './pages/dashboards/officer/OfficerEvents';
 import OfficerAttendance from './pages/dashboards/officer/OfficerAttendance';
-import OfficerTasks from './pages/dashboards/officer/OfficerTasks';
 import OfficerAnnouncements from './pages/dashboards/officer/OfficerAnnouncements';
 import OfficerMessages from './pages/dashboards/officer/OfficerMessages';
 import OfficerEvaluations from './pages/dashboards/officer/OfficerEvaluations';
-import OfficerClearance from './pages/dashboards/officer/OfficerClearance';
 import OfficerConsequenceRules from './pages/dashboards/officer/OfficerConsequenceRules';
 import OfficerFinance from './pages/dashboards/officer/OfficerFinance';
 import OfficerMinutes from './pages/dashboards/officer/OfficerMinutes';
 import OfficerAdviserDashboard from './pages/dashboards/officer/OfficerAdviserDashboard';
+import OfficerDocuments from './pages/dashboards/officer/OfficerDocuments';
 import RfidScanner from './pages/dashboards/officer/RfidScanner';
 
 function getUserRole() {
@@ -101,19 +99,19 @@ function App() {
           <Route path="members" element={<OfficerMembers />} />
           <Route path="events" element={<OfficerEvents />} />
           <Route path="attendance" element={<OfficerAttendance />} />
-          <Route path="tasks" element={<OfficerTasks />} />
+
           <Route path="announcements" element={<OfficerAnnouncements />} />
           <Route path="messages" element={<OfficerMessages />} />
           <Route path="evaluations" element={<OfficerEvaluations />} />
 
-          <Route path="clearance" element={<OfficerClearance />} />
+
           <Route path="consequence-rules" element={<OfficerConsequenceRules />} />
 
           <Route path="checkin" element={<StudentCheckIn />} />
           <Route path="my-events" element={<StudentEvents />} />
           <Route path="my-attendance" element={<StudentAttendance />} />
-          <Route path="my-clearance" element={<StudentClearance />} />
-          <Route path="documents" element={<StudentDocuments />} />
+
+          <Route path="documents" element={<OfficerDocuments />} />
           <Route path="obligations" element={<StudentObligations />} />
 
           <Route path="finance" element={<OfficerFinance />} />
@@ -129,7 +127,7 @@ function App() {
           <Route path="checkin" element={<StudentCheckIn />} />
           <Route path="events" element={<StudentEvents />} />
           <Route path="attendance" element={<StudentAttendance />} />
-          <Route path="clearance" element={<StudentClearance />} />
+
           <Route path="announcements" element={<StudentAnnouncements />} />
           <Route path="messages" element={<StudentMessages />} />
           <Route path="documents" element={<StudentDocuments />} />

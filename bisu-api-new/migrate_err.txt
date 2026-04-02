@@ -1,0 +1,5 @@
+﻿
+   INFO  Running migrations.  
+
+  2026_03_31_000001_merge_students_into_users  161.64ms DONE
+

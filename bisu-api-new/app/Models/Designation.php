@@ -6,18 +6,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\SchoolYear;
 
-class MemberOrganization extends Model
+class Designation extends Model
 {
     use HasFactory;
 
-    protected $table = 'member_organizations';
+    protected $table = 'designations';
 
     protected $fillable = [
         'organization_id',
-        'student_id',
+        'user_id',
         'school_year_id',
-        'role',
-        'position',
+        'designation',
         'joined_date',
         'status',
     ];
@@ -30,12 +29,12 @@ class MemberOrganization extends Model
 
     public function organization()
     {
-        return $this->belongsTo(Organization::class , 'organization_id');
+        return $this->belongsTo(Organization::class, 'organization_id');
     }
 
-    public function student()
+    public function user()
     {
-        return $this->belongsTo(Student::class , 'student_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function schoolYear()
@@ -52,11 +51,11 @@ class MemberOrganization extends Model
 
     public function scopeOfficers($query)
     {
-        return $query->whereIn('role', ['officer', 'adviser']);
+        return $query->whereNotIn('designation', ['Member']);
     }
 
     public function scopeMembers($query)
     {
-        return $query->where('role', 'member');
+        return $query->where('designation', 'Member');
     }
 }

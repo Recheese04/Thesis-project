@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\GroupChat;
 use App\Models\GroupChatMember;
-use App\Models\MemberOrganization;
+use App\Models\Designation;
 use App\Models\Message;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +20,7 @@ class GroupChatController extends Controller
         $groups = GroupChat::whereHas('members', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             })
-            ->with(['members.user.student', 'latestMessage.sender.student'])
+            ->with(['members.user', 'latestMessage.sender'])
             ->latest()
             ->get()
             ->map(fn($g) => $this->formatGroup($g));
@@ -40,7 +40,7 @@ class GroupChatController extends Controller
 
         $user = Auth::user();
 
-        $orgId = MemberOrganization::where('student_id', $user->student_id)
+        $orgId = Designation::where('user_id', $user->id)
             ->value('organization_id');
 
         if (!$orgId) {
@@ -71,7 +71,7 @@ class GroupChatController extends Controller
             }
         }
 
-        $group->load('members.user.student', 'latestMessage');
+        $group->load('members.user', 'latestMessage');
 
         return response()->json(['group' => $this->formatGroup($group)], 201);
     }
@@ -87,7 +87,7 @@ class GroupChatController extends Controller
         ]);
 
         $gc->update($request->only('name', 'avatar_color'));
-        $gc->load('members.user.student', 'latestMessage');
+        $gc->load('members.user', 'latestMessage');
 
         return response()->json(['group' => $this->formatGroup($gc)]);
     }
@@ -98,7 +98,7 @@ class GroupChatController extends Controller
         $this->authorizeMember($gc);
 
         $query = Message::where('group_chat_id', $gc->id)
-            ->with('sender.student')
+            ->with('sender')
             ->orderBy('id');
 
         if ($request->after_id) {
@@ -126,15 +126,13 @@ class GroupChatController extends Controller
         }
 
         $msg = Message::create([
-            'organization_id' => $gc->organization_id,
             'group_chat_id'   => $gc->id,
             'sender_id'       => Auth::id(),
-            'receiver_id'     => null,
             'message'         => $request->message ?? '',
             'image_path'      => $imagePath,
         ]);
 
-        $msg->load('sender.student');
+        $msg->load('sender');
 
         return response()->json(['message' => $this->formatMessage($msg)], 201);
     }
@@ -156,7 +154,7 @@ class GroupChatController extends Controller
             );
         }
 
-        $gc->load('members.user.student');
+        $gc->load('members.user');
 
         return response()->json(['group' => $this->formatGroup($gc)]);
     }
@@ -201,9 +199,8 @@ class GroupChatController extends Controller
     private function resolveUserName($user): string
     {
         if (!$user) return 'Unknown';
-        $student = $user->student;
-        if ($student) {
-            return trim($student->first_name . ' ' . $student->last_name);
+        if ($user->first_name && $user->last_name) {
+            return trim($user->first_name . ' ' . $user->last_name);
         }
         return $user->email;
     }

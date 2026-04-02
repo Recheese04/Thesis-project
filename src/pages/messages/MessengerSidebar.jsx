@@ -87,25 +87,9 @@ export default function MessengerSidebar({
   const { toggle, dark } = useTheme();
   const mobileLight = !dark;
 
-  // Org-wide group chat last message
-  const orgGroupMsgs  = getMessages(null);
-  const lastOrgMsg    = orgGroupMsgs[orgGroupMsgs.length - 1];
-  const orgPreview    = lastOrgMsg
-    ? (lastOrgMsg.image_url ? '📷 Photo' : `${lastOrgMsg.sender_name}: ${lastOrgMsg.message}`)
-    : 'Start the conversation…';
 
   const conversations = useMemo(() => {
     const q = search.toLowerCase();
-
-    // ── Org-wide group chat ────────────────────────────────────────────────
-    const orgChat = {
-      key: 'org-group', type: 'org',
-      name: 'Org Group Chat',
-      subtitle: orgPreview,
-      time: lastOrgMsg ? formatTime(lastOrgMsg.created_at) : '',
-      unread: 0, isOnline: false, isGroup: true,
-      avatarBg: 'from-slate-600 to-slate-800',
-    };
 
     // ── Custom group chats ─────────────────────────────────────────────────
     const gcList = groups
@@ -129,28 +113,26 @@ export default function MessengerSidebar({
       .map(m => ({
         key: `pm-${m.id}`, type: 'pm', userId: m.id,
         name: m.name,
-        subtitle: m.last_message ?? (m.position || m.role),
+        subtitle: m.last_message ?? (m.designation || m.position || m.role || 'Member'),
         time: m.last_time ? formatTime(m.last_time) : '',
         unread: m.unread ?? 0, isOnline: true, isGroup: false,
-        position: m.position, role: m.role,
+        designation: m.designation, position: m.position, role: m.role,
       }));
 
-    if (tab === 'groups') return [orgChat, ...gcList];
+    if (tab === 'groups') return gcList;
     if (tab === 'dms')    return dmList;
-    return [orgChat, ...gcList, ...dmList];
-  }, [members, groups, tab, search, orgPreview, lastOrgMsg, getGroupMessages]);
+    return [...gcList, ...dmList];
+  }, [members, groups, tab, search, getGroupMessages]);
 
   const isSelected = (conv) => {
-    if (conv.type === 'org')  return !selectedChat;
     if (conv.type === 'gc')   return selectedChat?.type === 'gc' && selectedChat.groupId === conv.groupId;
     if (conv.type === 'pm')   return selectedChat?.type === 'pm' && selectedChat.userId === conv.userId;
     return false;
   };
 
   const handleClick = (conv) => {
-    if (conv.type === 'org') { onSelectChat(null); return; }
     if (conv.type === 'gc')  { onSelectGroup({ id: conv.groupId, name: conv.name, avatar_color: conv.avatarBg }); return; }
-    onSelectChat({ type: 'pm', userId: conv.userId, name: conv.name, role: conv.role, position: conv.position });
+    onSelectChat({ type: 'pm', userId: conv.userId, name: conv.name, designation: conv.designation, role: conv.role, position: conv.position });
   };
 
   // ── Theme tokens ──────────────────────────────────────────────────────────

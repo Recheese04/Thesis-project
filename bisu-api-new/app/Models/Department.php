@@ -11,9 +11,9 @@ class Department extends Model
 
     protected $fillable = ['name', 'code', 'description'];
 
-    public function students()
+    public function users()
     {
-        return $this->hasMany(Student::class);
+        return $this->hasMany(User::class);
     }
 
     public function organizations()

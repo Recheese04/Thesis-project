@@ -41,12 +41,12 @@ const ROLE_META = {
 };
 
 const getInitials = (u) =>
-  u?.student
-    ? `${u.student.first_name?.[0] ?? ""}${u.student.last_name?.[0] ?? ""}`.toUpperCase()
+  u?.first_name || u?.last_name
+    ? `${u.first_name?.[0] ?? ""}${u.last_name?.[0] ?? ""}`.toUpperCase()
     : u?.email?.[0]?.toUpperCase() ?? "?";
 
 const getFullName = (u) =>
-  u?.student ? `${u.student.first_name} ${u.student.last_name}` : "System Admin";
+  u?.first_name || u?.last_name ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : "System Admin";
 
 // ── Stat Card ──────────────────────────────────────────────────────────────
 function StatCard({ icon: Icon, label, value, sub, grad }) {
@@ -176,18 +176,18 @@ export default function UserManagement() {
     const matchSearch = !search
       || getFullName(u).toLowerCase().includes(q)
       || u.email?.toLowerCase().includes(q)
-      || u.student?.student_number?.toLowerCase().includes(q);
+      || u.student_number?.toLowerCase().includes(q);
     const matchRole = filterRole === "all" || String(u.user_type_id) === filterRole;
-    const matchYear = filterYear === "all" || u.student?.year_level === filterYear;
-    const matchDept = filterDept === "all" || String(u.student?.department_id) === filterDept;
-    const matchCourse = filterCourse === "all" || u.student?.course === filterCourse;
+    const matchYear = filterYear === "all" || u.year_level === filterYear;
+    const matchDept = filterDept === "all" || String(u.department_id) === filterDept;
+    const matchCourse = filterCourse === "all" || u.course === filterCourse;
     const matchOrg = filterOrg === "all"
       || (u.all_memberships ?? []).some(m => String(m.organization_id) === filterOrg);
     return matchSearch && matchRole && matchYear && matchDept && matchCourse && matchOrg;
   });
 
-  const availableYears = [...new Set(users.map(u => u.student?.year_level).filter(Boolean))].sort();
-  const availableCourses = [...new Set(users.map(u => u.student?.course).filter(Boolean))].sort();
+  const availableYears = [...new Set(users.map(u => u.year_level).filter(Boolean))].sort();
+  const availableCourses = [...new Set(users.map(u => u.course).filter(Boolean))].sort();
   const activeFiltersCount = [filterYear, filterDept, filterCourse, filterOrg].filter(f => f !== "all").length;
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
@@ -389,7 +389,7 @@ export default function UserManagement() {
                   const rk = String(user.user_type_id);
                   const meta = ROLE_META[rk];
                   const Ico = meta?.icon ?? UserCircle;
-                  const deptName = user.student?.department?.name ?? departments.find(d => d.id === user.student?.department_id)?.name ?? null;
+                  const deptName = user.department?.name ?? departments.find(d => d.id === user.department_id)?.name ?? null;
                   const allMemberships = user.all_memberships ?? [];
 
                   return (
@@ -398,7 +398,7 @@ export default function UserManagement() {
                         <div className="flex items-center gap-3">
                           <div className="relative shrink-0">
                             <AvatarImg
-                              src={user.student?.profile_picture_url || null}
+                              src={user.profile_picture_url || null}
                               name={getFullName(user)}
                               size={36}
                             />
@@ -415,7 +415,7 @@ export default function UserManagement() {
                                   <span key={i} className="inline-flex items-center gap-0.5 bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-medium px-1.5 py-0.5 rounded-full">
                                     <Users className="w-2.5 h-2.5" />
                                     {m.organization?.name ?? "—"}
-                                    {rk === "2" && <span className="text-slate-400 capitalize"> · {m.role}</span>}
+                                    {rk === "2" && <span className="text-slate-400 capitalize"> · {m.designation || 'Member'}</span>}
                                   </span>
                                 ))}
                               </div>
@@ -425,7 +425,7 @@ export default function UserManagement() {
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="text-sm font-mono text-slate-500">
-                          {user.student?.student_number ?? <span className="text-slate-300 text-xs">—</span>}
+                          {user.student_number ?? <span className="text-slate-300 text-xs">—</span>}
                         </span>
                       </td>
                       <td className="px-5 py-3.5 max-w-[120px]">
@@ -434,8 +434,8 @@ export default function UserManagement() {
                           : <span className="text-slate-300 text-xs">—</span>}
                       </td>
                       <td className="px-5 py-3.5 max-w-[160px]">
-                        {user.student?.course
-                          ? <div className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" /><span className="text-sm text-slate-600 truncate" title={user.student.course}>{user.student.course}</span></div>
+                        {user.course
+                          ? <div className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" /><span className="text-sm text-slate-600 truncate" title={user.course}>{user.course}</span></div>
                           : <span className="text-slate-300 text-xs">—</span>}
                       </td>
                       <td className="px-5 py-3.5">
@@ -444,8 +444,8 @@ export default function UserManagement() {
                         </Badge>
                       </td>
                       <td className="px-5 py-3.5 text-sm text-slate-500 whitespace-nowrap">
-                        {user.student?.year_level
-                          ? <div className="flex items-center gap-1.5"><GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />{user.student.year_level}</div>
+                        {user.year_level
+                          ? <div className="flex items-center gap-1.5"><GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />{user.year_level}</div>
                           : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-5 py-3.5">

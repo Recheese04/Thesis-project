@@ -179,7 +179,7 @@ function DepartmentFormModal({ open, onClose, onSaved, editDept }) {
 
 // ── Delete Confirmation ────────────────────────────────────────────────────
 function DeleteDialog({ open, onClose, onConfirm, department }) {
-  const canDelete = department && department.students_count === 0 && department.organizations_count === 0;
+  const canDelete = department && department.users_count === 0 && department.organizations_count === 0;
 
   return (
     <AlertDialog open={open} onOpenChange={v => !v && onClose()}>
@@ -201,7 +201,7 @@ function DeleteDialog({ open, onClose, onConfirm, department }) {
             ) : (
               <>
                 <strong className="text-slate-700">{department?.name}</strong> has{' '}
-                <strong className="text-amber-600">{department?.students_count || 0} student(s)</strong> and{' '}
+                <strong className="text-amber-600">{department?.users_count || 0} student(s)</strong> and{' '}
                 <strong className="text-amber-600">{department?.organizations_count || 0} organization(s)</strong>. 
                 Remove all associations before deleting.
               </>
@@ -269,7 +269,7 @@ export default function DepartmentManagement() {
   };
 
   const total = departments.length;
-  const totalStudents = departments.reduce((sum, d) => sum + (d.students_count || 0), 0);
+  const totalStudents = departments.reduce((sum, d) => sum + (d.users_count || 0), 0);
   const totalOrgs = departments.reduce((sum, d) => sum + (d.organizations_count || 0), 0);
 
   const filtered = departments.filter(d => {
@@ -410,7 +410,7 @@ export default function DepartmentManagement() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-slate-400" />
-                        <span className="text-sm text-slate-600 font-medium">{dept.students_count || 0}</span>
+                        <span className="text-sm text-slate-600 font-medium">{dept.users_count || 0}</span>
                       </div>
                     </td>
 

@@ -1,0 +1,27 @@
+=== member_organizations ===
+Foreign Keys on student_id:
+Indexes on student_id:
+- unique_member_org
+- student_id
+=== attendances ===
+Foreign Keys on student_id:
+- attendances_ibfk_2
+Indexes on student_id:
+- unique_attendance
+- student_id
+=== student_clearances ===
+Foreign Keys on student_id:
+- student_clearance_student_fk
+Indexes on student_id:
+- unique_student_requirement
+=== evaluation_responses ===
+Foreign Keys on student_id:
+- evaluation_responses_ibfk_2
+Indexes on student_id:
+- unique_student_evaluation
+- student_id
+=== users ===
+Foreign Keys on student_id:
+- fk_users_student
+Indexes on student_id:
+- fk_users_student

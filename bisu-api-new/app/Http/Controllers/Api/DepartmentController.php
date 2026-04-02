@@ -16,7 +16,7 @@ class DepartmentController extends Controller
         try {
             // Check if Department model exists and has required methods
             $departments = Department::query()
-                ->withCount(['students', 'organizations'])
+                ->withCount(['users', 'organizations'])
                 ->orderBy('name', 'asc')
                 ->get();
 
@@ -36,7 +36,7 @@ class DepartmentController extends Controller
     public function show($id)
     {
         try {
-            $department = Department::withCount(['students', 'organizations'])
+            $department = Department::withCount(['users', 'organizations'])
                 ->findOrFail($id);
 
             return response()->json($department);
@@ -62,7 +62,7 @@ class DepartmentController extends Controller
             $department = Department::create($data);
 
             // Load counts after creation
-            $department->loadCount(['students', 'organizations']);
+            $department->loadCount(['users', 'organizations']);
 
             return response()->json([
                 'message' => 'Department has been created successfully!',
@@ -102,7 +102,7 @@ class DepartmentController extends Controller
             $department->update($data);
 
             // Load counts after update
-            $department->loadCount(['students', 'organizations']);
+            $department->loadCount(['users', 'organizations']);
 
             return response()->json([
                 'message' => 'Department has been updated successfully!',
@@ -127,13 +127,13 @@ class DepartmentController extends Controller
     public function destroy($id)
     {
         try {
-            $department = Department::withCount(['students', 'organizations'])->findOrFail($id);
+            $department = Department::withCount(['users', 'organizations'])->findOrFail($id);
 
             // Check if department has any students or organizations
-            if ($department->students_count > 0 || $department->organizations_count > 0) {
+            if ($department->users_count > 0 || $department->organizations_count > 0) {
                 return response()->json([
-                    'message' => 'Cannot delete department with existing students or organizations.',
-                    'students_count' => $department->students_count,
+                    'message' => 'Cannot delete department with existing users or organizations.',
+                    'users_count' => $department->users_count,
                     'organizations_count' => $department->organizations_count,
                 ], 422);
             }

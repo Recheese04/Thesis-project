@@ -5,12 +5,15 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Wallet, TrendingUp, Users, CheckCircle, Clock, AlertTriangle,
     Loader2, RefreshCw, Search, DollarSign, ArrowUpRight, ArrowDownRight,
-    PieChart, Receipt, BadgeCheck, CreditCard, BarChart3, Filter,
+    PieChart, Receipt, BadgeCheck, CreditCard, BarChart3, Filter, Plus
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardDescription, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import axios from 'axios';
 
 const api = () =>
@@ -78,20 +81,28 @@ export default function OfficerFinance() {
     const orgId = getOrgId();
 
     const [members, setMembers] = useState([]);
+    const [expandedMembers, setExpandedMembers] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
-    const [filter, setFilter] = useState('all'); // all | cleared | pending
+    const [filter, setFilter] = useState('all'); // all | fully_paid | pending | none
+    
+    // Gen fee modal
+    const [showGenModal, setShowGenModal] = useState(false);
+    const [feeName, setFeeName] = useState('');
+    const [feeDescription, setFeeDescription] = useState('');
+    const [feeAmount, setFeeAmount] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const schoolYear = '2025-2026';
     const semester = '2nd';
 
-    const fetchClearance = useCallback(async () => {
+    const fetchFees = useCallback(async () => {
         if (!orgId) return;
         setLoading(true);
         setError(null);
         try {
-            const { data } = await api().get(`/organizations/${orgId}/clearance`, {
+            const { data } = await api().get(`/organizations/${orgId}/membership-fees`, {
                 params: { school_year: schoolYear, semester },
             });
             setMembers(data);
@@ -102,42 +113,71 @@ export default function OfficerFinance() {
         }
     }, [orgId]);
 
-    useEffect(() => { fetchClearance(); }, [fetchClearance]);
+    useEffect(() => { fetchFees(); }, [fetchFees]);
+    
+    const handleGenerateFees = async (e) => {
+        e.preventDefault();
+        if(!feeName || !feeAmount || isNaN(feeAmount) || Number(feeAmount) < 0) return;
+        
+        setIsGenerating(true);
+        try {
+            await api().post(`/organizations/${orgId}/membership-fees`, {
+                name: feeName,
+                description: feeDescription,
+                amount: parseFloat(feeAmount)
+            });
+            setShowGenModal(false);
+            setFeeName('');
+            setFeeDescription('');
+            setFeeAmount('');
+            fetchFees();
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to generate fees.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+    
+    const updateFeeStatus = async (feeId, status) => {
+        try {
+            await api().put(`/membership-fees/${feeId}/status`, { status });
+            // local update
+            setMembers(prev => prev.map(m => ({
+                ...m,
+                fees: m.fees.map(f => f.id === feeId ? { ...f, status } : f)
+            })));
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to update status.');
+        }
+    };
+
+    const toggleAccordion = (studentId) => {
+        setExpandedMembers(prev => ({ ...prev, [studentId]: !prev[studentId] }));
+    };
 
     // ── Computations ──────────────────────────────────────────────────────────
     const totalMembers = members.length;
-    const allReqs = members.flatMap((m) => m.requirements || []);
-    const paymentReqs = allReqs.filter((r) => r.amount && parseFloat(r.amount) > 0);
-    const clearedPayments = paymentReqs.filter((r) => r.status === 'cleared');
-    const pendingPayments = paymentReqs.filter((r) => r.status !== 'cleared');
+    const allFees = members.flatMap(m => m.fees);
+    const clearedPayments = allFees.filter((f) => f.status === 'paid');
+    const pendingPayments = allFees.filter((f) => f.status !== 'paid');
 
-    // Budget = sum of all requirement amounts × members who have that requirement
-    // Target revenue = unique requirements with amounts × total members
-    const uniqueReqs = {};
-    allReqs.forEach((r) => {
-        if (r.amount && parseFloat(r.amount) > 0 && !uniqueReqs[r.requirement_id]) {
-            uniqueReqs[r.requirement_id] = { name: r.name, amount: parseFloat(r.amount), cleared: 0, total: 0 };
-        }
-        if (uniqueReqs[r.requirement_id]) {
-            uniqueReqs[r.requirement_id].total++;
-            if (r.status === 'cleared') uniqueReqs[r.requirement_id].cleared++;
-        }
-    });
-
-    const reqBreakdown = Object.values(uniqueReqs);
-    const targetRevenue = reqBreakdown.reduce((s, r) => s + r.amount * r.total, 0);
-    const collectedRevenue = reqBreakdown.reduce((s, r) => s + r.amount * r.cleared, 0);
+    const targetRevenue = allFees.reduce((s, f) => s + parseFloat(f.amount || 0), 0);
+    const collectedRevenue = clearedPayments.reduce((s, f) => s + parseFloat(f.amount || 0), 0);
     const pendingRevenue = targetRevenue - collectedRevenue;
     const collectionRate = targetRevenue > 0 ? (collectedRevenue / targetRevenue) * 100 : 0;
 
-    // Per-member clearance: fully cleared count
-    const fullyClearedMembers = members.filter((m) => m.overall === 'cleared').length;
+    const fullyClearedMembers = members.filter(m => m.fees.length > 0 && m.fees.every(f => f.status === 'paid')).length;
 
     // Filter & search
     const filtered = members.filter((m) => {
         const matchName = m.student_name.toLowerCase().includes(search.toLowerCase());
-        if (filter === 'cleared') return matchName && m.overall === 'cleared';
-        if (filter === 'pending') return matchName && m.overall !== 'cleared';
+        const isFullyPaid = m.fees.length > 0 && m.fees.every(f => f.status === 'paid');
+        const isPending = m.fees.some(f => f.status !== 'paid');
+        const hasNoFee = m.fees.length === 0;
+        
+        if (filter === 'fully_paid') return matchName && isFullyPaid;
+        if (filter === 'pending') return matchName && isPending;
+        if (filter === 'none') return matchName && hasNoFee;
         return matchName;
     });
 
@@ -160,13 +200,77 @@ export default function OfficerFinance() {
                         </div>
                         Treasury Dashboard
                     </h1>
-                    <p className="text-slate-500 mt-1 text-sm">{schoolYear} — {semester} Semester</p>
+                    <p className="text-slate-500 mt-1 text-sm">Membership Fees Tracker</p>
                 </div>
-                <Button variant="outline" onClick={fetchClearance} disabled={loading} className="gap-2 rounded-xl">
-                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button onClick={() => setShowGenModal(true)} className="gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">
+                        <Plus className="w-4 h-4" />
+                        Generate Fees
+                    </Button>
+                    <Button variant="outline" onClick={fetchFees} disabled={loading} className="gap-2 rounded-xl">
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        Refresh
+                    </Button>
+                </div>
             </div>
+
+            {/* ── Gen Fees Modal ── */}
+            <Dialog open={showGenModal} onOpenChange={setShowGenModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Generate Membership Fees</DialogTitle>
+                        <DialogDescription>
+                            This will create a pending fee record for all active members who don't have one yet.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleGenerateFees} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Fee Name (e.g. 2nd Sem Reg Fee)</label>
+                            <input
+                                type="text"
+                                value={feeName}
+                                onChange={e => setFeeName(e.target.value)}
+                                placeholder="Membership Fee"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label>
+                            <textarea
+                                value={feeDescription}
+                                onChange={e => setFeeDescription(e.target.value)}
+                                placeholder="What is this fee for?"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                rows={2}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Fee Amount (₱)</label>
+                            <div className="relative">
+                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={feeAmount}
+                                    onChange={e => setFeeAmount(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setShowGenModal(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isGenerating} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                                {isGenerating && <Loader2 className="w-4 h-4 animate-spin" />}
+                                Generate Fees
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {/* ── Loading ── */}
             {loading && (
@@ -234,7 +338,7 @@ export default function OfficerFinance() {
                                                 <span className="text-xs font-medium text-amber-700">Pending</span>
                                             </div>
                                             <p className="text-xl font-bold text-amber-700">{peso(pendingRevenue)}</p>
-                                            <p className="text-xs text-amber-500 mt-1">{pendingPayments.length} payments</p>
+                                            <p className="text-xs text-amber-500 mt-1">{pendingPayments.length} pending</p>
                                         </div>
 
                                         <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
@@ -248,58 +352,16 @@ export default function OfficerFinance() {
                                         <div className="p-4 rounded-xl bg-purple-50 border border-purple-100">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <BadgeCheck className="w-4 h-4 text-purple-600" />
-                                                <span className="text-xs font-medium text-purple-700">Fully Cleared</span>
+                                                <span className="text-xs font-medium text-purple-700">Fully Paid</span>
                                             </div>
                                             <p className="text-xl font-bold text-purple-700">{fullyClearedMembers}</p>
-                                            <p className="text-xs text-purple-500 mt-1">of {totalMembers} members</p>
+                                            <p className="text-xs text-purple-500 mt-1">cleared members</p>
                                         </div>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
                     </div>
-
-                    {/* ── Revenue Breakdown by Requirement ── */}
-                    {reqBreakdown.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <BarChart3 className="w-5 h-5 text-emerald-600" />
-                                    Revenue Breakdown
-                                </CardTitle>
-                                <CardDescription>Collection progress per fee / requirement</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {reqBreakdown.map((r) => {
-                                        const pct = r.total > 0 ? (r.cleared / r.total) * 100 : 0;
-                                        return (
-                                            <div key={r.name} className="space-y-2">
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        <CreditCard className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                                                        <span className="font-medium text-slate-800 truncate">{r.name}</span>
-                                                        <Badge variant="outline" className="text-[10px] flex-shrink-0">{peso(r.amount)}</Badge>
-                                                    </div>
-                                                    <div className="flex items-center gap-3 flex-shrink-0 text-xs text-slate-500">
-                                                        <span className="text-emerald-600 font-semibold">{peso(r.amount * r.cleared)}</span>
-                                                        <span>/</span>
-                                                        <span>{peso(r.amount * r.total)}</span>
-                                                        <span className="font-medium text-slate-700 tabular-nums w-10 text-right">{Math.round(pct)}%</span>
-                                                    </div>
-                                                </div>
-                                                <MiniBar value={r.cleared} max={r.total} />
-                                                <div className="flex justify-between text-[11px] text-slate-400">
-                                                    <span>{r.cleared} of {r.total} paid</span>
-                                                    <span>{r.total - r.cleared} remaining</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
 
                     {/* ── Member Payment Tracker ── */}
                     <Card>
@@ -308,7 +370,7 @@ export default function OfficerFinance() {
                                 <div>
                                     <CardTitle className="text-base flex items-center gap-2">
                                         <Receipt className="w-5 h-5 text-emerald-600" />
-                                        Member Payment Status
+                                        Membership Fees Status
                                     </CardTitle>
                                     <CardDescription className="mt-1">Individual payment breakdown per member</CardDescription>
                                 </div>
@@ -317,9 +379,10 @@ export default function OfficerFinance() {
                                 <div className="flex items-center gap-2">
                                     <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
                                         {[
-                                            { key: 'all', label: 'All', count: members.length },
-                                            { key: 'cleared', label: 'Cleared', count: fullyClearedMembers },
-                                            { key: 'pending', label: 'Pending', count: totalMembers - fullyClearedMembers },
+                                            { key: 'all', label: 'All', count: totalMembers },
+                                            { key: 'fully_paid', label: 'Fully Paid', count: fullyClearedMembers },
+                                            { key: 'pending', label: 'Pending', count: members.filter(m => m.fees.some(f => f.status !== 'paid')).length },
+                                            { key: 'none', label: 'No Fees', count: members.filter(m => m.fees.length === 0).length },
                                         ].map((f) => (
                                             <button
                                                 key={f.key}
@@ -356,77 +419,101 @@ export default function OfficerFinance() {
                                     <p className="text-sm">No members match your search.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-2">
+                                <div className="space-y-4">
                                     {filtered.map((member) => {
-                                        const reqs = member.requirements || [];
-                                        const paidReqs = reqs.filter((r) => r.status === 'cleared' && r.amount && parseFloat(r.amount) > 0);
-                                        const totalFees = reqs.reduce((s, r) => s + (r.amount ? parseFloat(r.amount) : 0), 0);
-                                        const paidFees = paidReqs.reduce((s, r) => s + parseFloat(r.amount), 0);
-                                        const allClear = member.overall === 'cleared';
-                                        const pct = reqs.length > 0 ? (member.cleared / member.total) * 100 : 0;
+                                        const totalFees = member.fees.length;
+                                        const paidFees = member.fees.filter(f => f.status === 'paid').length;
+                                        const isExpanded = expandedMembers[member.student_id] || search !== '';
+                                        const pct = totalFees > 0 ? (paidFees / totalFees) * 100 : 0;
+                                        const isFullyPaid = totalFees > 0 && paidFees === totalFees;
 
                                         return (
-                                            <div
-                                                key={member.student_id}
-                                                className={`flex items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-sm ${allClear ? 'bg-emerald-50/40 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'
-                                                    }`}
-                                            >
-                                                {/* Avatar */}
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${allClear
-                                                        ? 'bg-gradient-to-br from-emerald-500 to-emerald-600'
-                                                        : 'bg-gradient-to-br from-slate-400 to-slate-500'
-                                                    }`}>
-                                                    {member.student_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                                            <div key={member.student_id} className={`border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm transition-all ${isFullyPaid ? 'border-emerald-200' : ''}`}>
+                                                
+                                                {/* Member Header (Accordion toggle) */}
+                                                <div 
+                                                    onClick={() => toggleAccordion(member.student_id)} 
+                                                    className={`flex flex-wrap items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors gap-4 ${isFullyPaid ? 'bg-emerald-50/30' : ''}`}
+                                                >
+                                                    <div className="flex items-center gap-3 min-w-[200px] flex-1">
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-inner ${isFullyPaid
+                                                            ? 'bg-gradient-to-br from-emerald-500 to-emerald-600'
+                                                            : 'bg-gradient-to-br from-slate-500 to-slate-600'}`}
+                                                        >
+                                                            {member.student_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                                                {member.student_name}
+                                                                {isFullyPaid && <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none px-1.5 py-0 shadow-none"><CheckCircle className="w-3 h-3 mr-1" /> Cleared</Badge>}
+                                                            </h3>
+                                                            <p className="text-xs text-slate-500 mt-0.5">{member.student_number || 'No ID'}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="flex items-center gap-6">
+                                                        <div className="text-right hidden sm:block w-32">
+                                                            <p className="text-sm font-semibold text-slate-700">{paidFees} / {totalFees} Fees Paid</p>
+                                                            <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                                                                <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                                                            </div>
+                                                        </div>
+                                                        <div className={`p-2 rounded-full transition-all ${isExpanded ? 'bg-slate-100 text-slate-900 rotate-180' : 'text-slate-400 hover:bg-slate-100'}`}>
+                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
-                                                {/* Name + progress */}
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="font-semibold text-slate-900 text-sm truncate">{member.student_name}</p>
-                                                        {allClear && (
-                                                            <Badge className="bg-emerald-100 text-emerald-700 text-[10px] gap-1">
-                                                                <CheckCircle className="w-3 h-3" /> Cleared
-                                                            </Badge>
+                                                {/* Expanded Fees List for this Member */}
+                                                {isExpanded && (
+                                                    <div className="border-t border-slate-100 bg-slate-50/50 p-4 space-y-2">
+                                                        {member.fees.length === 0 ? (
+                                                            <p className="text-xs text-slate-400 italic text-center py-2">No fees assigned.</p>
+                                                        ) : (
+                                                            member.fees.map((fee) => {
+                                                                const isPaid = fee.status === 'paid';
+
+                                                                return (
+                                                                    <div
+                                                                        key={fee.id}
+                                                                        className={`flex items-center justify-between gap-4 p-3 rounded-lg border transition-all hover:shadow-sm ${isPaid ? 'bg-emerald-50/40 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'}`}
+                                                                    >
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <p className="font-semibold text-slate-900 text-sm">{fee.name}</p>
+                                                                                <span className={`text-sm font-bold ${isPaid ? 'text-emerald-700' : 'text-slate-700'}`}>
+                                                                                    {peso(parseFloat(fee.amount))}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2 mt-1">
+                                                                                {isPaid ? (
+                                                                                    <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Paid</span>
+                                                                                ) : (
+                                                                                    <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1"><Clock className="w-3 h-3" /> Pending</span>
+                                                                                )}
+                                                                                {fee.description && (
+                                                                                    <span className="text-[11px] text-slate-400 border-l border-slate-200 pl-2 truncate">{fee.description}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        <div className="flex-shrink-0 ml-2">
+                                                                            {isPaid ? (
+                                                                                <Button size="sm" variant="outline" onClick={() => updateFeeStatus(fee.id, 'pending')} className="h-8 text-xs font-medium px-3 text-slate-600 hover:text-slate-900">
+                                                                                    Undo
+                                                                                </Button>
+                                                                            ) : (
+                                                                                <Button size="sm" onClick={() => updateFeeStatus(fee.id, 'paid')} className="h-8 text-xs font-semibold px-4 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow">
+                                                                                    Mark as Paid
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })
                                                         )}
                                                     </div>
-                                                    <div className="flex items-center gap-2 mt-1.5">
-                                                        <MiniBar
-                                                            value={member.cleared}
-                                                            max={member.total}
-                                                            color={allClear ? 'bg-emerald-500' : 'bg-amber-500'}
-                                                        />
-                                                        <span className="text-xs text-slate-400 flex-shrink-0 w-10">{member.cleared}/{member.total}</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Amount */}
-                                                <div className="text-right flex-shrink-0">
-                                                    <p className={`text-sm font-bold ${allClear ? 'text-emerald-600' : 'text-slate-800'}`}>
-                                                        {peso(paidFees)}
-                                                    </p>
-                                                    {totalFees > 0 && !allClear && (
-                                                        <p className="text-[11px] text-slate-400">of {peso(totalFees)}</p>
-                                                    )}
-                                                </div>
-
-                                                {/* Requirement badges */}
-                                                <div className="hidden lg:flex items-center gap-1.5 flex-shrink-0 max-w-[300px] flex-wrap justify-end">
-                                                    {reqs.map((r) => (
-                                                        <Badge
-                                                            key={r.requirement_id}
-                                                            className={`text-[10px] cursor-default ${r.status === 'cleared'
-                                                                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                                                    : r.status === 'rejected'
-                                                                        ? 'bg-red-100 text-red-600 border-red-200'
-                                                                        : 'bg-slate-100 text-slate-500 border-slate-200'
-                                                                }`}
-                                                            title={`${r.name}${r.amount ? ` — ${peso(parseFloat(r.amount))}` : ''}`}
-                                                        >
-                                                            {r.status === 'cleared' ? '✓' : r.status === 'rejected' ? '✗' : '⏳'}{' '}
-                                                            {r.name?.length > 12 ? r.name.slice(0, 12) + '…' : r.name}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
+                                                )}
                                             </div>
                                         );
                                     })}

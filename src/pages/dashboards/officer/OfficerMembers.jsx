@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   Users, Search, Mail, Phone, MoreVertical, UserPlus,
   X, ChevronDown, Shield, User, Briefcase, Loader2,
-  AlertCircle, CheckCircle2, ArrowUpCircle,
+  AlertCircle, CheckCircle2, ArrowUpCircle, Copy,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,19 +44,26 @@ const apiFetch = async (path, options = {}) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Role helpers
 // ─────────────────────────────────────────────────────────────────────────────
-const ROLES = ['member', 'officer', 'adviser'];
+const ROLES = ['Member', 'Officer', 'Adviser', 'President', 'Vice President', 'Secretary', 'Treasurer', 'Auditor'];
 
 const roleConfig = {
-  officer: { label: 'Officer', bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', Icon: Shield },
-  adviser: { label: 'Adviser', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200', Icon: Briefcase },
-  member: { label: 'Member', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', Icon: User },
+  Officer: { label: 'Officer', bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', Icon: Shield },
+  Adviser: { label: 'Adviser', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200', Icon: Briefcase },
+  Member: { label: 'Member', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', Icon: User },
 };
 
-const RoleBadge = ({ role }) => {
-  const cfg = roleConfig[role] ?? roleConfig.member;
+const getRoleConfig = (designation) => {
+  if (!designation) return roleConfig.Member;
+  if (roleConfig[designation]) return roleConfig[designation];
+  if (designation !== 'Member') return roleConfig.Officer; // Default fallback for custom officer roles
+  return roleConfig.Member;
+};
+
+const RoleBadge = ({ designation }) => {
+  const cfg = getRoleConfig(designation);
   return (
     <Badge variant="outline" className={`text-xs px-2 py-0.5 ${cfg.bg} ${cfg.text} ${cfg.border}`}>
-      {cfg.label}
+      {designation || 'Member'}
     </Badge>
   );
 };
@@ -103,35 +110,35 @@ const POSITIONS = [
 ];
 
 const PromoteDialog = ({ membership, orgId, onClose, onSaved, pushToast }) => {
-  const [role, setRole] = useState(membership.role);
-  const initPos = membership.position ?? '';
-  const isPreset = POSITIONS.some(p => p.toLowerCase() === initPos.toLowerCase());
-  const [positionSelect, setPositionSelect] = useState(isPreset ? initPos : (initPos ? 'Other' : ''));
-  const [customPosition, setCustomPosition] = useState(isPreset ? '' : initPos);
+  const [designation, setDesignation] = useState(membership.designation || 'Member');
+  const isPreset = ROLES.some(p => p.toLowerCase() === designation.toLowerCase());
+  const [positionSelect, setPositionSelect] = useState(isPreset ? designation : (designation ? 'Other' : ''));
+  const [customPosition, setCustomPosition] = useState(isPreset ? '' : designation);
   const [saving, setSaving] = useState(false);
 
-  // Auto-set role to 'officer' when a named position is assigned
   const handlePositionChange = (v) => {
     setPositionSelect(v);
-    if (v !== 'Other') setCustomPosition('');
-    if (v && v !== '') setRole('officer');
+    if (v !== 'Other') {
+      setCustomPosition('');
+      setDesignation(v);
+    }
   };
 
-  const fullName = membership.student
-    ? `${membership.student.first_name} ${membership.student.last_name}`
+  const fullName = membership.user
+    ? `${membership.user.first_name} ${membership.user.last_name}`
     : '—';
 
-  const finalPosition = positionSelect === 'Other' ? customPosition.trim() : positionSelect;
+  const finalDesignation = positionSelect === 'Other' ? customPosition.trim() : positionSelect;
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await apiFetch(`/organizations/${orgId}/members/${membership.id}/role`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role, position: finalPosition || null }),
+      await apiFetch(`/organizations/${orgId}/members/${membership.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ designation: finalDesignation }),
       });
-      pushToast(`${fullName}'s role updated to ${roleConfig[role]?.label}.`);
-      onSaved({ ...membership, role, position: finalPosition });
+      pushToast(`${fullName}'s designation updated to ${finalDesignation}.`);
+      onSaved({ ...membership, designation: finalDesignation });
       onClose();
     } catch (err) {
       pushToast(err.message, 'error');
@@ -155,47 +162,33 @@ const PromoteDialog = ({ membership, orgId, onClose, onSaved, pushToast }) => {
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Role</Label>
-            <Select value={role} onValueChange={setRole}>
+            <Label>Designation</Label>
+            <Select value={positionSelect} onValueChange={handlePositionChange}>
               <SelectTrigger className="rounded-xl">
-                <SelectValue />
+                <SelectValue placeholder="Select a designation…" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 {ROLES.map(r => (
                   <SelectItem key={r} value={r}>
-                    <div className="flex items-center gap-2">
-                      {(() => { const I = roleConfig[r].Icon; return <I className="w-4 h-4" />; })()}
-                      {roleConfig[r].label}
-                    </div>
+                    {r}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Position / Title</Label>
-            <Select value={positionSelect} onValueChange={handlePositionChange}>
-              <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="Select a position…" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                {POSITIONS.map(p => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+
 
           {positionSelect === 'Other' && (
             <div className="space-y-2">
-              <Label>Custom Position</Label>
+              <Label>Custom Designation</Label>
               <Input
                 placeholder="e.g. Committee Head…"
                 value={customPosition}
-                onChange={e => setCustomPosition(e.target.value)}
+                onChange={e => {
+                  setCustomPosition(e.target.value);
+                  setDesignation(e.target.value);
+                }}
                 className="rounded-xl"
               />
             </div>
@@ -226,8 +219,7 @@ const AddMemberDialog = ({ orgId, onClose, onAdded, pushToast }) => {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [role, setRole] = useState('member');
-  const [position, setPosition] = useState('');
+  const [designation, setDesignation] = useState('Member');
   const [customPos, setCustomPos] = useState('');
   const [saving, setSaving] = useState(false);
   const debounce = useRef(null);
@@ -255,13 +247,13 @@ const AddMemberDialog = ({ orgId, onClose, onAdded, pushToast }) => {
     if (!selected) return;
     setSaving(true);
     try {
-      const finalPos = position === 'Other' ? customPos.trim() : position;
+      const finalDesignation = designation === 'Other' ? customPos.trim() : designation;
       const data = await apiFetch(`/organizations/${orgId}/members`, {
         method: 'POST',
-        body: JSON.stringify({ student_id: selected.id, role, position: finalPos || null }),
+        body: JSON.stringify({ user_id: selected.id, designation: finalDesignation }),
       });
-      pushToast(`${selected.full_name} added as ${roleConfig[role].label}.`);
-      onAdded(data.membership);
+      pushToast(`${selected.full_name} added as ${finalDesignation}.`);
+      onAdded(data.membership || data);
       onClose();
     } catch (err) {
       pushToast(err.message, 'error');
@@ -317,45 +309,27 @@ const AddMemberDialog = ({ orgId, onClose, onAdded, pushToast }) => {
             )}
           </div>
 
-          {/* Role */}
+          {/* Designation */}
           <div className="space-y-2">
-            <Label>Role</Label>
-            <Select value={role} onValueChange={setRole}>
+            <Label>Designation</Label>
+            <Select value={designation} onValueChange={(v) => { setDesignation(v); if (v !== 'Other') setCustomPos(''); }}>
               <SelectTrigger className="rounded-xl">
-                <SelectValue />
+                <SelectValue placeholder="Select a designation…" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
+                <SelectItem value="Other">Other (Custom)</SelectItem>
                 {ROLES.map(r => (
                   <SelectItem key={r} value={r}>
-                    <div className="flex items-center gap-2">
-                      {(() => { const I = roleConfig[r].Icon; return <I className="w-4 h-4" />; })()}
-                      {roleConfig[r].label}
-                    </div>
+                    {r}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Position */}
-          <div className="space-y-2">
-            <Label>Position</Label>
-            <Select value={position} onValueChange={(v) => { setPosition(v); if (v !== 'Other') setCustomPos(''); if (v && v !== '') setRole('officer'); }}>
-              <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="Select a position…" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                {POSITIONS.map(p => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {position === 'Other' && (
+          {designation === 'Other' && (
             <div className="space-y-2">
-              <Label>Custom Position</Label>
+              <Label>Custom Designation</Label>
               <Input
                 placeholder="e.g. Committee Head…"
                 value={customPos}
@@ -387,8 +361,8 @@ const AddMemberDialog = ({ orgId, onClose, onAdded, pushToast }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const ConfirmRemoveDialog = ({ membership, orgId, onClose, onRemoved, pushToast }) => {
   const [loading, setLoading] = useState(false);
-  const fullName = membership.student
-    ? `${membership.student.first_name} ${membership.student.last_name}`
+  const fullName = membership.user
+    ? `${membership.user.first_name} ${membership.user.last_name}`
     : '—';
 
   const handleRemove = async () => {
@@ -437,7 +411,7 @@ const ConfirmRemoveDialog = ({ membership, orgId, onClose, onRemoved, pushToast 
 // ─────────────────────────────────────────────────────────────────────────────
 const MemberDetailsDialog = ({ membership, onClose }) => {
   if (!membership) return null;
-  const s = membership.student || {};
+  const s = membership.user || {};
   const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Unknown';
 
   return (
@@ -448,7 +422,7 @@ const MemberDetailsDialog = ({ membership, onClose }) => {
           <h2 className="text-2xl font-bold text-center tracking-tight">{fullName}</h2>
           <p className="text-white/80 font-mono text-sm mt-1">{s.student_number || 'No ID'}</p>
           <div className="absolute top-4 right-4">
-            <RoleBadge role={membership.role} />
+            <RoleBadge designation={membership.designation} />
           </div>
         </div>
 
@@ -459,8 +433,8 @@ const MemberDetailsDialog = ({ membership, onClose }) => {
               <p className="font-semibold text-slate-900 text-sm">{s.course || '—'} · {s.year_level || '—'}</p>
             </div>
             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
-              <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider mb-0.5">Position</p>
-              <p className="font-semibold text-slate-900 text-sm">{membership.position || '—'}</p>
+              <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider mb-0.5">Designation</p>
+              <p className="font-semibold text-slate-900 text-sm">{membership.designation || '—'}</p>
             </div>
           </div>
 
@@ -471,7 +445,7 @@ const MemberDetailsDialog = ({ membership, onClose }) => {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-slate-500 mb-0.5">Email Address</p>
-                <p className="text-sm font-medium text-slate-900 truncate">{s.user?.email || '—'}</p>
+                <p className="text-sm font-medium text-slate-900 truncate">{s.email || '—'}</p>
               </div>
             </div>
 
@@ -560,6 +534,14 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [orgDetails, setOrgDetails] = useState(null);
+
+  useEffect(() => {
+    if (!orgId) return;
+    apiFetch(`/organizations/${orgId}`)
+      .then(data => setOrgDetails(data))
+      .catch(err => console.error("Failed to load org details", err));
+  }, [orgId]);
 
   // modals
   const [showAdd, setShowAdd] = useState(false);
@@ -634,7 +616,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
   const stats = {
     total: members.length,
     active: members.filter(m => m.status === 'active').length,
-    officers: members.filter(m => m.role === 'officer' || m.role === 'adviser').length,
+    officers: members.filter(m => m.designation !== 'Member').length,
     avgAttendance: members.length
       ? Math.round(members.reduce((s, m) => s + (m.attendance_rate ?? 0), 0) / members.length)
       : 0,
@@ -655,7 +637,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
             onClick={() => setPromoteTarget(membership)}
           >
             <ArrowUpCircle className="w-4 h-4 text-purple-500" />
-            Change Role
+            Change Designation
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -671,15 +653,15 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
   );
 
   // ── helper: get student full name ────────────────────────────────────────
-  const fullName = (m) => m.student
-    ? `${m.student.first_name} ${m.student.last_name}`
+  const fullName = (m) => m.user
+    ? `${m.user.first_name} ${m.user.last_name}`
     : 'Unknown';
 
-  const studentId = (m) => m.student?.student_number ?? '—';
-  const email = (m) => m.student?.user?.email || m.student?.email || '—';
-  const phone = (m) => m.student?.contact_number ?? '—';
-  const course = (m) => m.student?.course ?? '—';
-  const yearLevel = (m) => m.student?.year_level ?? '—';
+  const studentId = (m) => m.user?.student_number ?? '—';
+  const email = (m) => m.user?.email ?? '—';
+  const phone = (m) => m.user?.contact_number ?? '—';
+  const course = (m) => m.user?.course ?? '—';
+  const yearLevel = (m) => m.user?.year_level ?? '—';
 
   // ── render ────────────────────────────────────────────────────────────────
 
@@ -708,21 +690,37 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
       <div className="space-y-5 sm:space-y-6">
 
         {/* Header */}
-        <div className="flex flex-wrap justify-between items-start gap-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-xl sm:text-3xl font-bold text-slate-900">Members</h1>
             <p className="text-slate-600 mt-1 text-sm">
               {orgName ? `Managing · ${orgName}` : 'Manage organization members'}
             </p>
           </div>
-          <Button
-            onClick={() => setShowAdd(true)}
-            className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 h-9 text-sm"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Member</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {orgDetails?.invite_code && (
+              <div 
+                onClick={() => {
+                  navigator.clipboard.writeText(orgDetails.invite_code);
+                  pushToast('Invite code copied to clipboard!');
+                }}
+                className="flex items-center gap-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-xl cursor-pointer transition-colors"
+                title="Click to copy invite code"
+              >
+                <span className="text-xs font-semibold uppercase tracking-wider text-purple-600/70">Invite Code:</span>
+                <span className="font-mono font-bold tracking-widest">{orgDetails.invite_code}</span>
+                <Copy className="w-3.5 h-3.5 ml-1 opacity-50" />
+              </div>
+            )}
+            <Button
+              onClick={() => setShowAdd(true)}
+              className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 h-9 text-sm shrink-0"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Member</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -781,7 +779,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
               {pendingMembersList.map(m => (
                 <div key={m.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-white">
                   <div className="flex items-center gap-3 min-w-0">
-                    <AvatarImg name={fullName(m)} src={m.student?.profile_picture_url || null} size={40} />
+                    <AvatarImg name={fullName(m)} src={m.user?.profile_picture_url || null} size={40} />
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-900 text-sm truncate">{fullName(m)}</p>
                       <p className="text-xs text-slate-500 font-mono">{studentId(m)} · {course(m)}</p>
@@ -856,21 +854,17 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3 min-w-0">
-                          <AvatarImg name={fullName(m)} src={m.student?.profile_picture_url || null} size={40} />
+                          <AvatarImg name={fullName(m)} src={m.user?.profile_picture_url || null} size={40} />
                           <div className="min-w-0">
                             <p className="font-semibold text-slate-900 text-sm">{fullName(m)}</p>
                             <p className="text-xs text-slate-500 font-mono">{studentId(m)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <RoleBadge role={m.role} />
+                          <RoleBadge designation={m.designation} />
                           <MemberActions membership={m} />
                         </div>
                       </div>
-
-                      {m.position && (
-                        <p className="text-xs text-slate-500 italic">{m.position}</p>
-                      )}
 
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-xs text-slate-600">
@@ -912,8 +906,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
                         <TableHead>Student ID</TableHead>
                         <TableHead>Contact</TableHead>
                         <TableHead>Course &amp; Year</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Position</TableHead>
+                        <TableHead>Designation</TableHead>
                         {members.some(m => m.attendance_rate != null) && (
                           <TableHead>Attendance</TableHead>
                         )}
@@ -930,7 +923,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
                         >
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <AvatarImg name={fullName(m)} src={m.student?.profile_picture_url || null} size={40} />
+                              <AvatarImg name={fullName(m)} src={m.user?.profile_picture_url || null} size={40} />
                               <p className="font-medium text-slate-900 group-hover:text-blue-600 transition-colors">{fullName(m)}</p>
                             </div>
                           </TableCell>
@@ -953,10 +946,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
                             <p className="font-medium text-slate-900">{course(m)}</p>
                             <p className="text-sm text-slate-600">{yearLevel(m)}</p>
                           </TableCell>
-                          <TableCell><RoleBadge role={m.role} /></TableCell>
-                          <TableCell>
-                            <span className="text-sm text-slate-600 italic">{m.position ?? '—'}</span>
-                          </TableCell>
+                          <TableCell><RoleBadge designation={m.designation} /></TableCell>
                           {members.some(mm => mm.attendance_rate != null) && (
                             <TableCell>
                               {m.attendance_rate != null ? (

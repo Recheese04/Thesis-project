@@ -7,6 +7,7 @@ use App\Models\Organization;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class OrganizationController extends Controller
 {
@@ -86,6 +87,13 @@ class OrganizationController extends Controller
             if ($data['scope'] !== 'location') {
                 $data['location'] = null;
             }
+
+            // Generate a unique invite code
+            do {
+                $code = strtoupper(Str::random(6));
+            } while (Organization::where('invite_code', $code)->exists());
+            
+            $data['invite_code'] = $code;
 
             $organization = Organization::create($data);
 

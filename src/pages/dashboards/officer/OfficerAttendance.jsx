@@ -27,7 +27,7 @@ export default function OfficerAttendance() {
   const fetchEvents = async () => {
     try {
       setLoadingEvents(true);
-      const res = await axios.get('/api/events', authH());
+      const res = await axios.get('/api/events?role=officer', authH());
       setEvents(res.data);
     } catch { toast.error('Failed to load events'); }
     finally { setLoadingEvents(false); }

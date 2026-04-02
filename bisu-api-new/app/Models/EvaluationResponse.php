@@ -15,7 +15,7 @@ class EvaluationResponse extends Model
 
     protected $fillable = [
         'evaluation_id',
-        'student_id',
+        'user_id',
         'submitted_at',
     ];
 
@@ -30,9 +30,9 @@ class EvaluationResponse extends Model
         return $this->belongsTo(EventEvaluation::class, 'evaluation_id');
     }
 
-    public function student()
+    public function user()
     {
-        return $this->belongsTo(Student::class, 'student_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function answers()

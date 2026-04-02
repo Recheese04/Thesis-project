@@ -79,7 +79,7 @@ export default function ChatArea({ chat, messages, loading, sending, error, memb
     : isGroup ? 'Group Chat' : chat?.name ?? '';
   const subtitle = isCustomGc
     ? `${activeGroup?.members_count ?? activeGroup?.members?.length ?? ''} members`
-    : isGroup ? `${members.length} member${members.length !== 1 ? 's' : ''}` : (chat?.position || chat?.role || '');
+    : isGroup ? `${members.length} member${members.length !== 1 ? 's' : ''}` : (chat?.designation || chat?.position || chat?.role || '');
   const bg = isCustomGc
     ? (activeGroup?.avatar_color ?? 'from-violet-500 to-indigo-600')
     : isGroup ? 'from-slate-600 to-slate-800' : avatarColor(chat?.name ?? '');
@@ -150,7 +150,7 @@ export default function ChatArea({ chat, messages, loading, sending, error, memb
     return { isFirst: !pm || pm.sender_id !== it.data.sender_id, isLast: !nm || nm.sender_id !== it.data.sender_id };
   };
 
-  if (chat === undefined) return <NoChat dark={dark} />;
+  if (chat == null) return <NoChat dark={dark} />;
   const canSend = (text.trim() || image) && !sending;
 
   // Theme tokens

@@ -19,6 +19,7 @@ class Organization extends Model
         'location',
         'description',
         'status',
+        'invite_code',
     ];
 
     protected $casts = [
@@ -38,12 +39,17 @@ class Organization extends Model
      */
     public function members()
     {
-        return $this->hasMany(MemberOrganization::class, 'organization_id');
+        return $this->hasMany(Designation::class, 'organization_id');
     }
 
     public function events()
     {
         return $this->hasMany(Event::class, 'organization_id');
+    }
+
+    public function announcements()
+    {
+        return $this->hasMany(Announcement::class, 'organization_id');
     }
 
     public function documents()

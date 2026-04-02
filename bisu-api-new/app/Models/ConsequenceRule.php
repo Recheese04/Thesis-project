@@ -15,7 +15,6 @@ class ConsequenceRule extends Model
     protected $fillable = [
         'organization_id',
         'event_id',
-        'event_category',
         'consequence_title',
         'consequence_description',
         'due_days',

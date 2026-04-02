@@ -61,9 +61,26 @@ class EventController extends Controller
                 ->orderBy('event_time', 'desc');
 
             if (!$user->isAdmin()) {
-                $orgId = $user->getOfficerOrganizationId();
-                if ($orgId) {
-                    $query->where('organization_id', $orgId);
+                if ($request->role === 'officer') {
+                    $orgId = $request->input('organization_id') ?: $user->getOfficerOrganizationId();
+                    if ($orgId && $user->isOfficerOf($orgId)) {
+                        $query->where('organization_id', $orgId);
+                    } else {
+                        // Force empty if they somehow load officer view without an org
+                        $query->where('organization_id', 0);
+                    }
+                } else {
+                    // Default to student view (all actively joined organizations)
+                    $orgIds = \App\Models\Designation::where('user_id', $user->id)
+                        ->where('status', 'active')
+                        ->pluck('organization_id')
+                        ->toArray();
+
+                    if (!empty($orgIds)) {
+                        $query->whereIn('organization_id', $orgIds);
+                    } else {
+                        $query->where('organization_id', 0);
+                    }
                 }
             }
 
@@ -103,9 +120,9 @@ class EventController extends Controller
                 return response()->json(['message' => 'Only officers can create events.'], 403);
             }
 
-            $orgId = $user->getOfficerOrganizationId();
-            if (!$orgId) {
-                return response()->json(['message' => 'You are not an active officer of any organization.'], 403);
+            $orgId = $request->input('organization_id') ?: $user->getOfficerOrganizationId();
+            if (!$orgId || !$user->isOfficerOf($orgId)) {
+                return response()->json(['message' => 'You are not an active officer of this organization.'], 403);
             }
 
             $data = $request->validate([
@@ -153,8 +170,7 @@ class EventController extends Controller
             $event = Event::findOrFail($id);
 
             if (!$user->isAdmin()) {
-                $orgId = $user->getOfficerOrganizationId();
-                if (!$orgId || $event->organization_id !== $orgId) {
+                if (!$user->isOfficerOf($event->organization_id)) {
                     return response()->json(['message' => 'Unauthorized'], 403);
                 }
             }
@@ -192,8 +208,7 @@ class EventController extends Controller
             $event = Event::findOrFail($id);
 
             if (!$user->isAdmin()) {
-                $orgId = $user->getOfficerOrganizationId();
-                if (!$orgId || $event->organization_id !== $orgId) {
+                if (!$user->isOfficerOf($event->organization_id)) {
                     return response()->json(['message' => 'Unauthorized'], 403);
                 }
             }
@@ -228,9 +243,16 @@ class EventController extends Controller
                 ->orderBy('event_time', 'asc');
 
             if (!$user->isAdmin()) {
-                $orgId = $user->getOfficerOrganizationId();
-                if ($orgId) {
-                    $query->where('organization_id', $orgId);
+                $orgIds = \App\Models\Designation::where('user_id', $user->id)
+                    ->where('status', 'active')
+                    ->pluck('organization_id')
+                    ->toArray();
+
+                if (!empty($orgIds)) {
+                    $query->whereIn('organization_id', $orgIds);
+                } else {
+                    // Force zero results if not a member of any org
+                    $query->where('organization_id', 0);
                 }
             }
 
@@ -249,6 +271,21 @@ class EventController extends Controller
             return response()->json(['message' => 'Error fetching upcoming events'], 500);
         }
     }
+    /**
+     * POST /events/{eventId}/close
+     * Officer closes an event — marks it as completed.
+     */
+    public function closeEvent($eventId)
+    {
+        $event = Event::findOrFail($eventId);
+        $user  = auth()->user();
 
-   
+        if (!$user->isAdmin() && !$user->isOfficerOf($event->organization_id)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $event->update(['status' => 'completed']);
+
+        return response()->json(['message' => 'Event closed successfully.']);
+    }
 }

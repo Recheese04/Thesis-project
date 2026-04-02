@@ -1,0 +1,17 @@
+﻿
+  Migration name  Batch / Status  
+  0001_01_01_000000_create_users_table  Pending  
+  0001_01_01_000001_create_cache_table  Pending  
+  0001_01_01_000002_create_jobs_table  Pending  
+  2026_03_01_000001_add_amount_to_clearance_requirements  [1] Ran  
+  2026_03_03_000001_add_rfid_uid_to_students  [2] Ran  
+  2026_03_04_000001_add_profile_picture_and_drop_rfid_code_from_students  [2] Ran  
+  2026_03_04_000002_fix_member_organizations_status_enum  [2] Ran  
+  2026_03_11_133408_add_is_edited_to_messages_table  [4] Ran  
+  2026_03_15_045242_create_school_years_table  [3] Ran  
+  2026_03_15_045549_add_school_year_id_to_related_tables  [5] Ran  
+  2026_03_15_080344_add_school_year_id_to_attendances_table  [6] Ran  
+  2026_03_25_133856_add_school_year_id_to_member_organizations  Pending  
+  2026_03_25_135012_add_semester_to_clearance_requirements  Pending  
+  2026_03_31_000001_merge_students_into_users  Pending  
+

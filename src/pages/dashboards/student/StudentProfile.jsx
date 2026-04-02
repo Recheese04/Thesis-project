@@ -3,8 +3,12 @@ import axios from "axios";
 import {
     User, Mail, Phone, GraduationCap, Building2, BookOpen,
     Lock, Eye, EyeOff, Save, Loader2, CheckCircle2,
-    Users, Clock, Shield, UserPlus, Camera, Trash2
+    Users, Clock, Shield, UserPlus, Camera, Trash2, LogOut, AlertTriangle
 } from "lucide-react";
+import {
+    Dialog, DialogContent, DialogDescription, DialogFooter,
+    DialogHeader, DialogTitle
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -73,7 +77,7 @@ export default function StudentProfile() {
             // Keep localStorage in sync so the Sidebar shows the current avatar
             localStorage.setItem("user", JSON.stringify(res.data.user));
             setProfileForm({
-                contact_number: res.data.user?.student?.contact_number || "",
+                contact_number: res.data.user?.contact_number || "",
                 email: res.data.user?.email || "",
             });
         } catch (err) {
@@ -175,8 +179,6 @@ export default function StudentProfile() {
                 msg = Array.isArray(firstError) ? firstError[0] : firstError;
             } else if (err.response?.data?.message) {
                 msg = err.response.data.message;
-            } else if (typeof err.response?.data === 'string') {
-                msg = err.response.data.substring(0, 50); // Optional fallback if it returns HTML
             }
             toast.error(msg);
         } finally {
@@ -184,18 +186,47 @@ export default function StudentProfile() {
         }
     };
 
-    // ── Join Org ──
-    const handleJoinRequest = async (orgId) => {
-        setJoiningOrg(orgId);
+    // ── Leave Org ──
+    const [leavingOrg, setLeavingOrg] = useState(null);
+    const [submittingLeave, setSubmittingLeave] = useState(false);
+
+    const handleLeaveOrg = async () => {
+        if (!leavingOrg) return;
+        setSubmittingLeave(true);
         try {
-            await axios.post(`/api/organizations/${orgId}/join-request`, {}, authH());
-            toast.success("Join request sent!");
+            await axios.delete(`/api/profile/organizations/${leavingOrg.organization_id}/leave`, authH());
+            toast.success(`You have left ${leavingOrg.organization?.name || "the organization"}.`);
+            setLeavingOrg(null);
             fetchOrgs();
         } catch (err) {
-            const msg = err.response?.data?.message || "Failed to send request";
+            const msg = err.response?.data?.message || "Failed to leave organization.";
             toast.error(msg);
         } finally {
-            setJoiningOrg(null);
+            setSubmittingLeave(false);
+        }
+    };
+
+    // ── Join by Code ──
+    const [inviteCode, setInviteCode] = useState('');
+    const [joiningCode, setJoiningCode] = useState(false);
+
+    const handleJoinByCode = async (e) => {
+        if (e) e.preventDefault();
+        if (!inviteCode.trim()) {
+            toast.error("Please enter an invite code.");
+            return;
+        }
+        setJoiningCode(true);
+        try {
+            await axios.post(`/api/profile/join-by-code`, { invite_code: inviteCode }, authH());
+            toast.success("Successfully joined the organization!");
+            setInviteCode('');
+            fetchOrgs();
+        } catch (err) {
+            const msg = err.response?.data?.message || "Invalid invite code.";
+            toast.error(msg);
+        } finally {
+            setJoiningCode(false);
         }
     };
 
@@ -207,15 +238,14 @@ export default function StudentProfile() {
         );
     }
 
-    const student = user?.student;
     const myOrgIds = myOrgs.map((m) => m.organization_id);
     const pendingOrgIds = pendingRequests.map((r) => r.organization_id);
     const availableOrgs = allOrgs.filter(
         (o) => !myOrgIds.includes(o.id) && !pendingOrgIds.includes(o.id)
     );
 
-    const avatarUrl = student?.profile_picture_url || null;
-    const fullName = [student?.first_name, student?.last_name].filter(Boolean).join(' ');
+    const avatarUrl = user?.profile_picture_url || null;
+    const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ');
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
@@ -254,15 +284,15 @@ export default function StudentProfile() {
 
                     <div className="min-w-0 flex-1">
                         <h1 className="text-xl font-bold truncate">
-                            {student?.first_name} {student?.middle_name ? student.middle_name + " " : ""}{student?.last_name}
+                            {user?.first_name} {user?.middle_name ? user.middle_name + " " : ""}{user?.last_name}
                         </h1>
                         <p className="text-blue-200 text-sm">{user?.email}</p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <Badge className="bg-white/20 border-white/30 text-white text-[10px]">
-                                {student?.student_number}
+                                {user?.student_number}
                             </Badge>
                             <Badge className="bg-white/20 border-white/30 text-white text-[10px]">
-                                {student?.year_level}
+                                {user?.year_level}
                             </Badge>
                             {avatarUrl && (
                                 <button
@@ -299,28 +329,28 @@ export default function StudentProfile() {
                             <Label className="text-[11px] text-slate-400 font-semibold uppercase">Student Number</Label>
                             <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
                                 <Shield className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm font-mono text-slate-700">{student?.student_number}</span>
+                                <span className="text-sm font-mono text-slate-700">{user?.student_number}</span>
                             </div>
                         </div>
                         <div className="space-y-1">
                             <Label className="text-[11px] text-slate-400 font-semibold uppercase">Department</Label>
                             <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
                                 <Building2 className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm text-slate-700 truncate">{student?.department?.name || "—"}</span>
+                                <span className="text-sm text-slate-700 truncate">{user?.department?.name || "—"}</span>
                             </div>
                         </div>
                         <div className="space-y-1">
                             <Label className="text-[11px] text-slate-400 font-semibold uppercase">Course / Program</Label>
                             <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
                                 <BookOpen className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm text-slate-700 truncate">{student?.course || "—"}</span>
+                                <span className="text-sm text-slate-700 truncate">{user?.course || "—"}</span>
                             </div>
                         </div>
                         <div className="space-y-1">
                             <Label className="text-[11px] text-slate-400 font-semibold uppercase">Year Level</Label>
                             <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
                                 <GraduationCap className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm text-slate-700">{student?.year_level || "—"}</span>
+                                <span className="text-sm text-slate-700">{user?.year_level || "—"}</span>
                             </div>
                         </div>
                     </div>
@@ -426,17 +456,24 @@ export default function StudentProfile() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-semibold text-slate-700 truncate">{m.organization?.name || m.name || "—"}</p>
-                                            {m.position && <p className="text-xs text-slate-400">{m.position}</p>}
                                         </div>
-                                        <Badge className={`text-[10px] px-2 capitalize border ${m.role === "officer" ? "bg-[#1e4db7]/10 text-[#1e4db7] border-[#1e4db7]/20" :
-                                            m.role === "adviser" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                        <Badge className={`text-[10px] px-2 capitalize border ${m.designation !== "Member" ? "bg-[#1e4db7]/10 text-[#1e4db7] border-[#1e4db7]/20" :
                                                 "bg-blue-50 text-blue-600 border-blue-200"
                                             }`}>
-                                            {m.role || "member"}
+                                            {m.designation || "Member"}
                                         </Badge>
                                         <Badge className="bg-emerald-50 text-emerald-600 border-emerald-200 border text-[10px]">
                                             <CheckCircle2 className="w-3 h-3 mr-1" /> Active
                                         </Badge>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            onClick={() => setLeavingOrg(m)}
+                                            className="h-8 w-8 p-0 text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border hover:border-red-100 ml-1 rounded-lg"
+                                            title="Leave Organization"
+                                        >
+                                            <LogOut className="w-4 h-4 ml-0.5" />
+                                        </Button>
                                     </div>
                                 ))}
                             </div>
@@ -465,44 +502,69 @@ export default function StudentProfile() {
                         </Card>
                     )}
 
-                    {/* Browse Organizations */}
-                    <Card className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+                    {/* Join with Invite Code */}
+                    <Card className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-10 -mt-10 opacity-50 pointer-events-none"></div>
                         <SLabel icon={UserPlus} text="Join an Organization" />
-                        {availableOrgs.length === 0 ? (
-                            <div className="flex flex-col items-center gap-2 py-6 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                                <CheckCircle2 className="w-8 h-8 text-emerald-300" />
-                                <p className="text-sm text-slate-400">You're a member of all organizations, or all requests are pending!</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {availableOrgs.map((org) => (
-                                    <div key={org.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3 hover:border-[#1e4db7]/30 hover:shadow-sm transition-all">
-                                        <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                                            <Users className="w-4 h-4 text-[#1e4db7]" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-slate-700 truncate">{org.name}</p>
-                                            {org.description && <p className="text-xs text-slate-400 truncate">{org.description}</p>}
-                                        </div>
-                                        <Button
-                                            size="sm"
-                                            onClick={() => handleJoinRequest(org.id)}
-                                            disabled={joiningOrg === org.id}
-                                            className="bg-[#0f2d5e] hover:bg-[#1e4db7] text-white text-xs h-8 px-3 shrink-0"
-                                        >
-                                            {joiningOrg === org.id ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            ) : (
-                                                <><UserPlus className="w-3.5 h-3.5 mr-1" /> Join</>
-                                            )}
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        <p className="text-sm text-slate-500 mb-4 mt-1">
+                            Ask your organization officer for their unique 6-character invite code and enter it below to join instantly.
+                        </p>
+                        
+                        <form onSubmit={handleJoinByCode} className="flex gap-2">
+                            <Input 
+                                placeholder="e.g. AB12CD" 
+                                value={inviteCode}
+                                onChange={e => setInviteCode(e.target.value)}
+                                className="font-mono text-center tracking-widest uppercase rounded-xl border-slate-300 focus-visible:ring-blue-600 focus-visible:ring-offset-1 h-11"
+                                maxLength={6}
+                            />
+                            <Button 
+                                type="submit"
+                                disabled={joiningCode || !inviteCode.trim()} 
+                                className="bg-[#0f2d5e] hover:bg-[#1e4db7] text-white rounded-xl h-11 px-6 shadow-sm transition-all flex items-center gap-2"
+                            >
+                                {joiningCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                                <span>Join</span>
+                            </Button>
+                        </form>
                     </Card>
                 </div>
             )}
+
+            {/* Leave Organization Dialog */}
+            <Dialog open={!!leavingOrg} onOpenChange={(open) => !open && !submittingLeave && setLeavingOrg(null)}>
+                <DialogContent className="sm:max-w-md rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-red-600">
+                            <AlertTriangle className="w-5 h-5" />
+                            Leave Organization
+                        </DialogTitle>
+                        <DialogDescription className="pt-2 text-base text-slate-600">
+                            Are you sure you want to leave <strong>{leavingOrg?.organization?.name}</strong>? 
+                            This action cannot be undone. You will lose access to all its events and resources.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0 mt-4">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setLeavingOrg(null)} 
+                            disabled={submittingLeave}
+                            className="rounded-xl"
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant="destructive" 
+                            onClick={handleLeaveOrg} 
+                            disabled={submittingLeave}
+                            className="rounded-xl gap-2 bg-red-600 hover:bg-red-700"
+                        >
+                            {submittingLeave && <Loader2 className="w-4 h-4 animate-spin" />}
+                            Yes, Leave Organization
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

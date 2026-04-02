@@ -15,7 +15,7 @@ const COLORS = [
 ];
 
 export default function GroupSettingsModal({
-  group,          // { id, name, avatar_color, created_by, members: [{id, name, role}] }
+  group,          // { id, name, avatar_color, created_by, members: [{id, name, role, designation}] }
   allMembers,     // all org members (for invite)
   currentUserId,
   onClose,
@@ -291,7 +291,7 @@ export default function GroupSettingsModal({
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-medium truncate ${dark ? 'text-white' : 'text-slate-800'}`}>{m.name}</p>
-                      <p className={`text-xs ${subText}`}>{m.position || m.role}</p>
+                      <p className={`text-xs ${subText}`}>{m.designation || 'Member'}</p>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                       isChecked ? 'bg-violet-500 border-violet-500' : dark ? 'border-white/20' : 'border-slate-300'

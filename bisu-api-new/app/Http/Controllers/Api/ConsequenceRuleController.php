@@ -25,7 +25,6 @@ class ConsequenceRuleController extends Controller
     {
         $validated = $request->validate([
             'event_id'                => 'nullable|exists:events,id',
-            'event_category'          => 'nullable|string|max:100',
             'consequence_title'       => 'required|string|max:255',
             'consequence_description' => 'nullable|string',
             'due_days'                => 'required|integer|min:1',
@@ -47,7 +46,6 @@ class ConsequenceRuleController extends Controller
 
         $validated = $request->validate([
             'event_id'                => 'nullable|exists:events,id',
-            'event_category'          => 'nullable|string|max:100',
             'consequence_title'       => 'required|string|max:255',
             'consequence_description' => 'nullable|string',
             'due_days'                => 'required|integer|min:1',

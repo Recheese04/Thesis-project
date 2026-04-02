@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\MemberOrganization;
+use App\Models\Designation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -27,36 +27,9 @@ class AuthController extends Controller
             return response()->json(['message' => 'Your account has been deactivated.'], 403);
         }
 
-        $user->load(['student.department', 'userType']);
+        $user->load(['department', 'userType']);
 
-        // Default base role from user_type_id (1=Admin, 2=Officer, 3=Student)
-        $role = 'member';
-        if ($user->user_type_id == 1) {
-            $role = 'admin';
-        }
-        elseif ($user->user_type_id == 2) {
-            $role = 'officer';
-        }
-
-        $membership = null;
-        $organizationId = null;
-
-        if ($user->student_id) {
-            // ✅ Load 'organization' so frontend can read membership.organization.name
-            $membership = MemberOrganization::with('organization')
-                ->where('student_id', $user->student_id)
-                ->where('status', 'active')
-                ->orderByRaw("FIELD(role, 'adviser', 'officer', 'member')")
-                ->first();
-
-            if ($membership) {
-                // If they have an officer/adviser org role, temporarily elevate their session to officer
-                if (in_array($membership->role, ['officer', 'adviser'])) {
-                    $role = 'officer';
-                }
-                $organizationId = $membership->organization_id;
-            }
-        }
+        [$role, $membership, $organizationId] = $this->resolveRole($user);
 
         // Revoke all existing tokens for this user before issuing a new one
         $user->tokens()->delete();
@@ -81,41 +54,54 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        $user = $request->user()->load(['student.department', 'userType']);
+        $user = $request->user()->load(['department', 'userType']);
 
-        // Default base role from user_type_id (1=Admin, 2=Officer, 3=Student)
-        $role = 'member';
-        if ($user->user_type_id == 1) {
-            $role = 'admin';
-        }
-        elseif ($user->user_type_id == 2) {
-            $role = 'officer';
-        }
-
-        $membership = null;
-        $organizationId = null;
-
-        if ($user->student_id) {
-            // ✅ Load 'organization' so frontend can read membership.organization.name
-            $membership = MemberOrganization::with('organization')
-                ->where('student_id', $user->student_id)
-                ->where('status', 'active')
-                ->orderByRaw("FIELD(role, 'adviser', 'officer', 'member')")
-                ->first();
-
-            if ($membership) {
-                if (in_array($membership->role, ['officer', 'adviser'])) {
-                    $role = 'officer';
-                }
-                $organizationId = $membership->organization_id;
-            }
-        }
+        [$role, $membership, $organizationId] = $this->resolveRole($user);
 
         return response()->json([
             'user' => $user,
             'role' => $role,
-            'membership' => $membership, // includes membership.organization.name
-            'organization_id' => $organizationId, // ← this is what OfficerMembers reads
+            'membership' => $membership,
+            'organization_id' => $organizationId,
         ]);
+    }
+
+    /**
+     * Determine the user's effective role based on their designation.
+     *
+     * Priority:
+     *  1. user_type_id === 1  →  admin  (always)
+     *  2. Has an active designation that is NOT 'Member'  →  officer
+     *  3. Everything else  →  student
+     */
+    private function resolveRole(User $user): array
+    {
+        // Admin is always admin regardless of designations
+        if ($user->user_type_id == 1) {
+            return ['admin', null, null];
+        }
+
+        // For everyone else, check their designations
+        $membership = null;
+        $organizationId = null;
+        $role = $user->user_type_id == 2 ? 'officer' : 'student';
+
+        // Get all active designations, prioritize non-Member ones first
+        $membership = Designation::with('organization')
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->orderByRaw("CASE WHEN designation = 'Member' THEN 1 ELSE 0 END ASC")
+            ->first();
+
+        if ($membership) {
+            $organizationId = $membership->organization_id;
+
+            // If they have a non-Member designation (President, Treasurer, etc.) → officer
+            if ($membership->designation !== 'Member') {
+                $role = 'officer';
+            }
+        }
+
+        return [$role, $membership, $organizationId];
     }
 }

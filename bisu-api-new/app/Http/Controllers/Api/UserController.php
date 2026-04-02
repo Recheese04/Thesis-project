@@ -4,8 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\Student;
-use App\Models\MemberOrganization;
+use App\Models\Designation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -16,14 +15,14 @@ class UserController extends Controller
     public function index()
     {
         try {
-            $users = User::with(['student.department', 'userType'])
+            $users = User::with(['department', 'userType'])
                 ->orderBy('created_at', 'desc')
                 ->get();
 
             $users->each(function ($user) {
-                if ($user->student_id) {
-                    $allMemberships = MemberOrganization::with('organization')
-                        ->where('student_id', $user->student_id)
+                if ($user->student_number) {
+                    $allMemberships = Designation::with('organization')
+                        ->where('user_id', $user->id)
                         ->where('status', 'active')
                         ->get();
                     $user->setAttribute('all_memberships', $allMemberships);
@@ -45,11 +44,11 @@ class UserController extends Controller
     public function show($id)
     {
         try {
-            $user = User::with(['student.department', 'userType'])->findOrFail($id);
+            $user = User::with(['department', 'userType'])->findOrFail($id);
 
-            if ($user->student_id) {
-                $allMemberships = MemberOrganization::with('organization')
-                    ->where('student_id', $user->student_id)
+            if ($user->student_number) {
+                $allMemberships = Designation::with('organization')
+                    ->where('user_id', $user->id)
                     ->where('status', 'active')
                     ->get();
                 $user->setAttribute('all_memberships', $allMemberships);
@@ -84,7 +83,7 @@ class UserController extends Controller
                 'first_name'     => 'required|string|max:100',
                 'middle_name'    => 'nullable|string|max:100',
                 'last_name'      => 'required|string|max:100',
-                'student_number' => 'required|string|max:50|unique:students,student_number',
+                'student_number' => 'required|string|max:50|unique:users,student_number',
                 'department_id'  => 'required|exists:departments,id',
                 'year_level'     => 'required|string|max:20',
                 'contact_number' => 'nullable|string|max:20',
@@ -96,13 +95,11 @@ class UserController extends Controller
             $rules += [
                 'org_memberships'                       => 'nullable|array',
                 'org_memberships.*.organization_id'     => 'required|exists:organizations,id',
-                'org_memberships.*.position'            => 'nullable|string|max:100',
+                'org_memberships.*.designation'          => 'nullable|string|max:100',
             ];
         }
 
-        if ($isOfficer) {
-            $rules['org_memberships.*.org_role'] = 'required|in:officer,adviser';
-        }
+        // Designation is validated above as a string (e.g. President, Treasurer, Member)
 
         try {
             $data = $request->validate($rules);
@@ -112,36 +109,32 @@ class UserController extends Controller
 
         DB::beginTransaction();
         try {
-            $student = null;
-
-            if ($needsStudent) {
-                $student = Student::create([
-                    'student_number' => $data['student_number'],
-                    'first_name'     => $data['first_name'],
-                    'middle_name'    => $data['middle_name'] ?? null,
-                    'last_name'      => $data['last_name'],
-                    'department_id'  => $data['department_id'],
-                    'year_level'     => $data['year_level'],
-                    'contact_number' => $data['contact_number'] ?? null,
-                    'course'         => $data['course'],
-                ]);
-            }
-
-            $user = User::create([
+            $userPayload = [
                 'email'         => $data['email'],
                 'password_hash' => Hash::make($data['password']),
                 'user_type_id'  => $data['user_type_id'],
-                'student_id'    => $student?->id,
                 'is_active'     => ($data['is_active'] ?? '1') == '1',
-            ]);
+            ];
 
-            if ($student && !empty($data['org_memberships'])) {
+            if ($needsStudent) {
+                $userPayload['student_number'] = $data['student_number'];
+                $userPayload['first_name']     = $data['first_name'];
+                $userPayload['middle_name']    = $data['middle_name'] ?? null;
+                $userPayload['last_name']      = $data['last_name'];
+                $userPayload['department_id']  = $data['department_id'];
+                $userPayload['year_level']     = $data['year_level'];
+                $userPayload['contact_number'] = $data['contact_number'] ?? null;
+                $userPayload['course']         = $data['course'];
+            }
+
+            $user = User::create($userPayload);
+
+            if ($needsStudent && !empty($data['org_memberships'])) {
                 foreach ($data['org_memberships'] as $m) {
-                    MemberOrganization::create([
+                    Designation::create([
                         'organization_id' => $m['organization_id'],
-                        'student_id'      => $student->id,
-                        'role'            => $isOfficer ? ($m['org_role'] ?? 'officer') : 'member',
-                        'position'        => $m['position'] ?? null,
+                        'user_id'         => $user->id,
+                        'designation'     => $m['designation'] ?? 'Member',
                         'status'          => 'active',
                         'joined_date'     => now()->toDateString(),
                     ]);
@@ -149,7 +142,7 @@ class UserController extends Controller
             }
 
             DB::commit();
-            $user->load(['student.department', 'userType']);
+            $user->load(['department', 'userType']);
 
             return response()->json(['message' => 'Account has been created successfully!', 'user' => $user], 201);
 
@@ -162,11 +155,10 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
-        $user         = User::with('student')->findOrFail($id);
+        $user         = User::findOrFail($id);
         $needsStudent = in_array($request->user_type_id, ['2', 2, '3', 3]);
         $isOfficer    = in_array($request->user_type_id, ['2', 2]);
         $isStudent    = in_array($request->user_type_id, ['3', 3]);
-        $studentRowId = $user->student?->id;
 
         $rules = [
             'email'        => "required|email|unique:users,email,{$user->id}",
@@ -176,9 +168,7 @@ class UserController extends Controller
         ];
 
         if ($needsStudent) {
-            $uniqueRule = $studentRowId
-                ? "required|string|max:50|unique:students,student_number,{$studentRowId},id"
-                : 'required|string|max:50|unique:students,student_number';
+            $uniqueRule = "required|string|max:50|unique:users,student_number,{$user->id}";
 
             $rules += [
                 'first_name'     => 'required|string|max:100',
@@ -196,13 +186,11 @@ class UserController extends Controller
             $rules += [
                 'org_memberships'                   => 'nullable|array',
                 'org_memberships.*.organization_id' => 'required|exists:organizations,id',
-                'org_memberships.*.position'        => 'nullable|string|max:100',
+                'org_memberships.*.designation'      => 'nullable|string|max:100',
             ];
         }
 
-        if ($isOfficer) {
-            $rules['org_memberships.*.org_role'] = 'required|in:officer,adviser';
-        }
+        // Designation is validated above as a string
 
         try {
             $data = $request->validate($rules);
@@ -212,32 +200,22 @@ class UserController extends Controller
 
         DB::beginTransaction();
         try {
-            $student = $user->student;
-
-            if ($needsStudent) {
-                $studentData = [
-                    'student_number' => $data['student_number'],
-                    'first_name'     => $data['first_name'],
-                    'middle_name'    => $data['middle_name'] ?? null,
-                    'last_name'      => $data['last_name'],
-                    'department_id'  => $data['department_id'],
-                    'year_level'     => $data['year_level'],
-                    'contact_number' => $data['contact_number'] ?? null,
-                    'course'         => $data['course'],
-                ];
-                if ($student) {
-                    $student->update($studentData);
-                } else {
-                    $student = Student::create($studentData);
-                }
-            }
-
             $userUpdate = [
                 'email'        => $data['email'],
                 'user_type_id' => $data['user_type_id'],
                 'is_active'    => isset($data['is_active']) ? $data['is_active'] == '1' : $user->is_active,
-                'student_id'   => $student?->id ?? $user->student_id,
             ];
+
+            if ($needsStudent) {
+                $userUpdate['student_number'] = $data['student_number'];
+                $userUpdate['first_name']     = $data['first_name'];
+                $userUpdate['middle_name']    = $data['middle_name'] ?? null;
+                $userUpdate['last_name']      = $data['last_name'];
+                $userUpdate['department_id']  = $data['department_id'];
+                $userUpdate['year_level']     = $data['year_level'];
+                $userUpdate['contact_number'] = $data['contact_number'] ?? null;
+                $userUpdate['course']         = $data['course'];
+            }
 
             if (!empty($data['password'])) {
                 $userUpdate['password_hash'] = Hash::make($data['password']);
@@ -245,25 +223,24 @@ class UserController extends Controller
 
             $user->update($userUpdate);
 
-            if ($student) {
+            if ($needsStudent) {
                 // Deactivate all existing memberships then re-create from submitted list
-                MemberOrganization::where('student_id', $student->id)->update(['status' => 'inactive']);
+                Designation::where('user_id', $user->id)->update(['status' => 'inactive']);
 
                 foreach ($data['org_memberships'] ?? [] as $m) {
-                    MemberOrganization::updateOrCreate(
-                        ['student_id' => $student->id, 'organization_id' => $m['organization_id']],
+                    Designation::updateOrCreate(
+                        ['user_id' => $user->id, 'organization_id' => $m['organization_id']],
                         [
-                            'role'        => $isOfficer ? ($m['org_role'] ?? 'officer') : 'member',
-                            'position'    => $m['position'] ?? null,
-                            'status'      => 'active',
-                            'joined_date' => now()->toDateString(),
+                            'designation'  => $m['designation'] ?? 'Member',
+                            'status'       => 'active',
+                            'joined_date'  => now()->toDateString(),
                         ]
                     );
                 }
             }
 
             DB::commit();
-            $user->load(['student.department', 'userType']);
+            $user->load(['department', 'userType']);
 
             return response()->json(['message' => 'Account has been updated successfully!', 'user' => $user]);
 
@@ -278,19 +255,11 @@ class UserController extends Controller
     {
         DB::beginTransaction();
         try {
-            $user    = User::with('student')->findOrFail($id);
-            $student = $user->student;
+            $user = User::findOrFail($id);
 
-            if ($student) {
-                MemberOrganization::where('student_id', $student->id)->delete();
-            }
-
+            Designation::where('user_id', $user->id)->delete();
             $user->tokens()->delete();
             $user->delete();
-
-            if ($student) {
-                $student->delete();
-            }
 
             DB::commit();
             return response()->json(['message' => 'Account deleted successfully.']);
@@ -333,13 +302,13 @@ class UserController extends Controller
                     continue;
                 }
 
-                if (Student::where('student_number', $row['student_number'])->exists()) {
+                if (User::where('student_number', $row['student_number'])->exists()) {
                     $skipped[] = ['row' => $rowNum, 'reason' => "Student # {$row['student_number']} already exists"];
                     continue;
                 }
 
                 try {
-                    $student = Student::create([
+                    User::create([
                         'student_number' => $row['student_number'],
                         'first_name'     => $row['first_name'],
                         'middle_name'    => $row['middle_name'] ?? null,
@@ -348,14 +317,10 @@ class UserController extends Controller
                         'course'         => $row['course'],
                         'year_level'     => $row['year_level'],
                         'contact_number' => $row['contact_number'] ?? null,
-                    ]);
-
-                    User::create([
-                        'email'         => $row['email'],
-                        'password_hash' => Hash::make('bisu_' . $row['student_number']),
-                        'user_type_id'  => 3,
-                        'student_id'    => $student->id,
-                        'is_active'     => true,
+                        'email'          => $row['email'],
+                        'password_hash'  => Hash::make('bisu_' . $row['student_number']),
+                        'user_type_id'   => 3,
+                        'is_active'      => true,
                     ]);
 
                     $created++;

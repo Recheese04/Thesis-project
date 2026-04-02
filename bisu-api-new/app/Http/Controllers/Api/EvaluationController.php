@@ -29,9 +29,16 @@ class EvaluationController extends Controller
                 ->orderBy('created_at', 'desc');
 
             if (!$user->isAdmin()) {
-                $orgId = $user->getOfficerOrganizationId();
-                if ($orgId) {
-                    $query->whereHas('event', fn($q) => $q->where('organization_id', $orgId));
+                $orgIds = \App\Models\Designation::where('user_id', $user->id)
+                    ->where('status', 'active')
+                    ->whereNotIn('designation', ['Member'])
+                    ->pluck('organization_id')
+                    ->toArray();
+
+                if (!empty($orgIds)) {
+                    $query->whereHas('event', fn($q) => $q->whereIn('organization_id', $orgIds));
+                } else {
+                    $query->whereHas('event', fn($q) => $q->where('organization_id', 0));
                 }
             }
 
@@ -71,9 +78,9 @@ class EvaluationController extends Controller
                 return response()->json(['message' => 'Only officers can create evaluations.'], 403);
             }
 
-            $orgId = $user->getOfficerOrganizationId();
-            if (!$orgId) {
-                return response()->json(['message' => 'You are not an active officer of any organization.'], 403);
+            $orgId = $request->input('organization_id') ?: $user->getOfficerOrganizationId();
+            if (!$orgId || !$user->isOfficerOf($orgId)) {
+                return response()->json(['message' => 'You are not an active officer of this organization.'], 403);
             }
 
             $data = $request->validate([
@@ -161,8 +168,7 @@ class EvaluationController extends Controller
             $evaluation = EventEvaluation::findOrFail($id);
 
             if (!$user->isAdmin()) {
-                $orgId = $user->getOfficerOrganizationId();
-                if (!$orgId || $evaluation->event->organization_id !== $orgId) {
+                if (!$user->isOfficerOf($evaluation->event->organization_id)) {
                     return response()->json(['message' => 'Unauthorized'], 403);
                 }
             }
@@ -200,8 +206,7 @@ class EvaluationController extends Controller
             $evaluation = EventEvaluation::findOrFail($id);
 
             if (!$user->isAdmin()) {
-                $orgId = $user->getOfficerOrganizationId();
-                if (!$orgId || $evaluation->event->organization_id !== $orgId) {
+                if (!$user->isOfficerOf($evaluation->event->organization_id)) {
                     return response()->json(['message' => 'Unauthorized'], 403);
                 }
             }
@@ -225,13 +230,17 @@ class EvaluationController extends Controller
     {
         try {
             $user  = auth()->user();
-            $orgId = $user->getOfficerOrganizationId();
+            $orgIds = \App\Models\Designation::where('user_id', $user->id)
+                ->where('status', 'active')
+                ->whereNotIn('designation', ['Member'])
+                ->pluck('organization_id')
+                ->toArray();
 
-            if (!$orgId) {
+            if (empty($orgIds)) {
                 return response()->json(['message' => 'You are not an active officer of any organization.'], 403);
             }
 
-            $events = Event::where('organization_id', $orgId)
+            $events = Event::whereIn('organization_id', $orgIds)
                 ->with(['evaluation:id,event_id,status'])
                 ->orderBy('event_date', 'desc')
                 ->get()
@@ -259,18 +268,23 @@ class EvaluationController extends Controller
     public function getByEvent($eventId)
     {
         try {
-            // No status filter here — officers need to see closed evaluations too
             $evaluation = EventEvaluation::with(['questions.options'])
                 ->where('event_id', $eventId)
-                ->firstOrFail();
+                ->first();
 
-            $user      = auth()->user();
-            $studentId = $user->student_id ?? null;
+            if (!$evaluation) {
+                return response()->json([
+                    'evaluation' => null,
+                    'submitted'  => false,
+                ]);
+            }
+
+            $userId    = auth()->id();
             $submitted = false;
 
-            if ($studentId) {
+            if ($userId) {
                 $submitted = EvaluationResponse::where('evaluation_id', $evaluation->id)
-                    ->where('student_id', $studentId)
+                    ->where('user_id', $userId)
                     ->exists();
             }
 
@@ -279,7 +293,7 @@ class EvaluationController extends Controller
                 'submitted'  => $submitted,
             ]);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'No evaluation found for this event'], 404);
+            return response()->json(['message' => 'Error fetching evaluation', 'error' => $e->getMessage()], 500);
         }
     }
 
@@ -296,11 +310,11 @@ class EvaluationController extends Controller
                 ->where('status', 'open')
                 ->firstOrFail();
 
-            $studentId = $evaluation->is_anonymous ? null : ($user->student_id ?? null);
+            $userId = $evaluation->is_anonymous ? null : $user->id;
 
-            if ($studentId) {
+            if ($userId) {
                 $alreadySubmitted = EvaluationResponse::where('evaluation_id', $evaluation->id)
-                    ->where('student_id', $studentId)
+                    ->where('user_id', $userId)
                     ->exists();
 
                 if ($alreadySubmitted) {
@@ -321,7 +335,7 @@ class EvaluationController extends Controller
 
             $response = EvaluationResponse::create([
                 'evaluation_id' => $evaluation->id,
-                'student_id'    => $studentId,
+                'user_id'       => $userId,
                 'submitted_at'  => now(),
             ]);
 
@@ -362,11 +376,11 @@ class EvaluationController extends Controller
                 ->where('status', 'open')
                 ->firstOrFail();
 
-            $studentId = $evaluation->is_anonymous ? null : ($user->student_id ?? null);
+            $userId = $evaluation->is_anonymous ? null : $user->id;
 
-            if ($studentId) {
+            if ($userId) {
                 $alreadySubmitted = EvaluationResponse::where('evaluation_id', $evaluation->id)
-                    ->where('student_id', $studentId)
+                    ->where('user_id', $userId)
                     ->exists();
 
                 if ($alreadySubmitted) {
@@ -387,7 +401,7 @@ class EvaluationController extends Controller
 
             $response = EvaluationResponse::create([
                 'evaluation_id' => $evaluation->id,
-                'student_id'    => $studentId,
+                'user_id'       => $userId,
                 'submitted_at'  => now(),
             ]);
 
@@ -426,8 +440,7 @@ class EvaluationController extends Controller
             $evaluation = EventEvaluation::with('questions')->findOrFail($id);
 
             if (!$user->isAdmin()) {
-                $orgId = $user->getOfficerOrganizationId();
-                if (!$orgId || $evaluation->event->organization_id !== $orgId) {
+                if (!$user->isOfficerOf($evaluation->event->organization_id)) {
                     return response()->json(['message' => 'Unauthorized'], 403);
                 }
             }
@@ -496,8 +509,7 @@ class EvaluationController extends Controller
                 ->findOrFail($id);
 
             if (!$user->isAdmin()) {
-                $orgId = $user->getOfficerOrganizationId();
-                if (!$orgId || $evaluation->event->organization_id !== $orgId) {
+                if (!$user->isOfficerOf($evaluation->event->organization_id)) {
                     return response()->json(['message' => 'Unauthorized'], 403);
                 }
             }
@@ -563,17 +575,17 @@ class EvaluationController extends Controller
     public function studentEvaluations(Request $request)
     {
         try {
-            $user      = auth()->user();
-            $studentId = $user->student_id ?? null;
+            $user   = auth()->user();
+            $userId = $user->id;
 
             $evaluations = EventEvaluation::with(['event:id,title', 'questions:id,evaluation_id'])
                 ->orderBy('created_at', 'desc')
                 ->get()
-                ->map(function ($evaluation) use ($studentId) {
+                ->map(function ($evaluation) use ($userId) {
                     $hasResponded = false;
-                    if ($studentId) {
+                    if ($userId) {
                         $hasResponded = EvaluationResponse::where('evaluation_id', $evaluation->id)
-                            ->where('student_id', $studentId)
+                            ->where('user_id', $userId)
                             ->exists();
                     }
 
@@ -597,6 +609,74 @@ class EvaluationController extends Controller
         } catch (\Exception $e) {
             Log::error('Student evaluations error: ' . $e->getMessage());
             return response()->json(['message' => 'Error fetching evaluations', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /summarize
+     * AI-powered summarization of evaluation text responses using Gemini 1.5 Flash
+     */
+    public function summarize(Request $request)
+    {
+        try {
+            $apiKey = config('services.gemini.key');
+            if (!$apiKey) {
+                return response()->json(['error' => 'Gemini API Key not configured.'], 500);
+            }
+
+            $data = $request->validate([
+                'inputs' => 'required|string', 
+            ]);
+
+            $systemPrompt = "You are an expert student evaluation analyst. Your task is to accurately summarize a collection of student text responses for a specific evaluation question. 
+            Identify key themes, sentiments, and common feedback (both positive and negative). 
+            Speak concisely and professionally in a single well-structured paragraph. 
+            The responses might be in English, Tagalog, or Bisaya (Cebuano). Summarize everything in English.";
+
+            $response = \Illuminate\Support\Facades\Http::withoutVerifying()
+                ->timeout(60)
+                ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={$apiKey}", [
+                    'system_instruction' => [
+                        'parts' => [['text' => $systemPrompt]]
+                    ],
+                    'contents' => [
+                        [
+                            'role' => 'user',
+                            'parts' => [['text' => $data['inputs']]]
+                        ]
+                    ],
+                    'generationConfig' => [
+                        'temperature' => 0.4,
+                        'topK' => 40,
+                        'topP' => 0.95,
+                        'maxOutputTokens' => 1024,
+                    ]
+                ]);
+
+            if ($response->successful()) {
+                $resData = $response->json();
+                $text = $resData['candidates'][0]['content']['parts'][0]['text'] ?? null;
+                
+                if (!$text) {
+                    Log::error('Gemini Summarization: No text in response', ['data' => $resData]);
+                    return response()->json(['error' => 'No summary text generated.'], 500);
+                }
+
+                return response()->json([
+                    'summary_text' => trim($text),
+                ]);
+            }
+
+            Log::error('Gemini API Summarization Error', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+
+            return response()->json(['error' => 'AI Service Error: ' . $response->status()], $response->status());
+
+        } catch (\Exception $e) {
+            Log::error('Evaluation Summarize Exception: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 }

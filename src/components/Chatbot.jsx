@@ -222,7 +222,7 @@ export default function Chatbot() {
                 parts: [{ text: m.text }]
             }));
 
-            const req = await fetch('http://127.0.0.1:8000/api/chatbot', {
+            const req = await fetch('/api/chatbot', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -236,7 +236,8 @@ export default function Chatbot() {
             });
 
             if (!req.ok) {
-                throw new Error('API Error ' + req.status);
+                const errData = await req.json().catch(() => ({}));
+                throw new Error(errData.error || errData.message || ('API Error ' + req.status));
             }
 
             const data = await req.json();
@@ -254,6 +255,8 @@ export default function Chatbot() {
                 errMsg = "Invalid API Key bai! Check imong `.env` file! 😬";
             } else if (errorStr.includes('fetch') || errorStr.includes('network')) {
                 errMsg = "Network error! Gi-ghost ta sa internet! 👻 Check imong connection, bai.";
+            } else {
+                errMsg += ` [${error.message}]`;
             }
             setMessages((prev) => [...prev, { text: errMsg, isBot: true, time: new Date() }]);
         } finally {
@@ -407,7 +410,7 @@ export default function Chatbot() {
                                                     {msg.isBot ? (
                                                         <ReactMarkdown
                                                             components={{
-                                                                p: ({ children }) => <p style={{ margin: '0 0 6px 0', color: 'rgba(255,255,255,0.88)' }}>{children}</p>,
+                                                                p: ({ children }) => <div style={{ margin: '0 0 6px 0', color: 'rgba(255,255,255,0.88)' }}>{children}</div>,
                                                                 ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ul>,
                                                                 ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ol>,
                                                                 li: ({ children }) => <li style={{ marginBottom: '3px', color: 'rgba(255,255,255,0.82)' }}>{children}</li>,

@@ -18,7 +18,7 @@ export default function Register() {
     student_id: '',
     password: '',
     password_confirmation: '',
-    role: 'student' // default role
+    user_type_id: 3 // auto-assign student role type
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

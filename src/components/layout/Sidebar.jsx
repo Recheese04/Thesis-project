@@ -72,8 +72,7 @@ const officerMenuBase = [
   {
     label: 'Treasury',
     items: [
-      { icon: Wallet, label: 'Finance', path: '/officer/finance', badge: null, positions: ['Treasurer'] },
-      { icon: CheckCircle, label: 'Manage Clearance', path: '/officer/clearance', badge: null, positions: [...LEADERSHIP, ...FINANCE, 'Secretary'] },
+      { icon: Wallet, label: 'Finance', path: '/officer/finance', badge: null, positions: ['Treasurer', 'Auditor'] },
     ],
   },
   {
@@ -87,7 +86,6 @@ const officerMenuBase = [
     items: [
       { icon: Bell, label: 'Announcements', path: '/officer/announcements', badge: null, positions: ALL_POSITIONS },
       { icon: MessageSquare, label: 'Messages', path: '/officer/messages', badge: '2', positions: ALL_POSITIONS },
-      { icon: Award, label: 'Tasks', path: '/officer/tasks', badge: '5', positions: ALL_POSITIONS },
     ],
   },
   {
@@ -102,7 +100,6 @@ const officerMenuBase = [
       { icon: QrCode, label: 'Check In', path: '/officer/checkin', badge: 'Scan', positions: ALL_POSITIONS },
       { icon: Calendar, label: 'My Events', path: '/officer/my-events', badge: null, positions: ALL_POSITIONS },
       { icon: ClipboardList, label: 'My Attendance', path: '/officer/my-attendance', badge: null, positions: ALL_POSITIONS },
-      { icon: CheckCircle, label: 'My Clearance', path: '/officer/my-clearance', badge: null, positions: ALL_POSITIONS },
       { icon: FileText, label: 'Documents', path: '/officer/documents', badge: null, positions: ALL_POSITIONS },
       { icon: Award, label: 'Obligations', path: '/officer/obligations', badge: null, positions: ALL_POSITIONS },
     ],
@@ -139,7 +136,6 @@ const studentMenuSections = [
     items: [
       { icon: Calendar, label: 'Events', path: '/student/events', badge: null },
       { icon: ClipboardList, label: 'My Attendance', path: '/student/attendance', badge: null },
-      { icon: CheckCircle, label: 'Clearance Status', path: '/student/clearance', badge: null },
       { icon: ClipboardCheck, label: 'Evaluations', path: '/student/evaluations', badge: null },
     ],
   },
@@ -184,19 +180,18 @@ export default function Sidebar({ onClose }) {
   }, []);
 
   const storedMember = JSON.parse(localStorage.getItem('membership') || 'null');
-  const officerPosition = storedMember?.position || '';
-  const membershipRole = storedMember?.role || '';
-  const isAdviser = membershipRole === 'adviser';
+  const officerDesignation = storedMember?.designation || '';
+  const isAdviser = officerDesignation.toLowerCase() === 'adviser';
 
   const currentUser = isAdmin
     ? { name: 'Admin User', email: storedUser.email ?? '', role: 'System Admin', avatarUrl: null }
     : {
-      name: `${storedUser.student?.first_name ?? ''} ${storedUser.student?.last_name ?? ''}`.trim() || 'Student',
+      name: `${storedUser.first_name ?? ''} ${storedUser.last_name ?? ''}`.trim() || 'Student',
       email: storedUser.email ?? '',
-      studentId: storedUser.student?.student_number ?? '—',
-      role: isOfficer ? (isAdviser ? 'Adviser' : (officerPosition || 'Officer')) : 'Member',
-      yearLevel: storedUser.student?.year_level ?? '—',
-      avatarUrl: storedUser.student?.profile_picture_url ?? null,
+      studentId: storedUser.student_number ?? '—',
+      role: isOfficer ? (isAdviser ? 'Adviser' : (officerDesignation || 'Officer')) : 'Member',
+      yearLevel: storedUser.year_level ?? '—',
+      avatarUrl: storedUser.profile_picture_url ?? null,
     };
 
   const getInitials = (name) =>
@@ -206,6 +201,8 @@ export default function Sidebar({ onClose }) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('user_role');
+    localStorage.removeItem('membership');
+    localStorage.removeItem('organization_id');
     navigate('/login');
   };
 
@@ -239,7 +236,7 @@ export default function Sidebar({ onClose }) {
   const menuSections = isAdmin
     ? adminMenuSections
     : isOfficer
-      ? getOfficerMenu(officerPosition, membershipRole)
+      ? getOfficerMenu(officerDesignation, isAdviser ? 'adviser' : '')
       : studentMenuSections;
 
   const handleNavClick = () => {
@@ -349,7 +346,9 @@ export default function Sidebar({ onClose }) {
                   <p className="text-xs text-slate-400 truncate flex items-center gap-1">
                     {isAdmin
                       ? <><Shield className="w-3 h-3" />{currentUser.role}</>
-                      : <span className="font-mono">{currentUser.studentId}</span>
+                      : isOfficer
+                        ? <><TrendingUp className="w-3 h-3" />{currentUser.role}</>
+                        : <span className="font-mono">{currentUser.studentId}</span>
                     }
                   </p>
                 </div>

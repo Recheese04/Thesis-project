@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Api; // ← FIXED (was App\Http\Controllers)
+namespace App\Http\Controllers\Api; 
 
 use App\Http\Controllers\Controller;
 use App\Models\ClearanceRequirement;
 use App\Models\StudentClearance;
-use App\Models\MemberOrganization;
+use App\Models\Designation;
 use App\Models\Attendance;
 use App\Models\Event;
 use App\Models\SchoolYear;
@@ -26,17 +26,14 @@ class ClearanceController extends Controller
         if ($user->user_type_id === 1)
             return true; // admin
 
-        $student = $user->student;
-        if (!$student)
-            return false;
-
-        $m = MemberOrganization::where('organization_id', $orgId)
-            ->where('student_id', $student->id)
+        $m = Designation::where('organization_id', $orgId)
+            ->where('user_id', $user->id)
             ->where('status', 'active')
             ->first();
 
-        return $m && in_array($m->role, ['officer', 'adviser']);
+        return $m && !in_array($m->designation, ['Member']);
     }
+
     // GET /api/organizations/{orgId}/clearance-requirements
     public function getRequirements(Request $request, $orgId)
     {
@@ -92,8 +89,8 @@ class ClearanceController extends Controller
         return response()->json($req, 201);
     }
 
-    // GET /api/students/{studentId}/clearance?org_id=X&school_year=2025-2026&semester=2nd
-    public function getStudentClearance(Request $request, $studentId)
+    // GET /api/users/{userId}/clearance?org_id=X&school_year=2025-2026&semester=2nd
+    public function getStudentClearance(Request $request, $userId)
     {
         $orgId = $request->query('org_id');
         $schoolYearId = $request->query('school_year_id');
@@ -109,16 +106,16 @@ class ClearanceController extends Controller
             ->where('school_year_id', $schoolYearId)
             ->get();
 
-        $clearances = StudentClearance::where('student_id', $studentId)
+        $clearances = StudentClearance::where('user_id', $userId)
             ->where('organization_id', $orgId)
             ->where('school_year_id', $schoolYearId)
             ->where('semester', $semester)
             ->get()
             ->keyBy('requirement_id');
 
-        $result = $requirements->map(function ($req) use ($studentId, $orgId, $clearances) {
+        $result = $requirements->map(function ($req) use ($userId, $orgId, $clearances) {
             if ($req->type === 'auto') {
-                $data = $this->computeAttendanceClearance($studentId, $orgId);
+                $data = $this->computeAttendanceClearance($userId, $orgId);
                 return [
                 'requirement' => $req,
                 'status' => $data['status'],
@@ -162,7 +159,7 @@ class ClearanceController extends Controller
             $schoolYearId = $activeYear ? $activeYear->id : null;
         }
 
-        $members = MemberOrganization::with('student')
+        $members = Designation::with('user')
             ->where('organization_id', $orgId)
             ->where('status', 'active')
             ->get();
@@ -176,15 +173,15 @@ class ClearanceController extends Controller
             ->where('school_year_id', $schoolYearId)
             ->where('semester', $semester)
             ->get()
-            ->groupBy('student_id');
+            ->groupBy('user_id');
 
         $result = $members->map(function ($member) use ($requirements, $allClearances, $orgId) {
-            $studentId = $member->student_id;
-            $clearances = $allClearances->get($studentId, collect())->keyBy('requirement_id');
+            $userId = $member->user_id;
+            $clearances = $allClearances->get($userId, collect())->keyBy('requirement_id');
 
-            $reqStatuses = $requirements->map(function ($req) use ($studentId, $orgId, $clearances) {
+            $reqStatuses = $requirements->map(function ($req) use ($userId, $orgId, $clearances) {
                     if ($req->type === 'auto') {
-                        $data = $this->computeAttendanceClearance($studentId, $orgId);
+                        $data = $this->computeAttendanceClearance($userId, $orgId);
                         return [
                         'requirement_id' => $req->id,
                         'name' => $req->name,
@@ -209,8 +206,8 @@ class ClearanceController extends Controller
                 $cleared = $reqStatuses->where('status', 'cleared')->count();
 
                 return [
-                'student_id' => $studentId,
-                'student_name' => $member->student->first_name . ' ' . $member->student->last_name,
+                'user_id' => $userId,
+                'student_name' => $member->user->first_name . ' ' . $member->user->last_name,
                 'position' => $member->position,
                 'requirements' => $reqStatuses->values(),
                 'cleared' => $cleared,
@@ -222,8 +219,8 @@ class ClearanceController extends Controller
         return response()->json($result);
     }
 
-    // POST /api/clearance/{requirementId}/students/{studentId}/clear
-    public function clearRequirement(Request $request, $requirementId, $studentId)
+    // POST /api/clearance/{requirementId}/users/{userId}/clear
+    public function clearRequirement(Request $request, $requirementId, $userId)
     {
         $validated = $request->validate([
             'notes' => 'nullable|string|max:255',
@@ -247,7 +244,7 @@ class ClearanceController extends Controller
 
         $clearance = StudentClearance::updateOrCreate(
         [
-            'student_id' => $studentId,
+            'user_id' => $userId,
             'organization_id' => $req->organization_id,
             'requirement_id' => $requirementId,
             'school_year_id' => $validated['school_year_id'],
@@ -264,8 +261,8 @@ class ClearanceController extends Controller
         return response()->json($clearance);
     }
 
-    // POST /api/clearance/{requirementId}/students/{studentId}/reject
-    public function rejectRequirement(Request $request, $requirementId, $studentId)
+    // POST /api/clearance/{requirementId}/users/{userId}/reject
+    public function rejectRequirement(Request $request, $requirementId, $userId)
     {
         $validated = $request->validate([
             'notes' => 'nullable|string|max:255',
@@ -289,7 +286,7 @@ class ClearanceController extends Controller
 
         $clearance = StudentClearance::updateOrCreate(
         [
-            'student_id' => $studentId,
+            'user_id' => $userId,
             'organization_id' => $req->organization_id,
             'requirement_id' => $requirementId,
             'school_year_id' => $validated['school_year_id'],
@@ -307,7 +304,7 @@ class ClearanceController extends Controller
     }
 
     // ── Private: auto-compute attendance clearance ───────────────────────────
-    private function computeAttendanceClearance($studentId, $orgId)
+    private function computeAttendanceClearance($userId, $orgId)
     {
         $totalEvents = Event::where('organization_id', $orgId)
             ->where('status', 'completed')
@@ -316,7 +313,7 @@ class ClearanceController extends Controller
         $attended = Attendance::whereHas('event', function ($q) use ($orgId) {
             $q->where('organization_id', $orgId)->where('status', 'completed');
         })
-            ->where('student_id', $studentId)
+            ->where('user_id', $userId)
             ->count();
 
         if ($totalEvents === 0) {

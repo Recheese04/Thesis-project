@@ -3,43 +3,48 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Message;
-use App\Models\MemberOrganization;
+use App\Models\DirectMessage;
+use App\Models\Designation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class MessageController extends Controller
 {
     // ── helpers ──────────────────────────────────────────────────────────────
 
-   private function resolveOrgId(): ?int
-{
-    $user = Auth::user();
-
-    if ($id = $user->getOfficerOrganizationId()) {
-        return $id;
-    }
-
-    if ($id = request()->integer('organization_id') ?: null) {
-        return $id;
-    }
-
-    if ($user->student_id) {
-        $membership = MemberOrganization::where('student_id', $user->student_id)
-            ->where('status', 'active')
-            ->first();
-        return $membership?->organization_id;
-    }
-
-    return null;
-}
-
-    private function fmt(Message $m): array
+    private function resolveOrgId(): ?int
     {
-        $student = $m->sender?->student;
+        $user = Auth::user();
+
+        if ($id = request()->integer('organization_id') ?: null) {
+            $isMemberOrOfficer = Designation::where('user_id', $user->id)
+                ->where('organization_id', $id)
+                ->where('status', 'active')
+                ->exists();
+            if ($isMemberOrOfficer || $user->isAdmin()) {
+                return $id;
+            }
+        }
+
+        if ($id = $user->getOfficerOrganizationId()) {
+            return $id;
+        }
+
+        if ($user->id) {
+            $membership = Designation::where('user_id', $user->id)
+                ->where('status', 'active')
+                ->first();
+            return $membership?->organization_id;
+        }
+
+        return null;
+    }
+
+    private function fmtDm(DirectMessage $m): array
+    {
+        $sender = $m->sender;
         return [
             'id'          => $m->id,
             'message'     => $m->message,
@@ -48,8 +53,8 @@ class MessageController extends Controller
                                 : null,
             'sender_id'   => $m->sender_id,
             'receiver_id' => $m->receiver_id,
-            'sender_name' => $student
-                                ? trim($student->first_name . ' ' . $student->last_name)
+            'sender_name' => $sender
+                                ? trim($sender->first_name . ' ' . $sender->last_name)
                                 : 'Admin',
             'created_at'  => $m->created_at->toIso8601String(),
             'is_edited'   => (bool) $m->is_edited,
@@ -57,58 +62,50 @@ class MessageController extends Controller
     }
 
     // ── GET /api/messages ─────────────────────────────────────────────────────
-    // ?type=group               — org group chat
     // ?type=pm&with=<user_id>   — PM thread
     // ?after_id=<id>            — polling: only newer messages
     public function index(Request $request): JsonResponse
     {
-        $me    = Auth::user();
-        $orgId = $this->resolveOrgId();
-        if (!$orgId) return response()->json(['message' => 'Forbidden'], 403);
+        $me = Auth::user();
 
-        $type = $request->input('type', 'group');
-
-        $query = Message::with('sender.student')
-            ->where('organization_id', $orgId)
-            ->orderBy('created_at', 'asc');
+        $type = $request->input('type', 'pm');
 
         if ($type === 'pm') {
             $request->validate(['with' => 'required|integer|exists:users,id']);
-            $query->pmThread($me->id, (int) $request->with);
-        } else {
-            $query->group();
+
+            $query = DirectMessage::with('sender')
+                ->thread($me->id, (int) $request->with)
+                ->orderBy('created_at', 'asc');
+
+            if ($request->filled('after_id')) {
+                $query->where('id', '>', (int) $request->after_id);
+            }
+
+            return response()->json([
+                'messages' => $query->get()->map(fn($m) => $this->fmtDm($m)),
+            ]);
         }
 
-        if ($request->filled('after_id')) {
-            $query->where('id', '>', (int) $request->after_id);
-        }
-
-        return response()->json([
-            'messages' => $query->get()->map(fn($m) => $this->fmt($m)),
-        ]);
+        // Group chat messages should go through GroupChatController
+        return response()->json(['message' => 'Use /api/group-chats/{id}/messages for group chat.'], 400);
     }
 
     // ── POST /api/messages ────────────────────────────────────────────────────
     // Body (multipart/form-data):
-    //   message     string  (required if no image)
-    //   image       file    (optional, jpg/png/gif/webp, max 5 MB)
-    //   type        group|pm  (default: group)
-    //   receiver_id integer (required when type=pm)
+    //   message      string  (required if no image)
+    //   image        file    (optional, jpg/png/gif/webp, max 5 MB)
+    //   receiver_id  integer (required — this is for DMs only)
     public function store(Request $request): JsonResponse
     {
         $request->validate([
             'message'     => ['nullable', 'string', 'max:2000'],
             'image'       => ['nullable', 'image', 'mimes:jpg,jpeg,png,gif,webp', 'max:5120'],
-            'type'        => ['sometimes', 'in:group,pm'],
-            'receiver_id' => ['required_if:type,pm', 'nullable', 'integer', 'exists:users,id'],
+            'receiver_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
         if (!$request->filled('message') && !$request->hasFile('image')) {
             return response()->json(['message' => 'Send a message or image.'], 422);
         }
-
-        $orgId = $this->resolveOrgId();
-        if (!$orgId) return response()->json(['message' => 'Forbidden'], 403);
 
         $imagePath = null;
         if ($request->hasFile('image')) {
@@ -116,25 +113,24 @@ class MessageController extends Controller
                 ->store('messages/' . date('Y/m'), 'public');
         }
 
-        $msg = Message::create([
-            'organization_id' => $orgId,
-            'sender_id'       => Auth::id(),
-            'receiver_id'     => $request->input('type') === 'pm'
-                                    ? (int) $request->receiver_id
-                                    : null,
-            'message'         => $request->input('message', ''),
-            'image_path'      => $imagePath,
+        $msg = DirectMessage::create([
+            'sender_id'   => Auth::id(),
+            'receiver_id' => (int) $request->receiver_id,
+            'message'     => $request->input('message', ''),
+            'image_path'  => $imagePath,
         ]);
 
-        $msg->load('sender.student');
+        $msg->load('sender');
 
-        return response()->json(['message' => $this->fmt($msg)], 201);
+        return response()->json(['message' => $this->fmtDm($msg)], 201);
     }
 
-    // ── PATCH /api/messages/{message} ─────────────────────────────────────────
-    public function update(Request $request, Message $message): JsonResponse
+    // ── PATCH /api/messages/{id} ──────────────────────────────────────────────
+    public function update(Request $request, $id): JsonResponse
     {
-        if ($message->sender_id !== Auth::id()) {
+        $dm = DirectMessage::findOrFail($id);
+
+        if ($dm->sender_id !== Auth::id()) {
             return response()->json(['message' => 'Unauthorized to edit this message.'], 403);
         }
 
@@ -145,86 +141,82 @@ class MessageController extends Controller
 
         $changes = [];
 
-        if ($request->has('message') && $request->input('message') !== $message->message) {
+        if ($request->has('message') && $request->input('message') !== $dm->message) {
             $changes['message'] = $request->input('message');
             $changes['is_edited'] = true;
         }
 
-        if ($request->boolean('remove_image') && $message->image_path) {
-            Storage::disk('public')->delete($message->image_path);
+        if ($request->boolean('remove_image') && $dm->image_path) {
+            Storage::disk('public')->delete($dm->image_path);
             $changes['image_path'] = null;
         }
 
         if (empty($changes)) {
-            return response()->json(['message' => $this->fmt($message)]);
+            return response()->json(['message' => $this->fmtDm($dm)]);
         }
 
-        $message->update($changes);
+        $dm->update($changes);
 
-        // If message is completely empty after removing image and text, just delete it
-        if (empty($message->message) && empty($message->image_path)) {
-            $message->delete();
+        if (empty($dm->message) && empty($dm->image_path)) {
+            $dm->delete();
             return response()->json(['message' => 'deleted']);
         }
 
-        return response()->json(['message' => $this->fmt($message)]);
+        return response()->json(['message' => $this->fmtDm($dm)]);
     }
 
-    // ── DELETE /api/messages/{message} ────────────────────────────────────────
-    public function destroy(Message $message): JsonResponse
+    // ── DELETE /api/messages/{id} ─────────────────────────────────────────────
+    public function destroy($id): JsonResponse
     {
-        if ($message->sender_id !== Auth::id()) {
+        $dm = DirectMessage::findOrFail($id);
+
+        if ($dm->sender_id !== Auth::id()) {
             return response()->json(['message' => 'Unauthorized to delete this message.'], 403);
         }
 
-        if ($message->image_path) {
-            Storage::disk('public')->delete($message->image_path);
+        if ($dm->image_path) {
+            Storage::disk('public')->delete($dm->image_path);
         }
 
-        $message->delete();
+        $dm->delete();
 
         return response()->json(['message' => 'deleted']);
     }
 
     // ── GET /api/messages/members ─────────────────────────────────────────────
-    // Returns active org members with last-PM-message preview per member.
+    // Returns active org members with last-DM preview per member.
     public function members(): JsonResponse
     {
         $me    = Auth::user();
         $orgId = $this->resolveOrgId();
         if (!$orgId) return response()->json(['message' => 'Forbidden'], 403);
 
-        $memberships = MemberOrganization::with('student.user')
+        $memberships = Designation::with('user')
             ->where('organization_id', $orgId)
             ->where('status', 'active')
             ->get();
 
-        $members = $memberships->map(function ($mo) use ($me, $orgId) {
-            $student = $mo->student;
-            $user    = $student?->user;
+        $members = $memberships->map(function ($mo) use ($me) {
+            $user = $mo->user;
             if (!$user) return null;
 
-            // Last PM message in this thread
-            $last = Message::where('organization_id', $orgId)
-                ->pmThread($me->id, $user->id)
+            // Last DM in this thread
+            $last = DirectMessage::thread($me->id, $user->id)
                 ->orderByDesc('created_at')
                 ->first();
 
-            // Unread count (messages they sent to me that I haven't "read")
-            // Simple approach: count all their messages since last_read.
-            // For now just returning total for the thread.
-            $unread = Message::where('organization_id', $orgId)
-                ->where('sender_id', $user->id)
+            // Unread count (messages they sent to me)
+            $unread = DirectMessage::where('sender_id', $user->id)
                 ->where('receiver_id', $me->id)
                 ->count();
 
             return [
                 'id'           => $user->id,
-                'student_id'   => $student->id,
-                'name'         => trim($student->first_name . ' ' . $student->last_name),
-                'role'         => ucfirst($mo->role),
-                'position'     => $mo->position,
-                'student_no'   => $student->student_number,
+                'student_id'   => $user->id,
+                'name'         => trim($user->first_name . ' ' . $user->last_name),
+                'role'         => ucfirst($mo->role ?? $mo->designation),
+                'position'     => $mo->position ?? $mo->designation,
+                'student_no'   => $user->student_number,
                 'last_message' => $last ? ($last->image_path ? '📷 Image' : $last->message) : null,
                 'last_time'    => $last?->created_at->toIso8601String(),
                 'unread'       => $unread,

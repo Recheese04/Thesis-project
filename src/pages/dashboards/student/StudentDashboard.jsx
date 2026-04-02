@@ -101,7 +101,7 @@ export default function StudentDashboard() {
     try {
       setLoading(true);
       const [eventsRes, attendanceRes] = await Promise.all([
-        axios.get('/api/events/filter/upcoming', authH()),
+        axios.get('/api/events/upcoming', authH()),
         axios.get('/api/attendance/my', authH()),
       ]);
       const myAttendance = attendanceRes.data;

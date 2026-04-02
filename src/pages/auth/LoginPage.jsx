@@ -43,18 +43,27 @@ export default function LoginPage() {
       // Persist everything the app needs
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('user_role', role);                          // 'admin' | 'officer' | 'member'
+      localStorage.setItem('user_role', role);                          // 'admin' | 'officer' | 'student'
       localStorage.setItem('membership', JSON.stringify(membership));    // OrganizationMember row or null
       localStorage.setItem('organization_id', organization_id ?? '');        // org they manage, or ''
 
       // Fetch the global school years specifically for this new session
       await fetchSchoolYears();
 
-      // Route based on role returned by the server
+      // Route based on role + designation returned by the server
       if (role === 'admin') {
         navigate('/admin/dashboard');
       } else if (role === 'officer') {
-        navigate('/officer/dashboard');
+        const desig = (membership?.designation || '').toLowerCase();
+        if (desig === 'treasurer' || desig === 'auditor') {
+          navigate('/officer/finance');
+        } else if (desig === 'secretary') {
+          navigate('/officer/minutes');
+        } else if (desig === 'adviser') {
+          navigate('/officer/adviser-overview');
+        } else {
+          navigate('/officer/dashboard');
+        }
       } else {
         navigate('/student/dashboard');
       }

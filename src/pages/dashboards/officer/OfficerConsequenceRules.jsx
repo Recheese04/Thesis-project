@@ -31,13 +31,9 @@ const getOrgId = () => {
   return null;
 };
 
-const EVENT_CATEGORIES = [
-  'Intramurals', 'General Assembly', 'Org Meeting',
-  'Community Service', 'Sports Fest', 'Acquaintance Party', 'Seminar', 'Other',
-];
 
 const EMPTY_FORM = {
-  event_category: '',
+  event_id: '',
   consequence_title: '',
   consequence_description: '',
   due_days: 7,
@@ -47,6 +43,7 @@ export default function OfficerConsequenceRules() {
   const orgId = getOrgId();
 
   const [rules, setRules]         = useState([]);
+  const [events, setEvents]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState(null);
@@ -61,8 +58,12 @@ export default function OfficerConsequenceRules() {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api().get(`/organizations/${orgId}/consequence-rules`);
-      setRules(data);
+      const [rulesRes, eventsRes] = await Promise.all([
+        api().get(`/organizations/${orgId}/consequence-rules`),
+        api().get(`/events?role=officer`),
+      ]);
+      setRules(rulesRes.data);
+      setEvents(eventsRes.data);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load consequence rules.');
     } finally {
@@ -82,7 +83,7 @@ export default function OfficerConsequenceRules() {
 
   const openEdit = (rule) => {
     setForm({
-      event_category:          rule.event_category || '',
+      event_id:                rule.event_id || '',
       consequence_title:       rule.consequence_title,
       consequence_description: rule.consequence_description || '',
       due_days:                rule.due_days,
@@ -100,8 +101,8 @@ export default function OfficerConsequenceRules() {
 
   // ── Save ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!form.event_category || !form.consequence_title) {
-      setFormError('Event category and consequence title are required.');
+    if (!form.consequence_title) {
+      setFormError('Consequence title is required.');
       return;
     }
     setSaving(true);
@@ -186,16 +187,16 @@ export default function OfficerConsequenceRules() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="text-sm font-medium text-slate-700 block mb-1">
-                    Event Category <span className="text-red-500">*</span>
+                    Apply to Event <span className="text-slate-400 text-xs">(optional — leave blank for all events)</span>
                   </label>
                   <select
-                    value={form.event_category}
-                    onChange={(e) => setForm({ ...form, event_category: e.target.value })}
+                    value={form.event_id}
+                    onChange={(e) => setForm({ ...form, event_id: e.target.value || null })}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                   >
-                    <option value="">Select category...</option>
-                    {EVENT_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    <option value="">All Events</option>
+                    {events.map((ev) => (
+                      <option key={ev.id} value={ev.id}>{ev.title}</option>
                     ))}
                   </select>
                 </div>
@@ -281,7 +282,7 @@ export default function OfficerConsequenceRules() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
                         <Badge className="bg-purple-100 text-purple-700">
-                          {rule.event_category || rule.event?.title || 'All Events'}
+                          {rule.event?.title || 'All Events'}
                         </Badge>
                         <span className="text-slate-400 text-sm">→</span>
                         <span className="text-slate-900 font-semibold">{rule.consequence_title}</span>

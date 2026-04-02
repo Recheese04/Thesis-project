@@ -13,7 +13,7 @@ class Attendance extends Model
 
     protected $fillable = [
         'event_id',
-        'student_id',      // This is students.id (bigint PK from students table)
+        'user_id',
         'attendance_type',
         'time_in',
         'time_out',
@@ -34,15 +34,12 @@ class Attendance extends Model
     }
 
     /**
-     * Student relationship.
-     * attendances.student_id → students.id (bigint PK)
-     * 
-     * This loads the full Student record with all its relationships
-     * (department, program, etc.)
+     * User relationship.
+     * attendances.user_id → users.id
      */
-    public function student()
+    public function user()
     {
-        return $this->belongsTo(Student::class, 'student_id', 'id');
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
     // ── Accessors ──────────────────────────────────────────────────────────

@@ -14,28 +14,41 @@ class User extends Authenticatable
     protected $fillable = [
         'email',
         'password_hash',
-        'student_id',
         'user_type_id',
         'is_active',
+        'student_number',
+        'first_name',
+        'middle_name',
+        'last_name',
+        'course',
+        'year_level',
+        'contact_number',
+        'department_id',
+        'rfid_uid',
+        'profile_picture',
     ];
 
     protected $hidden = [
         'password_hash',
-        'remember_token',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
     ];
 
+    protected $appends = ['profile_picture_url'];
+
     public function getAuthPassword()
     {
         return $this->password_hash;
     }
 
-    public function student()
+    public function getProfilePictureUrlAttribute()
     {
-        return $this->belongsTo(Student::class, 'student_id', 'id');
+        if ($this->profile_picture) {
+            return asset('storage/' . $this->profile_picture);
+        }
+        return null;
     }
 
     public function userType()
@@ -43,34 +56,56 @@ class User extends Authenticatable
         return $this->belongsTo(UserType::class, 'user_type_id');
     }
 
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
     public function attendances()
     {
-        return $this->hasMany(Attendance::class, 'student_id', 'student_id');
+        return $this->hasMany(Attendance::class, 'user_id');
+    }
+
+    public function designations()
+    {
+        return $this->hasMany(Designation::class, 'user_id');
     }
 
     public function isAdmin(): bool
     {
-        return is_null($this->student_id);
+        return $this->user_type_id === 1;
     }
 
-    public function getOfficerMembership(): ?MemberOrganization
+    public function getOfficerDesignation(): ?Designation
     {
-        if (!$this->student_id) return null;
+        if ($this->isAdmin()) return null;
 
-        return MemberOrganization::where('student_id', $this->student_id)
-            ->whereIn('role', ['officer', 'adviser'])
+        return Designation::where('user_id', $this->id)
+            ->whereNotIn('designation', ['Member'])
             ->where('status', 'active')
             ->first();
     }
 
     public function getOfficerOrganizationId(): ?int
     {
-        return $this->getOfficerMembership()?->organization_id;
+        return $this->getOfficerDesignation()?->organization_id;
     }
 
     public function isOfficer(): bool
     {
         return $this->getOfficerOrganizationId() !== null;
+    }
+
+    public function isOfficerOf($organizationId): bool
+    {
+        if ($this->isAdmin()) return true;
+        if (!$organizationId) return false;
+
+        return Designation::where('user_id', $this->id)
+            ->where('organization_id', $organizationId)
+            ->whereNotIn('designation', ['Member'])
+            ->where('status', 'active')
+            ->exists();
     }
 
     public function scopeActive($query)
@@ -80,6 +115,6 @@ class User extends Authenticatable
 
     public function scopeStudents($query)
     {
-        return $query->whereNotNull('student_id');
+        return $query->whereNotNull('student_number');
     }
 }

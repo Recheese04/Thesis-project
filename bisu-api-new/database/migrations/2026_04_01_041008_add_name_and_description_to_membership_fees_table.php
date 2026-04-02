@@ -11,8 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('clearance_requirements', function (Blueprint $table) {
-            $table->string('semester')->default('2nd')->after('school_year_id');
+        Schema::table('membership_fees', function (Blueprint $table) {
+            $table->string('name')->after('users_id');
+            $table->text('description')->nullable()->after('name');
         });
     }
 
@@ -21,8 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('clearance_requirements', function (Blueprint $table) {
-            $table->dropColumn('semester');
+        Schema::table('membership_fees', function (Blueprint $table) {
+            $table->dropColumn(['name', 'description']);
         });
     }
 };

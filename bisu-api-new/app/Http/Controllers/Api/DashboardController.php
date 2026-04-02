@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\Organization;
-use App\Models\Student;
+use App\Models\User;
 use App\Models\SchoolYear;
 use App\Models\Attendance;
 use Illuminate\Http\Request;
@@ -21,7 +21,7 @@ class DashboardController extends Controller
             $schoolYearId = $active ? $active->id : null;
         }
 
-        $totalStudents = Student::count();
+        $totalStudents = User::whereNotNull('student_number')->count();
         $totalOrgs = Organization::count();
         
         $eventQuery = Event::where('school_year_id', $schoolYearId);
@@ -46,10 +46,10 @@ class DashboardController extends Controller
     public function officerStats(Request $request)
     {
         $user = auth()->user();
-        $orgId = $user->getOfficerOrganizationId();
+        $orgId = $request->input('organization_id') ?: $user->getOfficerOrganizationId();
         
-        if (!$orgId) {
-            return response()->json(['message' => 'Not an officer'], 403);
+        if (!$orgId || !$user->isOfficerOf($orgId)) {
+            return response()->json(['message' => 'Not an officer of this organization'], 403);
         }
 
         $schoolYearId = $request->query('school_year_id');
@@ -58,9 +58,8 @@ class DashboardController extends Controller
             $schoolYearId = $active ? $active->id : null;
         }
 
-        $totalMembers = \App\Models\MemberOrganization::where('organization_id', $orgId)
+        $totalMembers = \App\Models\Designation::where('organization_id', $orgId)
             ->where('status', 'active')
-            ->where('school_year_id', $schoolYearId)
             ->count();
 
         $eventQuery = Event::where('organization_id', $orgId)

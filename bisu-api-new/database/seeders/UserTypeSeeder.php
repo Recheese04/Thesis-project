@@ -9,7 +9,7 @@ class UserTypeSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach (['Admin', 'Officer', 'Member'] as $name) {
+        foreach (['Admin', 'Officer', 'Student'] as $name) {
             UserType::firstOrCreate(['name' => $name]);
         }
     }
