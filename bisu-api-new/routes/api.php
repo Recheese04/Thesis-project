@@ -24,7 +24,24 @@ use App\Models\Designation;
 use App\Models\User;
 
 Route::post('/login', [AuthController::class , 'login']);
-Route::any('/login-test', function() { return response()->json(['message' => 'Login route is alive']); });
+
+// TEMPORARY DEBUG: Check user existence and password hash (REMOVE AFTER FIXING)
+Route::any('/debug-user', function() {
+    $email = request('email', 'rechiejames4@gmail.com');
+    $user = \App\Models\User::where('email', $email)->first();
+    if (!$user) {
+        return response()->json(['error' => 'User not found', 'email' => $email]);
+    }
+    $hashStart = substr($user->password_hash ?? 'NULL', 0, 20);
+    $checkResult = \Illuminate\Support\Facades\Hash::check('password', $user->password_hash ?? '');
+    return response()->json([
+        'user_found' => true,
+        'email' => $user->email,
+        'hash_preview' => $hashStart . '...',
+        'password_check' => $checkResult ? 'MATCH' : 'NO MATCH',
+        'hash_column' => $user->password_hash ? 'has value' : 'NULL or empty',
+    ]);
+});
 
 
 Route::middleware('auth:sanctum')->group(function () {
