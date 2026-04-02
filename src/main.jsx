@@ -6,7 +6,7 @@ import './index.css';
 
 // 2. Configure Axios Defaults
 axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || '';
-axios.defaults.withCredentials = true; // Required for Sanctum session cookies
+axios.defaults.withCredentials = false; // Disable for cross-domain Bearer token auth
 
 // 3. Add global interceptor for 401 Unauthorized errors (expired tokens)
 axios.interceptors.response.use(

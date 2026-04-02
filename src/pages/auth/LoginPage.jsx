@@ -31,7 +31,6 @@ export default function LoginPage() {
     }
 
     try {
-      await axios.get('/sanctum/csrf-cookie', { withCredentials: true });
 
       const response = await axios.post('/api/login', {
         email: formData.email,
