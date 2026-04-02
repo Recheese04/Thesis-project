@@ -18,8 +18,8 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
+# Enable Apache modules for rewrite and CORS headers
+RUN a2enmod rewrite headers
 
 # Set working directory
 WORKDIR /var/www/html
