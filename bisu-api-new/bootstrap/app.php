@@ -12,8 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Prepend our custom CORS middleware so it runs FIRST and catches ALL responses (including crashes)
-        $middleware->prepend(\App\Http\Middleware\Cors::class);
+        // CORS is handled by Apache .htaccess — no PHP middleware needed
 
         // ✅ FIX: Return JSON 401 instead of crashing with "Route [login] not defined"
         $middleware->redirectGuestsTo(fn() => response()->json(['message' => 'Unauthenticated.'], 401));
