@@ -5,7 +5,7 @@ import App from './App';
 import './index.css';
 
 // 2. Configure Axios Defaults
-axios.defaults.baseURL = '';
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || '';
 axios.defaults.withCredentials = true; // Required for Sanctum session cookies
 
 // 3. Add global interceptor for 401 Unauthorized errors (expired tokens)
