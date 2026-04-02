@@ -23,7 +23,8 @@ use App\Http\Controllers\Api\ChatbotController;
 use App\Models\Designation;
 use App\Models\User;
 
-Route::post('/login', [AuthController::class , 'login'])->middleware('throttle:5,1');
+Route::post('/login', [AuthController::class , 'login']);
+Route::any('/login-test', function() { return response()->json(['message' => 'Login route is alive']); });
 
 
 Route::middleware('auth:sanctum')->group(function () {
