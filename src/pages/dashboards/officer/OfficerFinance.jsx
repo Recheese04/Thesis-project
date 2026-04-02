@@ -105,7 +105,7 @@ export default function OfficerFinance() {
             const { data } = await api().get(`/organizations/${orgId}/membership-fees`, {
                 params: { school_year: schoolYear, semester },
             });
-            setMembers(data);
+            setMembers(Array.isArray(data) ? data.map(m => ({ ...m, fees: m.fees || [] })) : []);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to load financial data.');
         } finally {
@@ -144,7 +144,7 @@ export default function OfficerFinance() {
             // local update
             setMembers(prev => prev.map(m => ({
                 ...m,
-                fees: m.fees.map(f => f.id === feeId ? { ...f, status } : f)
+                fees: (m.fees || []).map(f => f.id === feeId ? { ...f, status } : f)
             })));
         } catch (err) {
             alert(err.response?.data?.message || 'Failed to update status.');
@@ -157,7 +157,7 @@ export default function OfficerFinance() {
 
     // ── Computations ──────────────────────────────────────────────────────────
     const totalMembers = members.length;
-    const allFees = members.flatMap(m => m.fees);
+    const allFees = members.flatMap(m => m.fees || []);
     const clearedPayments = allFees.filter((f) => f.status === 'paid');
     const pendingPayments = allFees.filter((f) => f.status !== 'paid');
 
@@ -166,14 +166,15 @@ export default function OfficerFinance() {
     const pendingRevenue = targetRevenue - collectedRevenue;
     const collectionRate = targetRevenue > 0 ? (collectedRevenue / targetRevenue) * 100 : 0;
 
-    const fullyClearedMembers = members.filter(m => m.fees.length > 0 && m.fees.every(f => f.status === 'paid')).length;
+    const fullyClearedMembers = members.filter(m => (m.fees || []).length > 0 && (m.fees || []).every(f => f.status === 'paid')).length;
 
     // Filter & search
     const filtered = members.filter((m) => {
         const matchName = m.student_name.toLowerCase().includes(search.toLowerCase());
-        const isFullyPaid = m.fees.length > 0 && m.fees.every(f => f.status === 'paid');
-        const isPending = m.fees.some(f => f.status !== 'paid');
-        const hasNoFee = m.fees.length === 0;
+        const fees = m.fees || [];
+        const isFullyPaid = fees.length > 0 && fees.every(f => f.status === 'paid');
+        const isPending = fees.some(f => f.status !== 'paid');
+        const hasNoFee = fees.length === 0;
         
         if (filter === 'fully_paid') return matchName && isFullyPaid;
         if (filter === 'pending') return matchName && isPending;
@@ -381,8 +382,8 @@ export default function OfficerFinance() {
                                         {[
                                             { key: 'all', label: 'All', count: totalMembers },
                                             { key: 'fully_paid', label: 'Fully Paid', count: fullyClearedMembers },
-                                            { key: 'pending', label: 'Pending', count: members.filter(m => m.fees.some(f => f.status !== 'paid')).length },
-                                            { key: 'none', label: 'No Fees', count: members.filter(m => m.fees.length === 0).length },
+                                            { key: 'pending', label: 'Pending', count: members.filter(m => (m.fees || []).some(f => f.status !== 'paid')).length },
+                                            { key: 'none', label: 'No Fees', count: members.filter(m => (m.fees || []).length === 0).length },
                                         ].map((f) => (
                                             <button
                                                 key={f.key}
