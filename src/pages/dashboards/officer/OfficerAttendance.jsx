@@ -62,7 +62,7 @@ export default function OfficerAttendance() {
     const rows = [
       ['Name', 'Student ID', 'Check In', 'Check Out', 'Duration', 'Status'],
       ...attendance.map(r => [
-        r.student?.name ?? '—', r.student?.student_id ?? '—',
+        r.user?.name ?? '—', r.user?.student_number ?? '—',
         formatTime(r.time_in), formatTime(r.time_out),
         r.formatted_duration ?? '—', r.status,
       ])
@@ -79,8 +79,8 @@ export default function OfficerAttendance() {
     if (!searchQuery.trim()) return attendance;
     const q = searchQuery.toLowerCase();
     return attendance.filter(a =>
-      a.student?.name?.toLowerCase().includes(q) ||
-      a.student?.student_number?.toLowerCase().includes(q)
+      a.user?.name?.toLowerCase().includes(q) ||
+      a.user?.student_number?.toLowerCase().includes(q)
     );
   }, [attendance, searchQuery]);
 
@@ -90,13 +90,13 @@ export default function OfficerAttendance() {
         <div className="flex items-center gap-3">
           <Avatar className="w-9 h-9">
             <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold text-xs">
-              {getInitials(record.student?.name)}
+              {getInitials(record.user?.name)}
             </AvatarFallback>
           </Avatar>
-          <span className="font-medium text-slate-900">{record.student?.name ?? '—'}</span>
+          <span className="font-medium text-slate-900">{record.user?.name ?? '—'}</span>
         </div>
       </TableCell>
-      <TableCell><span className="font-mono text-sm">{record.student?.student_number ?? '—'}</span></TableCell>
+      <TableCell><span className="font-mono text-sm">{record.user?.student_number ?? '—'}</span></TableCell>
       <TableCell><Badge variant="outline" className="text-xs capitalize">{record.attendance_type}</Badge></TableCell>
       <TableCell>{formatTime(record.time_in)}</TableCell>
       <TableCell>{formatTime(record.time_out)}</TableCell>
@@ -111,12 +111,12 @@ export default function OfficerAttendance() {
         <div className="flex items-center gap-2 min-w-0">
           <Avatar className="w-8 h-8 shrink-0">
             <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold text-xs">
-              {getInitials(record.student?.name)}
+              {getInitials(record.user?.name)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="font-medium text-slate-900 text-sm truncate">{record.student?.name ?? '—'}</p>
-            <p className="text-xs text-slate-500 font-mono">{record.student?.student_number ?? '—'}</p>
+            <p className="font-medium text-slate-900 text-sm truncate">{record.user?.name ?? '—'}</p>
+            <p className="text-xs text-slate-500 font-mono">{record.user?.student_number ?? '—'}</p>
           </div>
         </div>
         <StatusBadge status={record.status} />
@@ -275,9 +275,9 @@ export default function OfficerAttendance() {
                 <div className="space-y-10">
                   {Object.entries(
                     filteredAttendance.reduce((acc, record) => {
-                      const dept = record.student?.department?.name || 'Unknown Department';
-                      const course = record.student?.course || 'Unknown Course';
-                      const year = record.student?.year_level ? `Year ${record.student.year_level}` : 'Unknown Year';
+                      const dept = record.user?.department?.name || 'Unknown Department';
+                      const course = record.user?.course || 'Unknown Course';
+                      const year = record.user?.year_level ? `Year ${record.user.year_level}` : 'Unknown Year';
                       const key = `${dept} — ${course} (${year})`;
 
                       if (!acc[key]) acc[key] = [];

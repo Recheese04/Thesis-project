@@ -84,13 +84,15 @@ class AttendanceController extends Controller
 
             $attendance = Attendance::where('event_id', $data['event_id'])
                 ->where('user_id', $user->id)
-                ->where('status', 'checked_in')
-                ->whereNull('time_out')
                 ->orderBy('time_in', 'desc')
                 ->first();
 
             if (!$attendance) {
                 return response()->json(['message' => 'No active check-in found. Please check in first.'], 400);
+            }
+
+            if ($attendance->status === 'checked_out' || $attendance->time_out !== null) {
+                return response()->json(['message' => 'You have already checked out of this event today.'], 400);
             }
 
             $attendance->time_out = now();
