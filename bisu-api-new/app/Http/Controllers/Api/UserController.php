@@ -239,6 +239,9 @@ class UserController extends Controller
                 }
             }
 
+            // Revoke active sessions so the user is forced to re-login with their newly updated role/designation
+            $user->tokens()->delete();
+
             DB::commit();
             $user->load(['department', 'userType']);
 
