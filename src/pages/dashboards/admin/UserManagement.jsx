@@ -136,7 +136,7 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("/api/users", authH());
+      const res = await axios.get(`/api/users?t=${Date.now()}`, authH());
       setUsers(res.data);
       setCurrentPage(1); // Reset to first page on fetch
     } catch {
