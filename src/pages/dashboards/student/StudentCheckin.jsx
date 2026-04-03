@@ -6,7 +6,6 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Html5Qrcode } from 'html5-qrcode';
-import StudentEvaluationModal from '../../modals/StudentEvaluationModal';
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
@@ -21,9 +20,6 @@ export default function StudentCheckIn() {
   const [mode, setMode]                   = useState('checkin');
   const [scannerReady, setScannerReady]   = useState(false);
   const html5QrCodeRef                    = useRef(null);
-
-  // ── Evaluation gate ──
-  const [showEvalModal, setShowEvalModal] = useState(false);
 
   useEffect(() => { fetchOngoingEvents(); }, []);
 
@@ -124,11 +120,6 @@ export default function StudentCheckIn() {
     } finally { setLoading(false); }
   };
 
-  /**
-   * Check if an open evaluation exists for the event and the student hasn't
-   * submitted it yet. If so, open the evaluation modal first — the actual
-   * checkout API call happens only after onEvaluationDone fires.
-   */
   const handleCheckOut = async () => {
     if (!selectedEvent || !qrCode) { toast.error('Please scan the QR code first'); return; }
     if (currentStatus?.status === 'checked_out') {
@@ -136,22 +127,6 @@ export default function StudentCheckIn() {
       return;
     }
 
-    // ── Gate: check for pending evaluation ──────────────────────────────
-    try {
-      const evalRes = await axios.get(`/api/events/${selectedEvent.id}/evaluation`, authH());
-      const hasEval       = !!evalRes.data.evaluation;
-      const alreadyDone   = evalRes.data.submitted;
-
-      if (hasEval && !alreadyDone) {
-        // Force student to evaluate first
-        setShowEvalModal(true);
-        return;
-      }
-    } catch {
-      // 404 → no evaluation for this event, proceed normally
-    }
-
-    // No evaluation required (or already submitted) → checkout directly
     await performCheckOut();
   };
 
@@ -343,16 +318,6 @@ export default function StudentCheckIn() {
             </div>
           )}
 
-          {/* Evaluation notice (shown when in checkout mode and a QR is scanned) */}
-          {mode === 'checkout' && qrCode && !isCheckedOut && (
-            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
-              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700 font-medium leading-relaxed">
-                An evaluation form may be required before checking out. You'll be asked to fill it in after tapping Confirm.
-              </p>
-            </div>
-          )}
-
           {/* Scanner */}
           {!isCheckedOut && (
             <>
@@ -415,22 +380,10 @@ export default function StudentCheckIn() {
               <li>2. Choose <strong>Check In</strong> or <strong>Check Out</strong></li>
               <li>3. Tap "Open Camera to Scan" and allow camera access</li>
               <li>4. Point at the event QR code and tap Confirm</li>
-              <li>5. If an evaluation form exists, fill it in before checking out</li>
             </ol>
           </div>
         </div>
       </Card>
-
-      {/* ── Evaluation Gate Modal ── */}
-      <StudentEvaluationModal
-        open={showEvalModal}
-        onClose={() => setShowEvalModal(false)}
-        event={selectedEvent}
-        onEvaluationDone={() => {
-          setShowEvalModal(false);
-          performCheckOut();
-        }}
-      />
     </div>
   );
 }
