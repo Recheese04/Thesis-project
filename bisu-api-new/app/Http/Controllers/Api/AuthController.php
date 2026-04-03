@@ -84,7 +84,7 @@ class AuthController extends Controller
         // For everyone else, check their designations
         $membership = null;
         $organizationId = null;
-        $role = $user->user_type_id == 2 ? 'officer' : 'student';
+        $role = 'student'; // Default fallback
 
         // Get all active designations, prioritize non-Member ones first
         $membership = Designation::with('organization')
