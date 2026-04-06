@@ -7,6 +7,9 @@ php artisan route:clear
 php artisan cache:clear
 php artisan view:clear
 
+# Run any pending migrations
+php artisan migrate --force
+
 # Generate optimized config/routes for production
 php artisan config:cache
 php artisan route:cache
