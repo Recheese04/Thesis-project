@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, AlertCircle, QrCode, Users, BarChart3, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
 import { useSchoolYear } from '@/context/SchoolYearContext';
+import PageLoader from '@/components/ui/PageLoader';
 
 const features = [
   { icon: QrCode, title: 'QR Code Check-In', desc: 'Instant attendance marking via QR scan' },
@@ -69,7 +70,6 @@ export default function LoginPage() {
 
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
-    } finally {
       setLoading(false);
     }
   };
@@ -211,7 +211,12 @@ export default function LoginPage() {
         }
       `}</style>
 
-      <div className="login-root min-h-screen flex bg-white">
+      <div className="login-root h-[100dvh] overflow-hidden sm:min-h-screen sm:h-auto sm:overflow-visible flex bg-white">
+        {loading && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/60 backdrop-blur-sm">
+            <PageLoader text="Authenticating..." />
+          </div>
+        )}
 
         {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
         <div className="hidden lg:flex lg:w-[56%] panel-clip relative overflow-hidden anim-panel"
@@ -310,7 +315,7 @@ export default function LoginPage() {
         </div>
 
         {/* ── RIGHT PANEL (Form) ───────────────────────────────────────────── */}
-        <div className="flex-1 flex items-center justify-center p-6 sm:p-10 lg:px-14 bg-slate-50 lg:bg-white relative overflow-hidden">
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-10 lg:px-14 bg-slate-50 lg:bg-white relative overflow-y-auto sm:overflow-hidden h-full">
 
           {/* Mobile Background Elements & 3D Icons */}
           <div className="absolute inset-0 block lg:hidden pointer-events-none">
@@ -338,34 +343,34 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="w-full max-w-[420px] anim-form relative z-10 bg-white/80 backdrop-blur-md lg:bg-transparent rounded-3xl lg:rounded-none shadow-2xl lg:shadow-none p-8 lg:p-0 border border-white/40 lg:border-none">
+          <div className="w-full max-w-[420px] anim-form relative z-10 bg-white/80 backdrop-blur-md lg:bg-transparent rounded-3xl lg:rounded-none shadow-2xl lg:shadow-none p-6 sm:p-8 lg:p-0 border border-white/40 lg:border-none my-auto">
 
             {/* Mobile logo header */}
-            <div className="flex lg:hidden flex-col items-center gap-3 mb-10 mt-2">
+            <div className="flex lg:hidden flex-col items-center gap-2 mb-6 mt-0 sm:mb-10 sm:mt-2">
               <div className="relative">
                 <div className="absolute inset-0 bg-blue-500 rounded-full blur-md opacity-20"></div>
-                <img src="/bisu-logo.png" alt="BISU" className="w-16 h-16 rounded-full object-cover relative z-10 border-2 border-white shadow-md" />
+                <img src="/bisu-logo.png" alt="BISU" className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover relative z-10 border-2 border-white shadow-md" />
               </div>
               <div className="text-center">
-                <h1 className="font-display font-extrabold text-[#0f172a] text-xl tracking-tight leading-none mb-1">TAPasok</h1>
-                <p className="text-blue-600 font-semibold text-[10px] tracking-widest uppercase">BISU Candijay</p>
+                <h1 className="font-display font-extrabold text-[#0f172a] text-lg sm:text-xl tracking-tight leading-none mb-0.5 sm:mb-1">TAPasok</h1>
+                <p className="text-blue-600 font-semibold text-[9px] sm:text-[10px] tracking-widest uppercase">BISU Candijay</p>
               </div>
             </div>
 
             {/* Heading */}
-            <div className="mb-8 text-center lg:text-left">
-              <h2 className="font-display font-extrabold text-[#0f172a] mb-2"
-                style={{ fontSize: 'clamp(24px, 5vw, 28px)', letterSpacing: '-0.5px' }}>
+            <div className="mb-5 sm:mb-8 text-center lg:text-left">
+              <h2 className="font-display font-extrabold text-[#0f172a] mb-1 sm:mb-2"
+                style={{ fontSize: 'clamp(20px, 5vw, 28px)', letterSpacing: '-0.5px' }}>
                 Welcome back 👋
               </h2>
-              <p style={{ color: '#64748b', fontSize: '14.5px' }}>
+              <p style={{ color: '#64748b', fontSize: '13.5px' }} className="sm:text-[14.5px]">
                 Sign in to your account to continue
               </p>
             </div>
 
             {/* Error alert */}
             {error && (
-              <div className="anim-shake mb-5 p-3.5 rounded-xl flex items-start gap-2.5"
+              <div className="anim-shake mb-4 sm:mb-5 p-3 sm:p-3.5 rounded-xl flex items-start gap-2.5"
                 style={{ background: '#fef2f2', border: '1.5px solid #fecaca' }}>
                 <AlertCircle style={{ width: 16, height: 16, color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
                 <p style={{ color: '#dc2626', fontSize: 13.5, lineHeight: 1.5 }}>{error}</p>
@@ -375,8 +380,8 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit}>
 
               {/* Email */}
-              <div className="mb-5">
-                <label htmlFor="email" className="font-display block mb-2"
+              <div className="mb-4 sm:mb-5">
+                <label htmlFor="email" className="font-display block mb-1.5 sm:mb-2"
                   style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
                   Email Address
                 </label>
@@ -388,15 +393,15 @@ export default function LoginPage() {
                     placeholder="you@bisu.edu.ph"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="field"
+                    className="field h-11 sm:h-[46px] text-[13px] sm:text-[14px]"
                     required
                   />
                 </div>
               </div>
 
               {/* Password */}
-              <div className="mb-5">
-                <div className="flex items-center justify-between mb-2">
+              <div className="mb-4 sm:mb-5">
+                <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                   <label htmlFor="password" className="font-display"
                     style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
                     Password
@@ -416,7 +421,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="field field-pr"
+                    className="field field-pr h-11 sm:h-[46px] text-[13px] sm:text-[14px]"
                     required
                   />
                   <button
@@ -435,15 +440,15 @@ export default function LoginPage() {
               </div>
 
               {/* Remember me */}
-              <div className="flex items-start gap-2.5 mb-6">
-                <input id="remember" type="checkbox" className="custom-check" />
-                <label htmlFor="remember" style={{ fontSize: 14, color: '#64748b', cursor: 'pointer', userSelect: 'none', lineHeight: 1.5 }}>
+              <div className="flex items-start gap-2.5 mb-5 sm:mb-6">
+                <input id="remember" type="checkbox" className="custom-check w-[14px] h-[14px] sm:w-[16px] sm:h-[16px]" />
+                <label htmlFor="remember" style={{ color: '#64748b', cursor: 'pointer', userSelect: 'none', lineHeight: 1.5 }} className="text-[13px] sm:text-[14px]">
                   Keep me signed in for 30 days
                 </label>
               </div>
 
               {/* Submit */}
-              <button type="submit" disabled={loading} className="submit-btn mb-5">
+              <button type="submit" disabled={loading} className="submit-btn mb-4 sm:mb-5 h-11 sm:h-12 text-[14px] sm:text-[15px]">
                 {loading ? (
                   <>
                     <span className="anim-spin" style={{
@@ -459,14 +464,14 @@ export default function LoginPage() {
             </form>
 
             {/* Divider */}
-            <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-center gap-3 mb-4 sm:mb-5">
               <div className="flex-1 h-px" style={{ background: '#f1f5f9' }} />
               <span style={{ color: '#cbd5e1', fontSize: 12, fontWeight: 500 }}>or</span>
               <div className="flex-1 h-px" style={{ background: '#f1f5f9' }} />
             </div>
 
             {/* Register */}
-            <p className="text-center" style={{ fontSize: 14, color: '#94a3b8' }}>
+            <p className="text-center text-[13px] sm:text-[14px]" style={{ color: '#94a3b8' }}>
               Don't have an account?{' '}
               <Link to="/register"
                 style={{ color: '#2563eb', fontWeight: 700, textDecoration: 'none', fontFamily: 'Plus Jakarta Sans, sans-serif' }}
@@ -477,9 +482,9 @@ export default function LoginPage() {
             </p>
 
             {/* Security note */}
-            <div className="flex items-center justify-center gap-1.5 mt-8">
-              <ShieldCheck style={{ width: 13, height: 13, color: '#cbd5e1' }} />
-              <span style={{ fontSize: 11.5, color: '#cbd5e1' }}>Secured with end-to-end encryption</span>
+            <div className="flex items-center justify-center gap-1.5 mt-4 sm:mt-8">
+              <ShieldCheck style={{ width: 12, height: 12, color: '#cbd5e1' }} className="sm:w-[13px] sm:h-[13px]" />
+              <span style={{ color: '#cbd5e1' }} className="text-[10px] sm:text-[11.5px]">Secured with end-to-end encryption</span>
             </div>
 
           </div>

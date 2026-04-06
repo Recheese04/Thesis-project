@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
@@ -16,6 +17,17 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import PageLoader from '@/components/ui/PageLoader';
 
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Menu Structures Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
@@ -170,6 +182,9 @@ export default function Sidebar({ onClose }) {
   const isAdmin = userRole === 'admin';
   const isOfficer = userRole === 'officer';
 
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   // Re-read user from localStorage whenever 'userUpdated' is dispatched
   const [storedUser, setStoredUser] = useState(
     () => JSON.parse(localStorage.getItem('user') || '{}')
@@ -198,7 +213,21 @@ export default function Sidebar({ onClose }) {
   const getInitials = (name) =>
     name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    setLogoutOpen(false);
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await axios.post('/api/logout', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (e) {
+      // Ignore API errors on logout
+    }
+
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('user_role');
@@ -277,6 +306,14 @@ export default function Sidebar({ onClose }) {
 
   return (
     <div className="w-64 h-screen bg-white border-r border-slate-200 flex flex-col">
+      {/* Loading Overlay */}
+      {isLoggingOut && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/60 backdrop-blur-sm">
+          <PageLoader text="Logging out..." />
+        </div>,
+        document.body
+      )}
+
       {/* Logo Header */}
       <div className="h-16 px-4 flex items-center justify-between border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-3">
@@ -491,7 +528,13 @@ export default function Sidebar({ onClose }) {
               )}
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={handleLogout}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  // For Radix UI DropdownMenu closing before AlertDialog opens
+                  // you can either keep it open (via preventDefault) or close it and timeout.
+                  // We'll just let preventDefault handle keeping it open or using document.body trigger.
+                  setLogoutOpen(true);
+                }}
                 className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg"
               >
                 <LogOut className="mr-2 h-4 w-4" />
@@ -501,6 +544,23 @@ export default function Sidebar({ onClose }) {
           </DropdownMenu>
         </div>
       </div>
+
+      <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <AlertDialogContent className="w-[90vw] sm:max-w-[425px] rounded-2xl p-6">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to log out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will be redirected to the login page and your current session will be closed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="mt-0 w-full sm:w-auto">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLogout} className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto">
+              Log out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

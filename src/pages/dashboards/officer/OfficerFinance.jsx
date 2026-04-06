@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
+import PageLoader from '@/components/ui/PageLoader';
 import axios from 'axios';
 
 const api = () =>
@@ -275,10 +276,7 @@ export default function OfficerFinance() {
 
             {/* ── Loading ── */}
             {loading && (
-                <div className="flex flex-col items-center justify-center h-60 gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-                    <p className="text-sm text-slate-400">Loading treasury data…</p>
-                </div>
+                <PageLoader text="Loading Treasury Data..." />
             )}
 
             {/* ── Error ── */}

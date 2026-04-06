@@ -4,6 +4,7 @@ import { CheckCircle, Clock, Calendar, DollarSign, AlertTriangle, Loader2, Alert
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import PageLoader from '@/components/ui/PageLoader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
@@ -35,12 +36,7 @@ export default function StudentObligations() {
   const rate = total > 0 ? Math.round((completed.length / total) * 100) : 0;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24 text-slate-400 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm">Loading obligations…</span>
-      </div>
-    );
+    return <PageLoader text="Loading Obligations..." />;
   }
 
   if (error) {

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import PageLoader from "@/components/ui/PageLoader";
 import { toast } from "sonner";
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
@@ -260,10 +261,7 @@ function ResultsView({ evaluationId, onBack }) {
       </div>
 
       {loading ? (
-        <div className="py-16 text-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[#7c3aed] mx-auto mb-2" />
-          <span className="text-sm text-slate-400">Loading results…</span>
-        </div>
+        <PageLoader text="Loading Results..." />
       ) : !data ? (
         <div className="py-16 text-center">
           <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
@@ -503,10 +501,7 @@ function ManageEvaluation({ event, onBack }) {
       </div>
 
       {loading ? (
-        <div className="py-16 text-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[#7c3aed] mx-auto mb-2" />
-          <span className="text-sm text-slate-400">Loading…</span>
-        </div>
+        <PageLoader text="Loading Evaluation..." />
       ) : (
         <>
           {/* ── MANAGE VIEW ── */}
@@ -830,10 +825,7 @@ function EventList({ onSelect }) {
 
       {/* List */}
       {loading ? (
-        <div className="py-16 text-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[#7c3aed] mx-auto mb-2" />
-          <span className="text-sm text-slate-400">Loading events…</span>
-        </div>
+        <PageLoader text="Loading Events..." />
       ) : !filtered.length ? (
         <div className="py-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">

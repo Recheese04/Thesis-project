@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import Avatar from "@/components/Avatar";
+import PageLoader from "@/components/ui/PageLoader";
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
@@ -232,9 +233,7 @@ export default function StudentProfile() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <Loader2 className="w-8 h-8 animate-spin text-[#0f2d5e]" />
-            </div>
+            <PageLoader text="Loading Profile..." />
         );
     }
 

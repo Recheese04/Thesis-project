@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import EvaluationModal from "../../modals/EvaluationModal";
 import { useSchoolYear } from "@/context/SchoolYearContext";
+import PageLoader from "@/components/ui/PageLoader";
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
@@ -578,10 +579,7 @@ export default function OfficerEvents() {
           {/* ── Mobile cards ── */}
           <div className="sm:hidden">
             {loading ? (
-              <div className="py-16 text-center">
-                <Loader2 className="w-6 h-6 animate-spin text-[#1e4db7] mx-auto mb-2" />
-                <span className="text-sm text-slate-400">Loading events…</span>
-              </div>
+              <PageLoader text="Loading Events..." />
             ) : filtered.length === 0 ? (
               <div className="py-16 text-center px-4">
                 <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -646,10 +644,7 @@ export default function OfficerEvents() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {loading ? (
-                  <tr><td colSpan="5" className="py-20 text-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-[#1e4db7] mx-auto mb-2" />
-                    <span className="text-sm text-slate-400">Loading events…</span>
-                  </td></tr>
+                  <tr><td colSpan="5"><PageLoader text="Loading Events..." /></td></tr>
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan="5" className="py-20 text-center">
                     <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />

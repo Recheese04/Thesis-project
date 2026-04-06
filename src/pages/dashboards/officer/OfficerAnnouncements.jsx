@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogDescription,
   DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import PageLoader from '@/components/ui/PageLoader';
 
 // ── Auth / fetch helpers (same pattern as OfficerMembers) ──────────────────
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
@@ -147,9 +148,8 @@ export default function OfficerAnnouncements() {
   // ── guards ────────────────────────────────────────────────────────────────
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center py-24 text-slate-400 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm">Loading your organization…</span>
+      <div className="py-24">
+        <PageLoader text="Loading Your Organization..." />
       </div>
     );
   }
@@ -202,10 +202,7 @@ export default function OfficerAnnouncements() {
 
         {/* Loading / Error / Empty */}
         {loading && (
-          <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm">Loading announcements…</span>
-          </div>
+          <PageLoader text="Loading Announcements..." />
         )}
 
         {!loading && error && (

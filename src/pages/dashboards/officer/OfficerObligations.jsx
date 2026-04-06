@@ -16,6 +16,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import PageLoader from '@/components/ui/PageLoader';
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
@@ -213,11 +214,8 @@ export default function OfficerObligations() {
         />
       </div>
 
-      {/* Loading / Error */}
       {loading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
-        </div>
+        <PageLoader text="Loading Obligations..." />
       )}
       {error && !loading && (
         <Card className="border-red-200 bg-red-50">

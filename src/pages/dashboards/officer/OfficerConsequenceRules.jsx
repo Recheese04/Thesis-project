@@ -5,6 +5,7 @@ import { Plus, Trash2, Pencil, AlertTriangle, Calendar, Loader2, X } from 'lucid
 import { Card, CardContent, CardHeader, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import PageLoader from '@/components/ui/PageLoader';
 import axios from 'axios';
 
 // ── Auth axios using your existing proxy ─────────────────────────────────────
@@ -249,9 +250,7 @@ export default function OfficerConsequenceRules() {
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center h-40">
-          <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
-        </div>
+        <PageLoader text="Loading Consequences..." />
       )}
 
       {/* Error */}

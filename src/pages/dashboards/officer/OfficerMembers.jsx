@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import MemberDetailsModal from '@/pages/modals/MemberDetailsModal';
+import PageLoader from '@/components/ui/PageLoader';
 
 // ── Same pattern as OfficerEvents — axios with relative /api URLs via Vite proxy ──
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
@@ -668,10 +669,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
   // Still resolving org from /me
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center py-24 text-slate-400 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm">Loading your organization…</span>
-      </div>
+      <PageLoader text="Loading your organization..." />
     );
   }
 
@@ -809,10 +807,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
 
             {/* Loading */}
             {loading && (
-              <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span className="text-sm">Loading members…</span>
-              </div>
+              <PageLoader text="Loading members..." />
             )}
 
             {/* Error */}

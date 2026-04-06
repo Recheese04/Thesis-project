@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import PageLoader from '@/components/ui/PageLoader';
 
 export default function StudentDocuments() {
   const [documents, setDocuments] = useState([]);
@@ -109,7 +110,7 @@ export default function StudentDocuments() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-slate-300" /></div>
+        <PageLoader text="Loading Documents..." />
       ) : filteredDocs.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-dashed">
           <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />

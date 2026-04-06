@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import axios from 'axios';
+import PageLoader from '@/components/ui/PageLoader';
 
 const API_URL = '/api';
 
@@ -120,14 +121,7 @@ export default function StudentEvents() {
   );
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
-          <p className="text-slate-600 text-sm">Loading events...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader text="Loading Events..." />;
   }
 
   if (error) {

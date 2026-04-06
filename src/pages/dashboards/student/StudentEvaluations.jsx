@@ -8,6 +8,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import PageLoader from "@/components/ui/PageLoader";
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
@@ -518,16 +519,7 @@ export default function StudentEvaluations() {
 
   // Loading evaluation
   if (loadingEval) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-3">
-            <Loader2 className="w-6 h-6 animate-spin text-[#1e4db7]" />
-          </div>
-          <p className="text-sm text-slate-400 font-medium">Loading evaluation…</p>
-        </div>
-      </div>
-    );
+    return <PageLoader text="Loading Evaluation..." />;
   }
 
   // Answer form
@@ -576,14 +568,8 @@ export default function StudentEvaluations() {
           </div>
         )}
 
-        {/* Content */}
         {loading ? (
-          <div className="py-20 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-3">
-              <Loader2 className="w-6 h-6 animate-spin text-[#1e4db7]" />
-            </div>
-            <p className="text-sm text-slate-400">Loading evaluations…</p>
-          </div>
+          <PageLoader text="Loading Evaluations..." />
         ) : evaluations.length === 0 ? (
           <div className="py-20 text-center">
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">

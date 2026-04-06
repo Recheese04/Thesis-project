@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Menu } from 'lucide-react';
+import Chatbot from '../ui/Chatbot';
 
 export default function OfficerLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -63,6 +64,8 @@ export default function OfficerLayout() {
           </div>
         )}
       </div>
+
+      <Chatbot />
     </div>
   );
 }

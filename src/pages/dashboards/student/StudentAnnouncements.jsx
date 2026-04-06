@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Bell, Calendar, User, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import PageLoader from '@/components/ui/PageLoader';
 
 // ── Auth / fetch helpers ───────────────────────────────────────────────────
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
@@ -45,12 +46,7 @@ export default function StudentAnnouncements() {
 
   // ── loading / error / empty guards ──────────────────────────────────────
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24 text-slate-400 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm">Loading announcements…</span>
-      </div>
-    );
+    return <PageLoader text="Loading Announcements..." />;
   }
 
   if (error) {
