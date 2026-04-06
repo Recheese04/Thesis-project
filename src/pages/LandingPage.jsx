@@ -61,7 +61,7 @@ const ACTIVITIES = [
 const FEATURES = [
   { icon: QrCode, title: "QR Code Check-In", desc: "Students scan to mark attendance instantly. No paper logs, no manual counting." },
   { icon: Cpu, title: "RFID Integration", desc: "Hardware-level check-in via RFID cards for supported events and venues." },
-  { icon: Users, title: "Member Management", desc: "Full roster of students, officers, and departments in one organized system." },
+  { icon: Users, title: "Member Management", desc: "Full roster of students, officers, and colleges in one organized system." },
   { icon: CalendarDays, title: "Event Scheduling", desc: "Create and manage events with attendance requirements and time windows." },
   { icon: FileCheck, title: "Clearance Automation", desc: "Attendance-based clearance issued automatically when requirements are met." },
   { icon: BarChart3, title: "Analytics & Reports", desc: "Visual dashboards showing attendance rates, trends, and event metrics." },

@@ -20,10 +20,10 @@ class User extends Authenticatable
         'first_name',
         'middle_name',
         'last_name',
-        'course',
         'year_level',
         'contact_number',
-        'department_id',
+        'college_id',
+        'course_id',
         'rfid_uid',
         'profile_picture',
     ];
@@ -56,9 +56,14 @@ class User extends Authenticatable
         return $this->belongsTo(UserType::class, 'user_type_id');
     }
 
-    public function department()
+    public function college()
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsTo(College::class, 'college_id');
+    }
+
+    public function course()
+    {
+        return $this->belongsTo(Course::class, 'course_id');
     }
 
     public function attendances()

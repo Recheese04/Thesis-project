@@ -660,7 +660,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
   const studentId = (m) => m.user?.student_number ?? '—';
   const email = (m) => m.user?.email ?? '—';
   const phone = (m) => m.user?.contact_number ?? '—';
-  const course = (m) => m.user?.course ?? '—';
+  const course = (m) => m.user?.course?.name ?? m.user?.course ?? '—';
   const yearLevel = (m) => m.user?.year_level ?? '—';
 
   // ── render ────────────────────────────────────────────────────────────────

@@ -56,7 +56,7 @@ class EventController extends Controller
             $this->syncEventStatuses();
 
             $user  = auth()->user();
-            $query = Event::with(['organization.department'])
+            $query = Event::with(['organization.college'])
                 ->orderBy('event_date', 'desc')
                 ->orderBy('event_time', 'desc');
 
@@ -104,7 +104,7 @@ class EventController extends Controller
     public function show($id)
     {
         try {
-            $event = Event::with(['organization.department'])->findOrFail($id);
+            $event = Event::with(['organization.college'])->findOrFail($id);
             return response()->json($event);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Event not found'], 404);
@@ -149,7 +149,7 @@ class EventController extends Controller
             $data['created_by']      = $user->id;
 
             $event = Event::create($data);
-            $event->load(['organization.department']);
+            $event->load(['organization.college']);
 
             return response()->json([
                 'message' => 'Event has been created successfully!',
@@ -187,7 +187,7 @@ class EventController extends Controller
             ]);
 
             $event->update($data);
-            $event->load(['organization.department']);
+            $event->load(['organization.college']);
 
             return response()->json([
                 'message' => 'Event has been updated successfully!',
@@ -237,7 +237,7 @@ class EventController extends Controller
             $this->syncEventStatuses();
 
             $user  = auth()->user();
-            $query = Event::with(['organization.department'])
+            $query = Event::with(['organization.college'])
                 ->where('status', 'ongoing')
                 ->orderBy('event_date', 'asc')
                 ->orderBy('event_time', 'asc');

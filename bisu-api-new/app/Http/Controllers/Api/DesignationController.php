@@ -20,7 +20,7 @@ class DesignationController extends Controller
         try {
             Organization::findOrFail($orgId);
 
-            $query = Designation::with(['user.department'])
+            $query = Designation::with(['user.college', 'user.course'])
                 ->join('users', 'users.id', '=', 'designations.user_id')
                 ->where('designations.organization_id', $orgId)
                 ->select('designations.*');
@@ -81,9 +81,9 @@ class DesignationController extends Controller
                     'student_number'      => $m->user->student_number ?? '',
                     'email'               => $m->user->email ?? null,
                     'contact_number'      => $m->user->contact_number ?? null,
-                    'course'              => $m->user->course ?? null,
+                    'course'              => $m->user->course?->name ?? null,
                     'year_level'          => $m->user->year_level ?? null,
-                    'department'          => $m->user->department?->name ?? null,
+                    'college'             => $m->user->college?->name ?? null,
                     'rfid_uid'            => $m->user->rfid_uid ?? null,
                     'profile_picture_url' => $m->user->profile_picture_url ?? null,
                 ],
@@ -129,7 +129,7 @@ class DesignationController extends Controller
                 ]
             );
 
-            $designation->load(['user.department']);
+            $designation->load(['user.college', 'user.course']);
 
             return response()->json([
                 'message'     => 'Member added successfully.',
@@ -147,9 +147,9 @@ class DesignationController extends Controller
                         'student_number'      => $designation->user->student_number ?? '',
                         'email'               => $designation->user->email ?? null,
                         'contact_number'      => $designation->user->contact_number ?? null,
-                        'course'              => $designation->user->course ?? null,
+                        'course'              => $designation->user->course?->name ?? null,
                         'year_level'          => $designation->user->year_level ?? null,
-                        'department'          => $designation->user->department?->name ?? null,
+                        'college'             => $designation->user->college?->name ?? null,
                         'rfid_uid'            => $designation->user->rfid_uid ?? null,
                         'profile_picture_url' => $designation->user->profile_picture_url ?? null,
                     ],
@@ -179,7 +179,7 @@ class DesignationController extends Controller
                 'designation' => $data['designation'],
             ]);
 
-            $record->load(['user.department']);
+            $record->load(['user.college', 'user.course']);
 
             return response()->json([
                 'message'     => 'Designation updated successfully.',
@@ -221,7 +221,7 @@ class DesignationController extends Controller
                 ->where('status', 'active')
                 ->pluck('user_id');
 
-            $users = User::with('department')
+            $users = User::with(['college', 'course'])
                 ->whereNotNull('student_number')
                 ->whereNotIn('id', $existingIds)
                 ->whereRaw('(first_name LIKE ? OR last_name LIKE ? OR student_number LIKE ?)', ["%{$search}%", "%{$search}%", "%{$search}%"])
@@ -232,9 +232,9 @@ class DesignationController extends Controller
                     'id'             => $s->id,
                     'student_number' => $s->student_number,
                     'full_name'      => trim("{$s->first_name} " . ($s->middle_name ? "{$s->middle_name} " : '') . $s->last_name),
-                    'course'         => $s->course,
+                    'course'         => $s->course?->name,
                     'year_level'     => $s->year_level,
-                    'department'     => $s->department?->name,
+                    'college'        => $s->college?->name,
                 ]);
 
             return response()->json($users);

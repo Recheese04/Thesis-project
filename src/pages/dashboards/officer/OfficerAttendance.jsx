@@ -275,8 +275,8 @@ export default function OfficerAttendance() {
                 <div className="space-y-10">
                   {Object.entries(
                     filteredAttendance.reduce((acc, record) => {
-                      const dept = record.user?.department?.name || 'Unknown Department';
-                      const course = record.user?.course || 'Unknown Course';
+                      const dept = record.user?.college?.name || 'Unknown College';
+                      const course = record.user?.course?.name || record.user?.course || 'Unknown Course';
                       const year = record.user?.year_level ? `Year ${record.user.year_level}` : 'Unknown Year';
                       const key = `${dept} — ${course} (${year})`;
 

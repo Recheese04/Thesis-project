@@ -100,7 +100,7 @@ function DeleteDialog({ open, onClose, onConfirm, userName }) {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
-  const [departments, setDepartments] = useState([]);
+  const [colleges, setColleges] = useState([]);
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -123,14 +123,14 @@ export default function UserManagement() {
 
   useEffect(() => {
     Promise.all([
-      axios.get("/api/departments", authH()),
+      axios.get("/api/colleges", authH()),
       axios.get("/api/organizations", authH()),
     ])
       .then(([deptRes, orgRes]) => {
-        setDepartments(deptRes.data);
+        setColleges(deptRes.data);
         setOrganizations(orgRes.data);
       })
-      .catch(() => toast.error("Could not load departments/organizations."));
+      .catch(() => toast.error("Could not load colleges/organizations."));
   }, []);
 
   const fetchUsers = async () => {
@@ -179,15 +179,15 @@ export default function UserManagement() {
       || u.student_number?.toLowerCase().includes(q);
     const matchRole = filterRole === "all" || String(u.user_type_id) === filterRole;
     const matchYear = filterYear === "all" || u.year_level === filterYear;
-    const matchDept = filterDept === "all" || String(u.department_id) === filterDept;
-    const matchCourse = filterCourse === "all" || u.course === filterCourse;
+    const matchDept = filterDept === "all" || String(u.college_id) === filterDept;
+    const matchCourse = filterCourse === "all" || u.course?.name === filterCourse;
     const matchOrg = filterOrg === "all"
       || (u.all_memberships ?? []).some(m => String(m.organization_id) === filterOrg);
     return matchSearch && matchRole && matchYear && matchDept && matchCourse && matchOrg;
   });
 
   const availableYears = [...new Set(users.map(u => u.year_level).filter(Boolean))].sort();
-  const availableCourses = [...new Set(users.map(u => u.course).filter(Boolean))].sort();
+  const availableCourses = [...new Set(users.map(u => u.course?.name).filter(Boolean))].sort();
   const activeFiltersCount = [filterYear, filterDept, filterCourse, filterOrg].filter(f => f !== "all").length;
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
@@ -297,13 +297,13 @@ export default function UserManagement() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide flex items-center gap-1">
-                    <Building2 className="w-3 h-3" />Department
+                    <Building2 className="w-3 h-3" />College
                   </Label>
                   <Select value={filterDept} onValueChange={setFilterDept}>
                     <SelectTrigger className="h-8 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-lg max-h-52">
-                      <SelectItem value="all" className="text-xs">All Departments</SelectItem>
-                      {departments.map(d => <SelectItem key={d.id} value={String(d.id)} className="text-xs">{d.name}</SelectItem>)}
+                      <SelectItem value="all" className="text-xs">All Colleges</SelectItem>
+                      {colleges.map(d => <SelectItem key={d.id} value={String(d.id)} className="text-xs">{d.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -349,7 +349,7 @@ export default function UserManagement() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60">
-                  {["User", "Student No.", "Department", "Course", "Role", "Year", "Status", ""].map(h => (
+                  {["User", "Student No.", "College", "Course", "Role", "Year", "Status", ""].map(h => (
                     <th key={h} className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -389,7 +389,7 @@ export default function UserManagement() {
                   const rk = String(user.user_type_id);
                   const meta = ROLE_META[rk];
                   const Ico = meta?.icon ?? UserCircle;
-                  const deptName = user.department?.name ?? departments.find(d => d.id === user.department_id)?.name ?? null;
+                  const deptName = user.college?.name ?? colleges.find(d => d.id === user.college_id)?.name ?? null;
                   const allMemberships = user.all_memberships ?? [];
 
                   return (
@@ -434,8 +434,8 @@ export default function UserManagement() {
                           : <span className="text-slate-300 text-xs">—</span>}
                       </td>
                       <td className="px-5 py-3.5 max-w-[160px]">
-                        {user.course
-                          ? <div className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" /><span className="text-sm text-slate-600 truncate" title={user.course}>{user.course}</span></div>
+                        {user.course?.name
+                          ? <div className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" /><span className="text-sm text-slate-600 truncate" title={user.course.name}>{user.course.name}</span></div>
                           : <span className="text-slate-300 text-xs">—</span>}
                       </td>
                       <td className="px-5 py-3.5">
@@ -534,14 +534,14 @@ export default function UserManagement() {
         onClose={() => { setFormOpen(false); setEditUser(null); }}
         onSaved={fetchUsers}
         editUser={editUser}
-        departments={departments}
+        colleges={colleges}
         organizations={organizations}
       />
       <ImportStudentsModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={fetchUsers}
-        departments={departments}
+        colleges={colleges}
       />
       <DeleteDialog
         open={Boolean(deleteTarget)}

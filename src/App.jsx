@@ -10,7 +10,7 @@ import AdminLayout from './components/layout/AdminLayout';
 import Dashboard from './pages/dashboards/admin/Dashboard';
 import UserManagement from './pages/dashboards/admin/UserManagement';
 import SchoolYearManagement from "./pages/dashboards/admin/SchoolYearManagement";
-import DepartmentManagement from './pages/dashboards/admin/DepartmentManagement';
+import CollegeManagement from './pages/dashboards/admin/CollegeManagement';
 import OrganizationManagement from './pages/dashboards/admin/OrganizationManagement';
 import EventManagement from './pages/dashboards/admin/EventManagement';
 import Settings from './pages/dashboards/admin/Settings';
@@ -24,7 +24,7 @@ import StudentEvents from './pages/dashboards/student/StudentEvents';
 import StudentAttendance from './pages/dashboards/student/StudentAttendance';
 import StudentAnnouncements from './pages/dashboards/student/StudentAnnouncements';
 import StudentMessages from './pages/dashboards/student/StudentMessages';
-import StudentDocuments from './pages/dashboards/student/StudentDocuments';
+
 import StudentObligations from './pages/dashboards/student/StudentObligations';
 import StudentEvaluations from './pages/dashboards/student/StudentEvaluations';
 import StudentProfile from './pages/dashboards/student/StudentProfile';
@@ -85,7 +85,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="users" element={<UserManagement />} />
             <Route path="school-years" element={<SchoolYearManagement />} />
-            <Route path="departments" element={<DepartmentManagement />} />
+            <Route path="colleges" element={<CollegeManagement />} />
           <Route path="organizations" element={<OrganizationManagement />} />
           <Route path="events" element={<EventManagement />} />
           <Route path="attendance" element={<AttendanceManagement />} />
@@ -130,7 +130,7 @@ function App() {
 
           <Route path="announcements" element={<StudentAnnouncements />} />
           <Route path="messages" element={<StudentMessages />} />
-          <Route path="documents" element={<StudentDocuments />} />
+
           <Route path="obligations" element={<StudentObligations />} />
           <Route path="evaluations" element={<StudentEvaluations />} />
           <Route path="profile" element={<StudentProfile />} />

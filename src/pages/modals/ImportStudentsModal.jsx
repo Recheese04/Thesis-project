@@ -20,7 +20,7 @@ const authH = () => ({
 
 const REQUIRED_FIELDS = [
     "student_number", "first_name", "last_name", "email",
-    "department_id", "course", "year_level",
+    "college_id", "course", "year_level",
 ];
 
 const COLUMN_LABELS = {
@@ -29,7 +29,7 @@ const COLUMN_LABELS = {
     middle_name: "Middle Name",
     last_name: "Last Name",
     email: "Email",
-    department_id: "Department ID",
+    college_id: "College ID",
     course: "Course",
     year_level: "Year Level",
     contact_number: "Contact No.",
@@ -50,7 +50,7 @@ function parseCSV(text) {
 
 // ──────────────────────────────────────────────────────────────────────────────
 
-export default function ImportStudentsModal({ open, onClose, onImported, departments }) {
+export default function ImportStudentsModal({ open, onClose, onImported, colleges }) {
     const [step, setStep] = useState(1); // 1=upload, 2=preview, 3=result
     const [file, setFile] = useState(null);
     const [csvHeaders, setCsvHeaders] = useState([]);
@@ -85,7 +85,7 @@ export default function ImportStudentsModal({ open, onClose, onImported, departm
             middle_name: ["middle_name", "middlename", "mname", "middle"],
             last_name: ["last_name", "lastname", "lname", "surname", "family_name"],
             email: ["email", "email_address", "e_mail"],
-            department_id: ["department_id", "dept_id", "department", "dept"],
+            college_id: ["college_id", "dept_id", "department_id", "department", "dept", "college"],
             course: ["course", "program", "course_program", "degree"],
             year_level: ["year_level", "yearlevel", "year", "level"],
             contact_number: ["contact_number", "contact", "phone", "mobile", "phone_number", "cellphone"],
@@ -131,15 +131,15 @@ export default function ImportStudentsModal({ open, onClose, onImported, departm
             for (const [field, csvCol] of Object.entries(columnMap)) {
                 mapped[field] = row[csvCol] || "";
             }
-            // Auto-detect department_id from department name if needed
-            if (mapped.department_id && isNaN(mapped.department_id)) {
-                const dept = departments.find(
-                    (d) => d.name.toLowerCase() === mapped.department_id.toLowerCase() ||
-                        d.code?.toLowerCase() === mapped.department_id.toLowerCase()
+            // Auto-detect college_id from college name if needed
+            if (mapped.college_id && isNaN(mapped.college_id)) {
+                const dept = colleges.find(
+                    (d) => d.name.toLowerCase() === mapped.college_id.toLowerCase() ||
+                        d.code?.toLowerCase() === mapped.college_id.toLowerCase()
                 );
-                mapped.department_id = dept ? dept.id : mapped.department_id;
+                mapped.college_id = dept ? dept.id : mapped.college_id;
             }
-            if (mapped.department_id) mapped.department_id = Number(mapped.department_id);
+            if (mapped.college_id) mapped.college_id = Number(mapped.college_id);
             return mapped;
         });
     };
@@ -171,7 +171,7 @@ export default function ImportStudentsModal({ open, onClose, onImported, departm
     };
 
     const downloadTemplate = () => {
-        const headers = "student_number,first_name,middle_name,last_name,email,department_id,course,year_level,contact_number";
+        const headers = "student_number,first_name,middle_name,last_name,email,college_id,course,year_level,contact_number";
         const example = "2024-00001,Juan,Santos,Dela Cruz,juan@bisu.edu.ph,1,Bachelor of Science in Computer Science,1st Year,09171234567";
         const blob = new Blob([headers + "\n" + example], { type: "text/csv" });
         const url = URL.createObjectURL(blob);

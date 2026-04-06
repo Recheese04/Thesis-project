@@ -5,7 +5,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserTypeController;
-use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\CollegeController;
+use App\Http\Controllers\Api\CourseController;
 use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\DesignationController;
 use App\Http\Controllers\Api\EventController;
@@ -253,8 +254,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/students', function () {
             try {
                 $query = User::whereNotNull('student_number')
-                    ->with('department:id,name,code')
-                    ->select('id', 'student_number', 'first_name', 'last_name', 'year_level', 'department_id', 'course', 'email', 'is_active');
+                    ->with(['college:id,name,code', 'course:id,name,code'])
+                    ->select('id', 'student_number', 'first_name', 'last_name', 'year_level', 'college_id', 'course_id', 'email', 'is_active');
 
                 if (request()->has('year_level') && request()->year_level != 'all') {
                     $query->where('year_level', request()->year_level);
@@ -273,18 +274,19 @@ Route::middleware('auth:sanctum')->group(function () {
                             'student_id' => $user->student_number,
                             'email' => $user->email,
                             'year_level' => $user->year_level,
-                            'department_id' => $user->department_id,
-                            'course' => $user->course ?? null,
+                            'college_id' => $user->college_id,
+                            'course_id' => $user->course_id,
+                            'course' => $user->course ? $user->course->name : null,
                             'is_active' => $user->is_active ?? true,
-                            'department' => $user->department ? [
-                            'id' => $user->department->id,
-                            'name' => $user->department->name,
-                            'code' => $user->department->code ?? null,
+                            'college' => $user->college ? [
+                            'id' => $user->college->id,
+                            'name' => $user->college->name,
+                            'code' => $user->college->code ?? null,
                             ] : null,
                             'program' => $user->course ? [
-                            'id' => null,
-                            'name' => $user->course,
-                            'code' => null,
+                            'id' => $user->course->id,
+                            'name' => $user->course->name,
+                            'code' => $user->course->code ?? null,
                             ] : null,
                             ];
                         }
@@ -303,12 +305,22 @@ Route::middleware('auth:sanctum')->group(function () {
                 // User Types
                 Route::get('/user-types', [UserTypeController::class , 'index']);
 
-                // Department Management
-                Route::get('/departments', [DepartmentController::class , 'index']);
-                Route::get('/departments/{id}', [DepartmentController::class , 'show']);
-                Route::post('/departments', [DepartmentController::class , 'store']);
-                Route::put('/departments/{id}', [DepartmentController::class , 'update']);
-                Route::delete('/departments/{id}', [DepartmentController::class , 'destroy']);
+                // College Management
+                Route::get('/colleges', [CollegeController::class , 'index']);
+                Route::get('/colleges/{id}', [CollegeController::class , 'show']);
+                Route::post('/colleges', [CollegeController::class , 'store']);
+                Route::put('/colleges/{id}', [CollegeController::class , 'update']);
+                Route::delete('/colleges/{id}', [CollegeController::class , 'destroy']);
+
+                // Legacy alias: /departments → /colleges
+                Route::get('/departments', [CollegeController::class , 'index']);
+
+                // Course Management
+                Route::get('/courses', [CourseController::class , 'index']);
+                Route::get('/colleges/{collegeId}/courses', [CourseController::class , 'byCollege']);
+                Route::post('/courses', [CourseController::class , 'store']);
+                Route::put('/courses/{id}', [CourseController::class , 'update']);
+                Route::delete('/courses/{id}', [CourseController::class , 'destroy']);
 
                 // Organization Management
                 Route::get('/organizations', [OrganizationController::class , 'index']);

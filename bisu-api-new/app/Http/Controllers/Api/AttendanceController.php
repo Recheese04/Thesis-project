@@ -121,7 +121,7 @@ class AttendanceController extends Controller
                 return response()->json(['message' => 'Unauthorized. You can only view attendance for your own events.'], 403);
             }
 
-            $attendance = Attendance::with(['user.department'])
+            $attendance = Attendance::with(['user.college', 'user.course'])
                 ->where('event_id', $eventId)
                 ->orderBy('time_in', 'desc')
                 ->get()
@@ -144,10 +144,10 @@ class AttendanceController extends Controller
                 'name' => trim($user->first_name . ' ' . $user->last_name),
                 'student_number' => $user->student_number,
                 'year_level' => $user->year_level,
-                'course' => $user->course ?? null,
-                'department' => $user->department ? [
-                'id' => $user->department->id,
-                'name' => $user->department->name,
+                'course' => $user->course ? $user->course->name : null,
+                'college' => $user->college ? [
+                'id' => $user->college->id,
+                'name' => $user->college->name,
                 ] : null,
                 ] : null,
                 ];
@@ -346,7 +346,7 @@ class AttendanceController extends Controller
                         'user_name' => trim($user->first_name . ' ' . $user->last_name),
                         'profile_picture_url' => $user->profile_picture_url,
                         'student_number' => $user->student_number,
-                        'course' => $user->course,
+                        'course' => $user->course ? $user->course->name : null,
                         'year_level' => $user->year_level,
                         'attendance' => $existing->load('user', 'event'),
                     ], 200);
@@ -357,7 +357,7 @@ class AttendanceController extends Controller
                     'user_name' => trim($user->first_name . ' ' . $user->last_name),
                     'profile_picture_url' => $user->profile_picture_url,
                     'student_number' => $user->student_number,
-                    'course' => $user->course,
+                    'course' => $user->course ? $user->course->name : null,
                     'year_level' => $user->year_level,
                     'attendance' => $existing->load('user', 'event'),
                 ], 200);
@@ -376,7 +376,7 @@ class AttendanceController extends Controller
                 'user_name' => trim($user->first_name . ' ' . $user->last_name),
                 'profile_picture_url' => $user->profile_picture_url,
                 'student_number' => $user->student_number,
-                'course' => $user->course,
+                'course' => $user->course ? $user->course->name : null,
                 'year_level' => $user->year_level,
                 'attendance' => $attendance->load('user', 'event'),
             ], 201);
@@ -436,7 +436,7 @@ class AttendanceController extends Controller
                 'user_name' => trim($user->first_name . ' ' . $user->last_name),
                 'profile_picture_url' => $user->profile_picture_url,
                 'student_number' => $user->student_number,
-                'course' => $user->course,
+                'course' => $user->course ? $user->course->name : null,
                 'year_level' => $user->year_level,
                 'attendance' => $attendance->load('user', 'event'),
                 'duration' => $attendance->formatted_duration,
@@ -478,7 +478,7 @@ class AttendanceController extends Controller
                 'user_name' => trim($user->first_name . ' ' . $user->last_name),
                 'profile_picture_url' => $user->profile_picture_url,
                 'student_number' => $user->student_number,
-                'course' => $user->course,
+                'course' => $user->course ? $user->course->name : null,
                 'year_level' => $user->year_level,
             ];
 

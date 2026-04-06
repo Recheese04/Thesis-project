@@ -27,7 +27,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Your account has been deactivated.'], 403);
         }
 
-        $user->load(['department', 'userType']);
+        $user->load(['college', 'course', 'userType']);
 
         [$role, $membership, $organizationId] = $this->resolveRole($user);
 
@@ -54,7 +54,7 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        $user = $request->user()->load(['department', 'userType']);
+        $user = $request->user()->load(['college', 'course', 'userType']);
 
         [$role, $membership, $organizationId] = $this->resolveRole($user);
 

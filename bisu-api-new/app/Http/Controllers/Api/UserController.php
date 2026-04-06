@@ -15,7 +15,7 @@ class UserController extends Controller
     public function index()
     {
         try {
-            $users = User::with(['department', 'userType'])
+            $users = User::with(['college', 'course', 'userType'])
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -44,7 +44,7 @@ class UserController extends Controller
     public function show($id)
     {
         try {
-            $user = User::with(['department', 'userType'])->findOrFail($id);
+            $user = User::with(['college', 'course', 'userType'])->findOrFail($id);
 
             if ($user->student_number) {
                 $allMemberships = Designation::with('organization')
@@ -84,7 +84,7 @@ class UserController extends Controller
                 'middle_name'    => 'nullable|string|max:100',
                 'last_name'      => 'required|string|max:100',
                 'student_number' => 'required|string|max:50|unique:users,student_number',
-                'department_id'  => 'required|exists:departments,id',
+                'college_id'  => 'required|exists:colleges,id',
                 'year_level'     => 'required|string|max:20',
                 'contact_number' => 'nullable|string|max:20',
                 'course'         => 'required|string|max:255',
@@ -121,7 +121,7 @@ class UserController extends Controller
                 $userPayload['first_name']     = $data['first_name'];
                 $userPayload['middle_name']    = $data['middle_name'] ?? null;
                 $userPayload['last_name']      = $data['last_name'];
-                $userPayload['department_id']  = $data['department_id'];
+                $userPayload['college_id']  = $data['college_id'];
                 $userPayload['year_level']     = $data['year_level'];
                 $userPayload['contact_number'] = $data['contact_number'] ?? null;
                 $userPayload['course']         = $data['course'];
@@ -142,7 +142,7 @@ class UserController extends Controller
             }
 
             DB::commit();
-            $user->load(['department', 'userType']);
+            $user->load(['college', 'course', 'userType']);
 
             return response()->json(['message' => 'Account has been created successfully!', 'user' => $user], 201);
 
@@ -175,7 +175,7 @@ class UserController extends Controller
                 'middle_name'    => 'nullable|string|max:100',
                 'last_name'      => 'required|string|max:100',
                 'student_number' => $uniqueRule,
-                'department_id'  => 'required|exists:departments,id',
+                'college_id'  => 'required|exists:colleges,id',
                 'year_level'     => 'required|string|max:20',
                 'contact_number' => 'nullable|string|max:20',
                 'course'         => 'required|string|max:255',
@@ -211,7 +211,7 @@ class UserController extends Controller
                 $userUpdate['first_name']     = $data['first_name'];
                 $userUpdate['middle_name']    = $data['middle_name'] ?? null;
                 $userUpdate['last_name']      = $data['last_name'];
-                $userUpdate['department_id']  = $data['department_id'];
+                $userUpdate['college_id']  = $data['college_id'];
                 $userUpdate['year_level']     = $data['year_level'];
                 $userUpdate['contact_number'] = $data['contact_number'] ?? null;
                 $userUpdate['course']         = $data['course'];
@@ -243,7 +243,7 @@ class UserController extends Controller
             $user->tokens()->delete();
 
             DB::commit();
-            $user->load(['department', 'userType']);
+            $user->load(['college', 'course', 'userType']);
 
             return response()->json(['message' => 'Account has been updated successfully!', 'user' => $user]);
 
@@ -284,7 +284,7 @@ class UserController extends Controller
             'students.*.middle_name'    => 'nullable|string|max:100',
             'students.*.last_name'      => 'required|string|max:100',
             'students.*.email'          => 'required|email|max:255',
-            'students.*.department_id'  => 'required|integer|exists:departments,id',
+            'students.*.college_id'  => 'required|integer|exists:colleges,id',
             'students.*.course'         => 'required|string|max:255',
             'students.*.year_level'     => 'required|string|max:20',
             'students.*.contact_number' => 'nullable|string|max:20',
@@ -316,7 +316,7 @@ class UserController extends Controller
                         'first_name'     => $row['first_name'],
                         'middle_name'    => $row['middle_name'] ?? null,
                         'last_name'      => $row['last_name'],
-                        'department_id'  => $row['department_id'],
+                        'college_id'  => $row['college_id'],
                         'course'         => $row['course'],
                         'year_level'     => $row['year_level'],
                         'contact_number' => $row['contact_number'] ?? null,

@@ -36,10 +36,10 @@ import { toast } from "sonner";
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
 const EMPTY_FORM = {
-  department_id: "",
+  college_id: "",
   name: "",
   type: "academic",
-  scope: "department",
+  scope: "college",
   location: "",
   description: "",
   status: "active",
@@ -51,7 +51,7 @@ const TYPE_COLORS = {
 };
 
 const SCOPE_COLORS = {
-  department: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  college: "bg-emerald-50 text-emerald-700 border-emerald-200",
   location: "bg-amber-50 text-amber-700 border-amber-200",
   independent: "bg-indigo-50 text-indigo-700 border-indigo-200",
 };
@@ -82,7 +82,7 @@ function StatCard({ icon: Icon, label, value, sub, grad }) {
 }
 
 // ── Organization Form Modal ────────────────────────────────────────────────
-function OrganizationFormModal({ open, onClose, onSaved, editOrg, departments }) {
+function OrganizationFormModal({ open, onClose, onSaved, editOrg, colleges }) {
   const isEdit = Boolean(editOrg);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -90,10 +90,10 @@ function OrganizationFormModal({ open, onClose, onSaved, editOrg, departments })
   useEffect(() => {
     if (!open) return;
     setForm(editOrg ? {
-      department_id: String(editOrg.department_id ?? ""),
+      college_id: String(editOrg.college_id ?? ""),
       name: editOrg.name ?? "",
       type: editOrg.type ?? "academic",
-      scope: editOrg.scope ?? "department",
+      scope: editOrg.scope ?? "college",
       location: editOrg.location ?? "",
       description: editOrg.description ?? "",
       status: editOrg.status ?? "active",
@@ -106,7 +106,7 @@ function OrganizationFormModal({ open, onClose, onSaved, editOrg, departments })
     setForm(p => ({
       ...p,
       scope: newScope,
-      department_id: newScope === "department" ? p.department_id : "",
+      college_id: newScope === "college" ? p.college_id : "",
       location: newScope === "location" ? p.location : "",
     }));
   };
@@ -122,19 +122,19 @@ function OrganizationFormModal({ open, onClose, onSaved, editOrg, departments })
       status: form.status,
     };
 
-    // Handle department_id based on scope
-    if (form.scope === "department") {
-      if (!form.department_id) {
+    // Handle college_id based on scope
+    if (form.scope === "college") {
+      if (!form.college_id) {
         toast.error("Validation Error", {
-          description: "Please select a department",
+          description: "Please select a college",
         });
         return;
       }
-      submitData.department_id = form.department_id;
+      submitData.college_id = form.college_id;
     } else {
-      // For non-department orgs, send empty string or don't send at all
+      // For non-college orgs, send empty string or don't send at all
       // This makes it optional in the backend
-      submitData.department_id = "";
+      submitData.college_id = "";
     }
 
     // Add scope and location (backend will ignore if not supported)
@@ -174,7 +174,7 @@ function OrganizationFormModal({ open, onClose, onSaved, editOrg, departments })
     }
   };
 
-  const requiresDepartment = form.scope === "department";
+  const requiresCollege = form.scope === "college";
   const requiresLocation = form.scope === "location";
 
   return (
@@ -228,12 +228,12 @@ function OrganizationFormModal({ open, onClose, onSaved, editOrg, departments })
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="department">
+                  <SelectItem value="college">
                     <div className="flex items-center gap-2">
                       <Building2 className="w-3.5 h-3.5 text-emerald-600" />
                       <div>
-                        <div className="font-medium">Department-Based</div>
-                        <div className="text-xs text-slate-500">Under a specific department</div>
+                        <div className="font-medium">College-Based</div>
+                        <div className="text-xs text-slate-500">Under a specific college</div>
                       </div>
                     </div>
                   </SelectItem>
@@ -251,7 +251,7 @@ function OrganizationFormModal({ open, onClose, onSaved, editOrg, departments })
                       <Globe className="w-3.5 h-3.5 text-indigo-600" />
                       <div>
                         <div className="font-medium">Independent</div>
-                        <div className="text-xs text-slate-500">Not tied to department or location</div>
+                        <div className="text-xs text-slate-500">Not tied to college or location</div>
                       </div>
                     </div>
                   </SelectItem>
@@ -259,18 +259,18 @@ function OrganizationFormModal({ open, onClose, onSaved, editOrg, departments })
               </Select>
             </div>
 
-            {/* Department - only show if scope is department */}
-            {requiresDepartment && (
+            {/* College - only show if scope is college */}
+            {requiresCollege && (
               <div className="space-y-1">
                 <Label className="text-slate-700 font-semibold text-xs">
-                  Department <span className="text-red-500">*</span>
+                  College <span className="text-red-500">*</span>
                 </Label>
-                <Select value={form.department_id} onValueChange={set("department_id")} required>
+                <Select value={form.college_id} onValueChange={set("college_id")} required>
                   <SelectTrigger className="border-slate-200 bg-white h-10 text-sm">
-                    <SelectValue placeholder="Select department" />
+                    <SelectValue placeholder="Select college" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {departments.map(dept => (
+                    {colleges.map(dept => (
                       <SelectItem key={dept.id} value={String(dept.id)}>
                         <div className="flex items-center gap-2">
                           <Building2 className="w-3.5 h-3.5 text-slate-500" />
@@ -435,7 +435,7 @@ function DeleteDialog({ open, onClose, onConfirm, organization }) {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function OrganizationManagement() {
   const [organizations, setOrganizations] = useState([]);
-  const [departments, setDepartments] = useState([]);
+  const [colleges, setColleges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -450,10 +450,10 @@ export default function OrganizationManagement() {
       setLoading(true);
       const [orgsRes, deptsRes] = await Promise.all([
         axios.get("/api/organizations", authH()),
-        axios.get("/api/departments", authH()),
+        axios.get("/api/colleges", authH()),
       ]);
       setOrganizations(orgsRes.data);
-      setDepartments(deptsRes.data);
+      setColleges(deptsRes.data);
     } catch (err) {
       console.error(err);
       toast.error("Error", {
@@ -488,7 +488,7 @@ export default function OrganizationManagement() {
   const active = organizations.filter(o => o.status === 'active').length;
   const academic = organizations.filter(o => o.type === 'academic').length;
   const nonAcademic = organizations.filter(o => o.type === 'non-academic').length;
-  const departmentBased = organizations.filter(o => (o.scope === 'department' || !o.scope)).length;
+  const collegeBased = organizations.filter(o => (o.scope === 'college' || !o.scope)).length;
   const locationBased = organizations.filter(o => o.scope === 'location').length;
   const independent = organizations.filter(o => o.scope === 'independent').length;
   const totalMembers = organizations.reduce((sum, o) => sum + (o.members_count || 0), 0);
@@ -496,10 +496,10 @@ export default function OrganizationManagement() {
 
   const filtered = organizations.filter(o => {
     const q = search.toLowerCase();
-    const orgScope = o.scope || 'department'; // default to department for backward compatibility
+    const orgScope = o.scope || 'college'; // default to college for backward compatibility
     const matchSearch = !search
       || o.name?.toLowerCase().includes(q)
-      || o.department?.name?.toLowerCase().includes(q)
+      || o.college?.name?.toLowerCase().includes(q)
       || o.location?.toLowerCase().includes(q);
     const matchType = filterType === "all" || o.type === filterType;
     const matchScope = filterScope === "all" || orgScope === filterScope;
@@ -555,8 +555,8 @@ export default function OrganizationManagement() {
                 <Building2 className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-xs text-slate-500 font-medium">Department-Based</p>
-                <p className="text-2xl font-bold text-slate-900">{departmentBased}</p>
+                <p className="text-xs text-slate-500 font-medium">College-Based</p>
+                <p className="text-2xl font-bold text-slate-900">{collegeBased}</p>
               </div>
             </div>
           </div>
@@ -618,7 +618,7 @@ export default function OrganizationManagement() {
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   <SelectItem value="all">All Scopes</SelectItem>
-                  <SelectItem value="department">Department</SelectItem>
+                  <SelectItem value="college">College</SelectItem>
                   <SelectItem value="location">Location</SelectItem>
                   <SelectItem value="independent">Independent</SelectItem>
                 </SelectContent>
@@ -647,7 +647,7 @@ export default function OrganizationManagement() {
                 <tr className="border-b border-slate-100 bg-slate-50/60">
                   <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Organization</th>
                   <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Scope</th>
-                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Department/Location</th>
+                  <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">College/Location</th>
                   <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Type</th>
                   <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Members</th>
                   <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Events</th>
@@ -686,7 +686,7 @@ export default function OrganizationManagement() {
                     </td>
                   </tr>
                 ) : filtered.map(org => {
-                  const orgScope = org.scope || 'department'; // default for backward compatibility
+                  const orgScope = org.scope || 'college'; // default for backward compatibility
                   return (
                   <tr key={org.id} className="hover:bg-blue-50/30 transition-colors group">
                     
@@ -706,19 +706,19 @@ export default function OrganizationManagement() {
                     {/* Scope */}
                     <td className="px-5 py-4">
                       <Badge className={`${SCOPE_COLORS[orgScope]} border text-xs font-semibold px-2.5 py-1 capitalize`}>
-                        {orgScope === 'department' && <Building2 className="w-3 h-3 mr-1" />}
+                        {orgScope === 'college' && <Building2 className="w-3 h-3 mr-1" />}
                         {orgScope === 'location' && <MapPin className="w-3 h-3 mr-1" />}
                         {orgScope === 'independent' && <Globe className="w-3 h-3 mr-1" />}
                         {orgScope}
                       </Badge>
                     </td>
 
-                    {/* Department/Location */}
+                    {/* College/Location */}
                     <td className="px-5 py-4">
-                      {orgScope === 'department' && (
+                      {orgScope === 'college' && (
                         <div className="flex items-center gap-2">
                           <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className="text-sm text-slate-600">{org.department?.name || "—"}</span>
+                          <span className="text-sm text-slate-600">{org.college?.name || "—"}</span>
                         </div>
                       )}
                       {orgScope === 'location' && (
@@ -800,7 +800,7 @@ export default function OrganizationManagement() {
               {(filterType !== "all" || filterScope !== "all" || filterStatus !== "all" || search) && " (filtered)"}
             </span>
             <span>
-              <strong className="text-slate-600">{departmentBased}</strong> dept · <strong className="text-slate-600">{locationBased}</strong> location · <strong className="text-slate-600">{independent}</strong> independent
+              <strong className="text-slate-600">{collegeBased}</strong> college · <strong className="text-slate-600">{locationBased}</strong> location · <strong className="text-slate-600">{independent}</strong> independent
             </span>
           </div>
         </div>
@@ -812,7 +812,7 @@ export default function OrganizationManagement() {
         onClose={() => { setFormOpen(false); setEditOrg(null); }}
         onSaved={fetchData}
         editOrg={editOrg}
-        departments={departments}
+        colleges={colleges}
       />
       <DeleteDialog
         open={Boolean(deleteTarget)}

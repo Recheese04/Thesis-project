@@ -15,7 +15,7 @@ class OrganizationController extends Controller
     public function index()
     {
         try {
-            $organizations = Organization::with('department')
+            $organizations = Organization::with('college')
                 ->withCount(['members', 'events'])
                 ->orderBy('name', 'asc')
                 ->get();
@@ -35,7 +35,7 @@ class OrganizationController extends Controller
     public function show($id)
     {
         try {
-            $organization = Organization::with('department')
+            $organization = Organization::with('college')
                 ->withCount(['members', 'events'])
                 ->findOrFail($id);
 
@@ -58,20 +58,20 @@ class OrganizationController extends Controller
             $rules = [
                 'name' => 'required|string|max:255',
                 'type' => 'required|in:academic,non-academic',
-                'scope' => 'required|in:department,location,independent',
+                'scope' => 'required|in:college,location,independent',
                 'description' => 'nullable|string',
                 'status' => 'nullable|in:active,inactive',
             ];
 
             // Conditional validation based on scope
-            if ($request->scope === 'department') {
-                $rules['department_id'] = 'required|exists:departments,id';
+            if ($request->scope === 'college') {
+                $rules['college_id'] = 'required|exists:colleges,id';
                 $rules['location'] = 'nullable|string|max:255';
             } elseif ($request->scope === 'location') {
                 $rules['location'] = 'required|string|max:255';
-                $rules['department_id'] = 'nullable|exists:departments,id';
+                $rules['college_id'] = 'nullable|exists:colleges,id';
             } else { // independent
-                $rules['department_id'] = 'nullable|exists:departments,id';
+                $rules['college_id'] = 'nullable|exists:colleges,id';
                 $rules['location'] = 'nullable|string|max:255';
             }
 
@@ -81,8 +81,8 @@ class OrganizationController extends Controller
             $data['status'] = $data['status'] ?? 'active';
 
             // Clean up data based on scope
-            if ($data['scope'] !== 'department') {
-                $data['department_id'] = null;
+            if ($data['scope'] !== 'college') {
+                $data['college_id'] = null;
             }
             if ($data['scope'] !== 'location') {
                 $data['location'] = null;
@@ -98,7 +98,7 @@ class OrganizationController extends Controller
             $organization = Organization::create($data);
 
             // Load relationships and counts
-            $organization->load('department');
+            $organization->load('college');
             $organization->loadCount(['members', 'events']);
 
             return response()->json([
@@ -130,28 +130,28 @@ class OrganizationController extends Controller
             $rules = [
                 'name' => 'required|string|max:255',
                 'type' => 'required|in:academic,non-academic',
-                'scope' => 'required|in:department,location,independent',
+                'scope' => 'required|in:college,location,independent',
                 'description' => 'nullable|string',
                 'status' => 'nullable|in:active,inactive',
             ];
 
             // Conditional validation based on scope
-            if ($request->scope === 'department') {
-                $rules['department_id'] = 'required|exists:departments,id';
+            if ($request->scope === 'college') {
+                $rules['college_id'] = 'required|exists:colleges,id';
                 $rules['location'] = 'nullable|string|max:255';
             } elseif ($request->scope === 'location') {
                 $rules['location'] = 'required|string|max:255';
-                $rules['department_id'] = 'nullable|exists:departments,id';
+                $rules['college_id'] = 'nullable|exists:colleges,id';
             } else { // independent
-                $rules['department_id'] = 'nullable|exists:departments,id';
+                $rules['college_id'] = 'nullable|exists:colleges,id';
                 $rules['location'] = 'nullable|string|max:255';
             }
 
             $data = $request->validate($rules);
 
             // Clean up data based on scope
-            if ($data['scope'] !== 'department') {
-                $data['department_id'] = null;
+            if ($data['scope'] !== 'college') {
+                $data['college_id'] = null;
             }
             if ($data['scope'] !== 'location') {
                 $data['location'] = null;
@@ -160,7 +160,7 @@ class OrganizationController extends Controller
             $organization->update($data);
 
             // Load relationships and counts
-            $organization->load('department');
+            $organization->load('college');
             $organization->loadCount(['members', 'events']);
 
             return response()->json([

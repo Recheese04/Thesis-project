@@ -124,7 +124,7 @@ function ManualCheckInModal({ open, onClose, onSaved, events, students, defaultE
 
   // Extract unique values for filter dropdowns
   const yearLevels = [...new Set(students.map(s => s.year_level).filter(Boolean))].sort();
-  const departments = [...new Map(students.filter(s => s.department).map(s => [s.department_id, s.department])).values()];
+  const colleges = [...new Map(students.filter(s => s.college).map(s => [s.college_id, s.college])).values()];
   const programs = [...new Map(students.filter(s => s.program).map(s => [s.program_id, s.program])).values()];
 
   const activeFiltersCount = [yearFilter, deptFilter, progFilter].filter(f => f !== "all").length;
@@ -275,8 +275,8 @@ function ManualCheckInModal({ open, onClose, onSaved, events, students, defaultE
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="rounded-lg max-h-52">
-                        <SelectItem value="all" className="text-xs">All Departments</SelectItem>
-                        {departments.map(dept => (
+                        <SelectItem value="all" className="text-xs">All Colleges</SelectItem>
+                        {colleges.map(dept => (
                           <SelectItem key={dept.id} value={String(dept.id)} className="text-xs">
                             {dept.name}
                           </SelectItem>

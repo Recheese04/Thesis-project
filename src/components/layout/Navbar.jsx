@@ -41,7 +41,7 @@ const NOTIFICATIONS = [
   },
   {
     id: 3,
-    title: 'Department updated',
+    title: 'College updated',
     description: 'College of Engineering details modified',
     time: '3 hours ago',
     unread: false,
@@ -53,7 +53,7 @@ const NOTIFICATIONS = [
 const BREADCRUMB_MAP = {
   '/admin/dashboard': 'Dashboard',
   '/admin/users': 'User Management',
-  '/admin/departments': 'Department Management',
+  '/admin/colleges': 'College Management',
   '/admin/organizations': 'Organization Management',
   '/admin/events': 'Event Management',
   '/admin/attendance': 'Attendance Records',

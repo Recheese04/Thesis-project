@@ -37,11 +37,13 @@ export default function OfficerDocuments() {
       const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
       const headers = { Authorization: `Bearer ${token}` };
 
-      // Get me to find orgId (officer usually maps to designation)
-      // If the dashboard already manages the active org, we adapt here.
-      // Usually bisu dashboard has /api/me where designation[0].organization_id is used.
-      const meRes = await axios.get('/api/me', { headers });
-      const activeOrgId = meRes.data.user?.designations?.[0]?.organization_id;
+      // Try localStorage first (set during login), then fall back to API
+      let activeOrgId = localStorage.getItem('organization_id');
+      
+      if (!activeOrgId) {
+        const meRes = await axios.get('/api/me', { headers });
+        activeOrgId = meRes.data.user?.designations?.[0]?.organization_id;
+      }
       
       if (!activeOrgId) {
         toast.error("You are not assigned to an organization.");

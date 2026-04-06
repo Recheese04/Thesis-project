@@ -29,7 +29,7 @@ const adminMenuSections = [
     label: 'Management',
     items: [
       { icon: Users, label: 'Users', path: '/admin/users', badge: null },
-      { icon: Building2, label: 'Departments', path: '/admin/departments', badge: null },
+      { icon: Building2, label: 'Colleges', path: '/admin/colleges', badge: null },
       { icon: Briefcase, label: 'Organizations', path: '/admin/organizations', badge: null },
       { icon: Calendar, label: 'Events', path: '/admin/events', badge: 'New' },
     ],
@@ -67,6 +67,7 @@ const officerMenuBase = [
       { icon: ClipboardList, label: 'Attendance', path: '/officer/attendance', badge: null, positions: [...LEADERSHIP, 'Secretary', 'Auditor'] },
       { icon: CreditCard, label: 'RFID Scanner', path: '/officer/rfid-scanner', badge: 'Scan', positions: [...LEADERSHIP, 'Secretary', 'Auditor'] },
       { icon: ClipboardCheck, label: 'Evaluations', path: '/officer/evaluations', badge: null, positions: [...ADMIN_ROLES, 'Auditor'] },
+      { icon: FileText, label: 'Documents', path: '/officer/documents', badge: null, positions: ALL_POSITIONS },
     ],
   },
   {
@@ -100,7 +101,6 @@ const officerMenuBase = [
       { icon: QrCode, label: 'Check In', path: '/officer/checkin', badge: 'Scan', positions: ALL_POSITIONS },
       { icon: Calendar, label: 'My Events', path: '/officer/my-events', badge: null, positions: ALL_POSITIONS },
       { icon: ClipboardList, label: 'My Attendance', path: '/officer/my-attendance', badge: null, positions: ALL_POSITIONS },
-      { icon: FileText, label: 'Documents', path: '/officer/documents', badge: null, positions: ALL_POSITIONS },
       { icon: Award, label: 'Obligations', path: '/officer/obligations', badge: null, positions: ALL_POSITIONS },
     ],
   },
@@ -149,7 +149,6 @@ const studentMenuSections = [
   {
     label: 'Requirements',
     items: [
-      { icon: FileText, label: 'Documents', path: '/student/documents', badge: null },
       { icon: Award, label: 'Obligations', path: '/student/obligations', badge: null },
     ],
   },

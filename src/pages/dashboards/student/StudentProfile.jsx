@@ -333,17 +333,17 @@ export default function StudentProfile() {
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-[11px] text-slate-400 font-semibold uppercase">Department</Label>
+                            <Label className="text-[11px] text-slate-400 font-semibold uppercase">College</Label>
                             <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
                                 <Building2 className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm text-slate-700 truncate">{user?.department?.name || "—"}</span>
+                                <span className="text-sm text-slate-700 truncate">{user?.college?.name || "—"}</span>
                             </div>
                         </div>
                         <div className="space-y-1">
                             <Label className="text-[11px] text-slate-400 font-semibold uppercase">Course / Program</Label>
                             <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
                                 <BookOpen className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm text-slate-700 truncate">{user?.course || "—"}</span>
+                                <span className="text-sm text-slate-700 truncate">{user?.course?.name || "—"}</span>
                             </div>
                         </div>
                         <div className="space-y-1">

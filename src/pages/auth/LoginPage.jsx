@@ -6,7 +6,7 @@ import { useSchoolYear } from '@/context/SchoolYearContext';
 
 const features = [
   { icon: QrCode, title: 'QR Code Check-In', desc: 'Instant attendance marking via QR scan' },
-  { icon: Users, title: 'Member Management', desc: 'Students, officers & departments in one place' },
+  { icon: Users, title: 'Member Management', desc: 'Students, officers & colleges in one place' },
   { icon: BarChart3, title: 'Attendance Analytics', desc: 'Real-time reports and completion tracking' },
   { icon: ShieldCheck, title: 'Clearance System', desc: 'Automated clearance based on attendance' },
 ];

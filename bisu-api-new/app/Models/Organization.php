@@ -12,7 +12,7 @@ class Organization extends Model
     protected $table = 'organizations';
 
     protected $fillable = [
-        'department_id',
+        'college_id',
         'name',
         'type',
         'scope',
@@ -30,9 +30,9 @@ class Organization extends Model
 
     // ── Relationships ──────────────────────────────────────────────────────
 
-    public function department()
+    public function college()
     {
-        return $this->belongsTo(Department::class, 'department_id');
+        return $this->belongsTo(College::class, 'college_id');
     }
 
     /**
@@ -74,9 +74,9 @@ class Organization extends Model
         return $query->where('status', 'active');
     }
 
-    public function scopeDepartmentBased($query)
+    public function scopeCollegeBased($query)
     {
-        return $query->where('scope', 'department');
+        return $query->where('scope', 'college');
     }
 
     public function scopeLocationBased($query)

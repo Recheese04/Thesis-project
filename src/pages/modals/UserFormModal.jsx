@@ -16,30 +16,13 @@ import { toast } from "sonner";
 
 const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year"];
 
-const COURSES_BY_DEPARTMENT = {
-  "1": [
-    "Bachelor of Science in Computer Science",
-    "Bachelor of Science in Environmental Science major in Coastal Resource Management"
-  ],
-  "2": [
-    "Bachelor of Science in Fisheries",
-    "Bachelor of Science in Marine Biology"
-  ],
-  "3": [
-    "Bachelor of Elementary Education",
-    "Bachelor of Secondary Education (BSEd)"
-  ],
-  "4": [
-    "Bachelor of Science in Hospitality Management",
-    "Bachelor of Science in Office Administration"
-  ]
-};
+const COURSES_BY_COLLEGE = {};
 
 const EMPTY_FORM = {
   email: "", password: "", user_type_id: "", is_active: "1",
   student_number: "", first_name: "", middle_name: "",
-  last_name: "", department_id: "", year_level: "", contact_number: "",
-  course: "",
+  last_name: "", college_id: "", year_level: "", contact_number: "",
+  course_id: "",
   org_memberships: [],
 };
 
@@ -190,7 +173,7 @@ function OrgMembershipList({ memberships, organizations, onRemove, isOfficer }) 
 }
 
 // ── Main Export ────────────────────────────────────────────────────────────
-export default function UserFormModal({ open, onClose, onSaved, editUser, departments, organizations }) {
+export default function UserFormModal({ open, onClose, onSaved, editUser, colleges, organizations }) {
   const isEdit              = Boolean(editUser);
   const [form, setForm]     = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -220,10 +203,10 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, depart
         first_name:      editUser.first_name     ?? "",
         middle_name:     editUser.middle_name    ?? "",
         last_name:       editUser.last_name      ?? "",
-        department_id:   String(editUser.department_id ?? ""),
+        college_id:      String(editUser.college_id ?? ""),
         year_level:      editUser.year_level     ?? "",
         contact_number:  editUser.contact_number ?? "",
-        course:          editUser.course         ?? "",
+        course_id:       String(editUser.course_id ?? ""),
         org_memberships: (editUser.all_memberships ?? []).map(m => ({
           organization_id: String(m.organization_id),
           designation:     m.designation ?? "Member",
@@ -261,8 +244,19 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, depart
     }
   };
 
-  const selectedDept     = departments.find(d => String(d.id) === form.department_id);
-  const availableCourses = COURSES_BY_DEPARTMENT[form.department_id] || [];
+  const [collegeCourses, setCollegeCourses] = useState([]);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const selectedCollege = colleges.find(d => String(d.id) === form.college_id);
+
+  // Fetch courses when college changes
+  useEffect(() => {
+    if (!form.college_id) { setCollegeCourses([]); return; }
+    setLoadingCourses(true);
+    axios.get(`/api/colleges/${form.college_id}/courses`, authH())
+      .then(res => setCollegeCourses(res.data))
+      .catch(() => setCollegeCourses([]))
+      .finally(() => setLoadingCourses(false));
+  }, [form.college_id]);
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -426,19 +420,19 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, depart
                       className="border-slate-200 focus:border-[#1e4db7] bg-white h-9 font-mono text-sm" />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-slate-700 font-semibold text-xs">Department <span className="text-red-500">*</span></Label>
-                    <Select value={form.department_id}
-                      onValueChange={(val) => setForm(p => ({ ...p, department_id: val, course: "" }))} required>
+                    <Label className="text-slate-700 font-semibold text-xs">College <span className="text-red-500">*</span></Label>
+                    <Select value={form.college_id}
+                      onValueChange={(val) => setForm(p => ({ ...p, college_id: val, course_id: "" }))} required>
                       <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                        <SelectValue placeholder={departments.length === 0 ? "No departments…" : "Select department"} />
+                        <SelectValue placeholder={colleges.length === 0 ? "No colleges…" : "Select college"} />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl max-h-52">
-                        {departments.map(dept => (
-                          <SelectItem key={dept.id} value={String(dept.id)}>
+                        {colleges.map(col => (
+                          <SelectItem key={col.id} value={String(col.id)}>
                             <div className="flex items-center gap-2">
                               <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span className="truncate">{dept.name}</span>
-                              {dept.code && <span className="text-slate-400 text-[10px] font-mono shrink-0">{dept.code}</span>}
+                              <span className="truncate">{col.name}</span>
+                              {col.code && <span className="text-slate-400 text-[10px] font-mono shrink-0">{col.code}</span>}
                             </div>
                           </SelectItem>
                         ))}
@@ -449,16 +443,16 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, depart
 
                 <div className="space-y-1">
                   <Label className="text-slate-700 font-semibold text-xs">Course / Program <span className="text-red-500">*</span></Label>
-                  <Select value={form.course} onValueChange={set("course")} required disabled={!form.department_id}>
+                  <Select value={form.course_id} onValueChange={set("course_id")} required disabled={!form.college_id || loadingCourses}>
                     <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
-                      <SelectValue placeholder={!form.department_id ? "Select department first" : "Select course"} />
+                      <SelectValue placeholder={!form.college_id ? "Select college first" : loadingCourses ? "Loading courses…" : "Select course"} />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl max-h-60">
-                      {availableCourses.map(course => (
-                        <SelectItem key={course} value={course}>
+                      {collegeCourses.map(course => (
+                        <SelectItem key={course.id} value={String(course.id)}>
                           <div className="flex items-start gap-2 py-1">
                             <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                            <span className="text-xs leading-relaxed">{course}</span>
+                            <span className="text-xs leading-relaxed">{course.name}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -495,12 +489,12 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, depart
                   </div>
                 </div>
 
-                {selectedDept && (
+                {selectedCollege && (
                   <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
                     <Building2 className="w-3.5 h-3.5 text-[#1e4db7] shrink-0" />
                     <span className="text-xs text-slate-600 truncate">
-                      Department: <strong className="text-[#0f2d5e]">{selectedDept.name}</strong>
-                      {selectedDept.code && <span className="ml-1.5 font-mono text-slate-400">({selectedDept.code})</span>}
+                      College: <strong className="text-[#0f2d5e]">{selectedCollege.name}</strong>
+                      {selectedCollege.code && <span className="ml-1.5 font-mono text-slate-400">({selectedCollege.code})</span>}
                     </span>
                   </div>
                 )}
