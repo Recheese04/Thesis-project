@@ -211,7 +211,7 @@ export default function LoginPage() {
         }
       `}</style>
 
-      <div className="login-root h-[100dvh] overflow-hidden sm:min-h-screen sm:h-auto sm:overflow-visible flex bg-white">
+      <div className="login-root h-[100dvh] overflow-hidden lg:h-screen lg:overflow-hidden flex bg-white w-full">
         {loading && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/60 backdrop-blur-sm">
             <PageLoader text="Authenticating..." />
@@ -315,7 +315,7 @@ export default function LoginPage() {
         </div>
 
         {/* ── RIGHT PANEL (Form) ───────────────────────────────────────────── */}
-        <div className="flex-1 flex items-center justify-center p-4 sm:p-10 lg:px-14 bg-slate-50 lg:bg-white relative overflow-y-auto sm:overflow-hidden h-full">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-10 lg:px-14 bg-slate-50 lg:bg-white relative overflow-y-auto sm:overflow-hidden h-full">
 
           {/* Mobile Background Elements & 3D Icons */}
           <div className="absolute inset-0 block lg:hidden pointer-events-none">
@@ -343,7 +343,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="w-full max-w-[420px] anim-form relative z-10 bg-white/80 backdrop-blur-md lg:bg-transparent rounded-3xl lg:rounded-none shadow-2xl lg:shadow-none p-6 sm:p-8 lg:p-0 border border-white/40 lg:border-none my-auto">
+          <div className="w-full max-w-[420px] anim-form relative z-10 bg-white/80 backdrop-blur-md lg:bg-transparent rounded-3xl lg:rounded-none shadow-2xl lg:shadow-none p-6 sm:p-8 lg:p-0 border border-white/40 lg:border-none">
 
             {/* Mobile logo header */}
             <div className="flex lg:hidden flex-col items-center gap-2 mb-6 mt-0 sm:mb-10 sm:mt-2">
