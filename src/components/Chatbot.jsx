@@ -174,6 +174,8 @@ export default function Chatbot() {
     const scrollRef = useRef(null);
     const inputRef = useRef(null);
     const chatRef = useRef(null);
+    const constraintsRef = useRef(null);
+    const [isDragging, setIsDragging] = useState(false);
 
     useEffect(() => {
         const checkAuth = () => setIsLoggedIn(!!localStorage.getItem('token'));
@@ -331,7 +333,19 @@ export default function Chatbot() {
                 }
             `}</style>
 
-            <div className="tapasok-root">
+            {/* Full-viewport drag constraint */}
+            <div ref={constraintsRef} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9998 }} />
+
+            <motion.div
+                className="tapasok-root"
+                drag
+                dragConstraints={constraintsRef}
+                dragElastic={0.08}
+                dragMomentum={false}
+                onDragStart={() => setIsDragging(true)}
+                onDragEnd={() => setTimeout(() => setIsDragging(false), 50)}
+                style={{ pointerEvents: 'auto' }}
+            >
                 <AnimatePresence>
                     {isOpen && (
                         <motion.div
@@ -341,13 +355,16 @@ export default function Chatbot() {
                             transition={{ type: 'spring', damping: 26, stiffness: 370 }}
                             className="tapasok-window"
                         >
-                            {/* ── HEADER ── */}
+                            {/* ── HEADER (drag handle) ── */}
                             <div style={{
                                 background: 'linear-gradient(135deg, #0c1836 0%, #112060 50%, #1a3080 100%)',
                                 padding: '14px 18px',
                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                 position: 'relative', overflow: 'hidden', flexShrink: 0,
-                            }}>
+                                cursor: 'grab',
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            >
                                 <div style={{ position: 'absolute', top: '-25px', right: '-15px', width: '90px', height: '90px', borderRadius: '50%', background: 'rgba(99,102,241,0.25)', filter: 'blur(22px)', pointerEvents: 'none' }} />
                                 <div style={{ position: 'absolute', bottom: '-18px', left: '25%', width: '55px', height: '55px', borderRadius: '50%', background: 'rgba(59,130,246,0.2)', filter: 'blur(14px)', pointerEvents: 'none' }} />
 
@@ -618,7 +635,7 @@ export default function Chatbot() {
                         )}
                     </AnimatePresence>
                 </motion.button>
-            </div>
+            </motion.div>
         </>
     );
 }
