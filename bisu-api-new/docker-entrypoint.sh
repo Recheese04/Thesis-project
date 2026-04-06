@@ -7,8 +7,8 @@ php artisan route:clear
 php artisan cache:clear
 php artisan view:clear
 
-# Run any pending migrations
-php artisan migrate --force
+# Run any pending migrations (don't crash the server if they fail)
+php artisan migrate --force 2>&1 || echo "WARNING: Migration failed, check logs"
 
 # Generate optimized config/routes for production
 php artisan config:cache
