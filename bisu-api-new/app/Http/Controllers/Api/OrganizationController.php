@@ -80,8 +80,13 @@ class OrganizationController extends Controller
             // Set default status if not provided
             $data['status'] = $data['status'] ?? 'active';
 
+            // Map 'college' scope to 'department' (DB enum uses 'department')
+            if ($data['scope'] === 'college') {
+                $data['scope'] = 'department';
+            }
+
             // Clean up data based on scope
-            if ($data['scope'] !== 'college') {
+            if ($data['scope'] !== 'department') {
                 $data['college_id'] = null;
             }
             if ($data['scope'] !== 'location') {
@@ -149,8 +154,13 @@ class OrganizationController extends Controller
 
             $data = $request->validate($rules);
 
+            // Map 'college' scope to 'department' (DB enum uses 'department')
+            if ($data['scope'] === 'college') {
+                $data['scope'] = 'department';
+            }
+
             // Clean up data based on scope
-            if ($data['scope'] !== 'college') {
+            if ($data['scope'] !== 'department') {
                 $data['college_id'] = null;
             }
             if ($data['scope'] !== 'location') {

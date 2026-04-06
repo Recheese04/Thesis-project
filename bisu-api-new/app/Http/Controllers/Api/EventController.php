@@ -19,6 +19,16 @@ class EventController extends Controller
     private function syncEventStatuses(): void
     {
         try {
+            // Grab IDs of events about to be completed so we can assign consequences
+            $nowCompletingIds = DB::table('events')
+                ->where('status', '!=', 'completed')
+                ->whereIn('status', ['upcoming', 'ongoing'])
+                ->whereNotNull('event_date')
+                ->whereNotNull('end_time')
+                ->whereRaw("CONCAT(event_date, ' ', end_time) <= NOW()")
+                ->pluck('id')
+                ->toArray();
+
             // Step 1: Mark as completed when end_time has passed
             DB::statement("
                 UPDATE events
@@ -43,8 +53,71 @@ class EventController extends Controller
                   )
             ");
 
+            // Auto-assign consequences for newly completed events
+            foreach ($nowCompletingIds as $eventId) {
+                $this->assignConsequencesForEvent($eventId);
+            }
+
         } catch (\Exception $e) {
             Log::error('Event status sync error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Auto-assign consequences to members who were absent from a completed event.
+     */
+    private function assignConsequencesForEvent(int $eventId): void
+    {
+        try {
+            $event = Event::find($eventId);
+            if (!$event) return;
+
+            $orgId = $event->organization_id;
+
+            // Get consequence rules: event-specific + org-wide (event_id IS NULL)
+            $rules = \App\Models\ConsequenceRule::where('organization_id', $orgId)
+                ->where(function ($q) use ($eventId) {
+                    $q->where('event_id', $eventId)
+                      ->orWhereNull('event_id');
+                })
+                ->get();
+
+            if ($rules->isEmpty()) return;
+
+            // All active members of this org
+            $memberUserIds = \App\Models\Designation::where('organization_id', $orgId)
+                ->where('status', 'active')
+                ->pluck('user_id');
+
+            // Members who actually checked in to this event
+            $attendedUserIds = \App\Models\Attendance::where('event_id', $eventId)
+                ->pluck('user_id');
+
+            // Absent = members who didn't check in
+            $absentUserIds = $memberUserIds->diff($attendedUserIds);
+
+            if ($absentUserIds->isEmpty()) return;
+
+            foreach ($rules as $rule) {
+                foreach ($absentUserIds as $userId) {
+                    \App\Models\StudentConsequence::firstOrCreate(
+                        [
+                            'consequence_rule_id' => $rule->id,
+                            'user_id'             => $userId,
+                            'event_id'            => $eventId,
+                        ],
+                        [
+                            'status'   => 'pending',
+                            'due_date' => now()->addDays($rule->due_days ?? 7)->toDateString(),
+                        ]
+                    );
+                }
+            }
+
+            Log::info("Auto-assigned consequences for event #{$eventId}: {$absentUserIds->count()} absent members, {$rules->count()} rules.");
+
+        } catch (\Exception $e) {
+            Log::error("assignConsequencesForEvent error (event #{$eventId}): " . $e->getMessage());
         }
     }
 
@@ -271,9 +344,10 @@ class EventController extends Controller
             return response()->json(['message' => 'Error fetching upcoming events'], 500);
         }
     }
+
     /**
      * POST /events/{eventId}/close
-     * Officer closes an event — marks it as completed.
+     * Officer closes an event — marks it as completed and auto-assigns consequences.
      */
     public function closeEvent($eventId)
     {
@@ -286,6 +360,9 @@ class EventController extends Controller
 
         $event->update(['status' => 'completed']);
 
-        return response()->json(['message' => 'Event closed successfully.']);
+        // Auto-assign consequences to absent members
+        $this->assignConsequencesForEvent($eventId);
+
+        return response()->json(['message' => 'Event closed successfully. Consequences assigned to absent members.']);
     }
 }

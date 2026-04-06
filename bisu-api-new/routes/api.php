@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\ConsequenceRuleController;
 use App\Http\Controllers\Api\ClearanceController;
 use App\Http\Controllers\Api\SchoolYearController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\ObligationController;
 use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ChatbotController;
@@ -366,6 +367,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/consequence-rules/{id}', [ConsequenceRuleController::class , 'update']);
         Route::delete('/consequence-rules/{id}', [ConsequenceRuleController::class , 'destroy']);
 
+        // Obligations (consequences assigned to students)
+        Route::get('/organizations/{orgId}/obligations', [ObligationController::class, 'index']);
+        Route::post('/organizations/{orgId}/obligations', [ObligationController::class, 'store']);
+        Route::put('/obligations/{id}', [ObligationController::class, 'update']);
+        Route::delete('/obligations/{id}', [ObligationController::class, 'destroy']);
+
         // Membership Fees
         Route::get('/organizations/{orgId}/membership-fees', [\App\Http\Controllers\Api\MembershipFeeController::class, 'index']);
         Route::post('/organizations/{orgId}/membership-fees', [\App\Http\Controllers\Api\MembershipFeeController::class, 'store']);
@@ -467,6 +474,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/officer/events', [EvaluationController::class , 'officerEvents']);
         Route::get('/student/evaluations', [EvaluationController::class , 'studentEvaluations']);
         Route::get('/student/announcements', [AnnouncementController::class, 'studentIndex']);
+        Route::get('/student/obligations', [ObligationController::class, 'myObligations']);
         Route::get('/student/documents', [DocumentController::class, 'studentIndex']);
 
         // Messages (DMs + Org group chat)

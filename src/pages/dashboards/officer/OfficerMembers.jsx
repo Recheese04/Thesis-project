@@ -430,7 +430,7 @@ const MemberDetailsDialog = ({ membership, onClose }) => {
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
               <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider mb-0.5">Course & Year</p>
-              <p className="font-semibold text-slate-900 text-sm">{s.course || '—'} · {s.year_level || '—'}</p>
+              <p className="font-semibold text-slate-900 text-sm">{(typeof s.course === 'object' ? s.course?.name : s.course) || '—'} · {s.year_level || '—'}</p>
             </div>
             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
               <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider mb-0.5">Designation</p>
@@ -1012,6 +1012,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
       {selectedMember && (
         <MemberDetailsModal
           membership={selectedMember}
+          orgId={orgId}
           onClose={() => setSelectedMember(null)}
         />
       )}

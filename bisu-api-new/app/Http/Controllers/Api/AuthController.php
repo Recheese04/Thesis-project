@@ -86,12 +86,28 @@ class AuthController extends Controller
         $organizationId = null;
         $role = 'student'; // Default fallback
 
-        // Get all active designations, prioritize non-Member ones first
-        $membership = Designation::with('organization')
-            ->where('user_id', $user->id)
-            ->where('status', 'active')
-            ->orderByRaw("CASE WHEN designation = 'Member' THEN 1 ELSE 0 END ASC")
-            ->first();
+        // If the frontend specifically requests a scoped organization context via the switcher
+        $headerOrgId = request()->header('X-Organization-Id');
+        if ($headerOrgId) {
+            $scopedMembership = Designation::with('organization')
+                ->where('user_id', $user->id)
+                ->where('organization_id', $headerOrgId)
+                ->where('status', 'active')
+                ->first();
+                
+            if ($scopedMembership) {
+                $membership = $scopedMembership;
+            }
+        }
+
+        // If not scoped, or invalid scope, get their primary active designation (prioritize non-Member ones first)
+        if (!$membership) {
+            $membership = Designation::with('organization')
+                ->where('user_id', $user->id)
+                ->where('status', 'active')
+                ->orderByRaw("CASE WHEN designation = 'Member' THEN 1 ELSE 0 END ASC")
+                ->first();
+        }
 
         if ($membership) {
             $organizationId = $membership->organization_id;

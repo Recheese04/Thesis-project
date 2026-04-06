@@ -93,6 +93,13 @@ class User extends Authenticatable
 
     public function getOfficerOrganizationId(): ?int
     {
+        // If the frontend explicitly requested data for an org they manage, respect it
+        $headerOrgId = request()->header('X-Organization-Id');
+        if ($headerOrgId && $this->isOfficerOf($headerOrgId)) {
+            return (int) $headerOrgId;
+        }
+
+        // Fallback to their primary/first active officer org
         return $this->getOfficerDesignation()?->organization_id;
     }
 

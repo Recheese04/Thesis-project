@@ -30,14 +30,16 @@ const RoleBadge = ({ designation }) => {
     );
 };
 
-export default function MemberDetailsModal({ membership, onClose }) {
+export default function MemberDetailsModal({ membership, orgId: orgIdProp, onClose }) {
     const [attendanceHistory, setAttendanceHistory] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (membership) {
             setLoading(true);
-            axios.get(`/api/organizations/${membership.organization_id}/members/${membership.student_id}/attendance`, authH())
+            const resolvedOrgId = orgIdProp || membership.organization_id;
+            if (!resolvedOrgId) { setLoading(false); return; }
+            axios.get(`/api/organizations/${resolvedOrgId}/members/${membership.user_id}/attendance`, authH())
                 .then((res) => setAttendanceHistory(res.data))
                 .catch((err) => console.error('Failed to load attendance:', err))
                 .finally(() => setLoading(false));
@@ -76,7 +78,7 @@ export default function MemberDetailsModal({ membership, onClose }) {
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
                             <p className="text-[11px] text-slate-500 uppercase font-bold tracking-wider mb-1">Course</p>
-                            <p className="font-semibold text-slate-900 text-sm line-clamp-2">{s.course || '—'}</p>
+                            <p className="font-semibold text-slate-900 text-sm line-clamp-2">{(typeof s.course === 'object' ? s.course?.name : s.course) || '—'}</p>
                         </div>
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
                             <p className="text-[11px] text-slate-500 uppercase font-bold tracking-wider mb-1">Year Level</p>

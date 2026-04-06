@@ -56,7 +56,7 @@ function StatCard({ icon: Icon, label, value, sub, grad }) {
 }
 
 // â”€â”€ college Form Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function collegeFormModal({ open, onClose, onSaved, editCollege }) {
+function CollegeFormModal({ open, onClose, onSaved, editCollege }) {
   const isEdit = Boolean(editCollege);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -457,7 +457,7 @@ export default function CollegeManagement() {
       </div>
 
       {/* Modals */}
-      <collegeFormModal
+      <CollegeFormModal
         open={formOpen}
         onClose={() => { setFormOpen(false); seteditCollege(null); }}
         onSaved={fetchcolleges}

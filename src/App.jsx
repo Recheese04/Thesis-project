@@ -1,5 +1,15 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import axios from 'axios';
+
+// Add global interceptor to inject the active organization_id into every request
+axios.interceptors.request.use((config) => {
+  const orgId = localStorage.getItem('organization_id');
+  if (orgId) {
+    config.headers['X-Organization-Id'] = orgId;
+  }
+  return config;
+});
 import Login from './pages/auth/LoginPage';
 import LandingPage from './pages/LandingPage';
 import Chatbot from './components/Chatbot';
@@ -43,6 +53,7 @@ import OfficerFinance from './pages/dashboards/officer/OfficerFinance';
 import OfficerMinutes from './pages/dashboards/officer/OfficerMinutes';
 import OfficerAdviserDashboard from './pages/dashboards/officer/OfficerAdviserDashboard';
 import OfficerDocuments from './pages/dashboards/officer/OfficerDocuments';
+import OfficerObligations from './pages/dashboards/officer/OfficerObligations';
 import RfidScanner from './pages/dashboards/officer/RfidScanner';
 
 function getUserRole() {
@@ -112,7 +123,7 @@ function App() {
           <Route path="my-attendance" element={<StudentAttendance />} />
 
           <Route path="documents" element={<OfficerDocuments />} />
-          <Route path="obligations" element={<StudentObligations />} />
+          <Route path="obligations" element={<OfficerObligations />} />
 
           <Route path="finance" element={<OfficerFinance />} />
           <Route path="minutes" element={<OfficerMinutes />} />

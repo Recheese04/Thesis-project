@@ -248,12 +248,12 @@ class DesignationController extends Controller
     public function memberAttendance($orgId, $userId)
     {
         try {
-            $events = \App\Models\Event::where('organization_id', $orgId)
+            $events = Event::where('organization_id', $orgId)
+                ->whereIn('status', ['completed', 'ongoing', 'upcoming'])
                 ->orderBy('event_date', 'desc')
-                ->orderBy('event_time', 'desc')
                 ->get();
 
-            $attendances = \App\Models\Attendance::where('user_id', $userId)
+            $attendances = Attendance::where('user_id', $userId)
                 ->whereIn('event_id', $events->pluck('id'))
                 ->get()
                 ->keyBy('event_id');
@@ -262,13 +262,11 @@ class DesignationController extends Controller
                 $att = $attendances->get($event->id);
                 return [
                     'event_title'  => $event->title,
-                    'event_date'   => $event->formatted_date,
+                    'event_date'   => $event->event_date ? \Carbon\Carbon::parse($event->event_date)->format('M d, Y') : null,
                     'event_status' => $event->status,
-                    'is_past'      => $event->is_past,
                     'attended'     => $att !== null,
                     'time_in'      => $att && $att->time_in ? $att->time_in->format('h:i A') : null,
                     'time_out'     => $att && $att->time_out ? $att->time_out->format('h:i A') : null,
-                    'duration'     => $att ? $att->formatted_duration : null,
                 ];
             });
 
