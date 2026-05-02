@@ -71,22 +71,10 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
           </TouchableOpacity>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {avatarUri ? (
-              <Image 
-                source={{ uri: avatarUri }} 
-                style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(255, 255, 255, 0.3)' }} 
-              />
-            ) : (
-              <View style={{
-                width: 28, height: 28, borderRadius: 8,
-                backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>
-                  {user?.first_name?.charAt(0) || 'S'}
-                </Text>
-              </View>
-            )}
+            <Image 
+              source={require('../../assets/images/tapasok-icon.png')} 
+              style={{ width: 28, height: 28, borderRadius: 8 }} 
+            />
             <Text style={{ fontWeight: '800', color: '#ffffff', fontSize: 17, letterSpacing: -0.3 }}>
               {title || 'TAPasok'}
             </Text>
