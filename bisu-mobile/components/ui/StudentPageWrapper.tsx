@@ -72,7 +72,7 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Image 
-              source={require('../../assets/images/tapasok-icon.png')} 
+              source={require('../../assets/images/icon.png')} 
               style={{ width: 28, height: 28, borderRadius: 8 }} 
             />
             <Text style={{ fontWeight: '800', color: '#ffffff', fontSize: 17, letterSpacing: -0.3 }}>

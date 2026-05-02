@@ -58,7 +58,7 @@ export default function OfficerPageWrapper({ children, activeRoute, title }: Pro
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Image 
-            source={require('../../assets/images/tapasok-icon.png')} 
+            source={require('../../assets/images/icon.png')} 
             style={{ width: 28, height: 28, borderRadius: 14 }} 
           />
           <Text style={{ fontWeight: '800', color: '#ffffff', fontSize: 16 }}>
