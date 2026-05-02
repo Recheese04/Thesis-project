@@ -49,8 +49,6 @@ RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Expose port
-EXPOSE 80
 
 # Start with entrypoint (clears caches, runs migrations, then starts Apache)
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
