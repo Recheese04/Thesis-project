@@ -11,7 +11,7 @@ class StudentConsequence extends Model
         'user_id',
         'event_id',
         'type',
-        'financial_consequence_id',
+        'student_fee_id',
         'status',
         'due_date',
         'completed_at',
@@ -20,7 +20,7 @@ class StudentConsequence extends Model
 
     public function financialFee()
     {
-        return $this->belongsTo(StudentFee::class, 'financial_consequence_id');
+        return $this->belongsTo(StudentFee::class, 'student_fee_id');
     }
 
     public function rule()

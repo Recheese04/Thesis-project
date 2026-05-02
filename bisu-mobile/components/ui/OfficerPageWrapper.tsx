@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StatusBar } from 'react-native';
 import { Menu, Bell, Moon, Sun } from 'lucide-react-native';
 import OfficerDrawer from './OfficerDrawer';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { API_BASE_URL } from '../../constants/Config';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Props {
@@ -24,36 +25,47 @@ export default function OfficerPageWrapper({ children, activeRoute, title }: Pro
   const STORAGE_BASE = API_BASE_URL.replace('/api', '/storage');
   const avatarUri = user?.profile_picture ? `${STORAGE_BASE}/${user.profile_picture}` : null;
 
+  // Ensure we have padding for the status bar so content doesn't overlap time/battery
+  const safeTopPadding = Math.max(insets.top, StatusBar.currentHeight || 24);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
       <OfficerDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} activeRoute={activeRoute} />
       
-      <View style={{
-        backgroundColor: colors.navBar,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.navBarBorder,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingTop: insets.top + 4,
-        paddingBottom: 12,
-      }}>
+      <LinearGradient
+        colors={['#1e3a8a', '#3b82f6']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingTop: safeTopPadding + 10, // Add explicit padding to clear the notch/status bar completely
+          paddingBottom: 16,
+          shadowColor: '#000',
+          shadowOpacity: 0.15,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 8,
+        }}
+      >
         
         <TouchableOpacity onPress={() => setDrawerOpen(true)} style={{ padding: 4 }}>
-          <Menu size={22} color={colors.textPrimary} />
+          <Menu size={22} color="#ffffff" />
         </TouchableOpacity>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {avatarUri ? (
             <Image 
               source={{ uri: avatarUri }} 
-              style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.border }} 
+              style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255, 255, 255, 0.3)' }} 
             />
           ) : (
             <View style={{
               width: 28, height: 28, borderRadius: 14,
-              backgroundColor: isDark ? '#3b82f6' : '#2563eb',
+              backgroundColor: 'rgba(255, 255, 255, 0.3)',
               alignItems: 'center', justifyContent: 'center',
             }}>
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>
@@ -61,7 +73,7 @@ export default function OfficerPageWrapper({ children, activeRoute, title }: Pro
               </Text>
             </View>
           )}
-          <Text style={{ fontWeight: '800', color: colors.textPrimary, fontSize: 16 }}>
+          <Text style={{ fontWeight: '800', color: '#ffffff', fontSize: 16 }}>
             {title || 'TAPasok'}
           </Text>
         </View>
@@ -71,15 +83,15 @@ export default function OfficerPageWrapper({ children, activeRoute, title }: Pro
             {isDark ? (
               <Sun size={20} color="#fbbf24" />
             ) : (
-              <Moon size={20} color="#64748b" />
+              <Moon size={20} color="#ffffff" />
             )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/(officer)/announcements')}>
-            <Bell size={20} color={colors.textPrimary} />
+            <Bell size={20} color="#ffffff" />
           </TouchableOpacity>
         </View>
 
-      </View>
+      </LinearGradient>
       {children}
     </View>
   );

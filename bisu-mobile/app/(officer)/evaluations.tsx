@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Switch, Image } from 'react-native';
 import api from '../../services/api';
 import EmptyState from '../../components/ui/EmptyState';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
+import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ClipboardList, Plus, Search, ChevronRight, ArrowLeft, Star, MessageSquare, ThumbsUp, Trash2, Calendar, ListChecks, CheckCircle2, Clock, X } from 'lucide-react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
@@ -122,16 +124,66 @@ export default function OfficerEvaluations() {
 
     return (
       <ScrollView style={{ flex: 1, backgroundColor: bg }} refreshControl={<RefreshControl refreshing={refreshingList} onRefresh={() => { setRefreshingList(true); fetchEvents(); }} />} showsVerticalScrollIndicator={false}>
-        <View style={{ backgroundColor: cardBg, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: borderLight }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}>
-            <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#8b5cf6', alignItems: 'center', justifyContent: 'center' }}>
-              <ClipboardList size={22} color="#fff" />
+        
+        {/* Header Area with Tarsi */}
+        <View style={{ position: 'relative', overflow: 'hidden' }}>
+          
+          {/* Decorative Background Circles */}
+          <View style={{
+            position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#4ade80', opacity: 0.1, zIndex: 0
+          }} />
+          <View style={{
+            position: 'absolute', top: 60, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: '#22c55e', opacity: 0.08, zIndex: 0
+          }} />
+
+          {/* Title & Quick Actions */}
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
+                Feedback & Ratings
+              </Text>
+              <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
+                Evaluations
+              </Text>
             </View>
-            <View style={{ marginLeft: 12 }}>
-              <Text style={{ fontSize: 24, fontWeight: '800', color: textPrimary }}>Evaluations</Text>
-              <Text style={{ fontSize: 12, color: textSecondary, fontWeight: '500' }}>Select an event to manage its evaluation form.</Text>
+
+            {/* Quick Actions moved to the right */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+               <View style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+                  <ClipboardList size={16} color={isDark ? '#94a3b8' : '#8b5cf6'} />
+               </View>
             </View>
           </View>
+
+          {/* Mascot & Chat Area */}
+          <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
+            
+            {/* Flat Green Bar Background (Gradient) */}
+            <LinearGradient
+              colors={['#4ade80', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, zIndex: 0 }}
+            />
+
+            {/* Mascot Image Wrapper */}
+            <View style={{ 
+              position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10 
+            }}>
+              <Image 
+                source={require('../../tarsier-mascot/tar-evaluation-nobg.png')} 
+                style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }} 
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Chat Bubble */}
+            <TarsiChatBubble 
+              message={`You have ${counts.open} open evaluation${counts.open !== 1 ? 's' : ''} right now! Let's review the feedback.`} 
+            />
+          </View>
+        </View>
+
+        <View style={{ paddingHorizontal: 20, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: borderLight }}>
 
           {/* Stats */}
           {!loadingList && events.length > 0 && (

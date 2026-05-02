@@ -28,6 +28,8 @@ class ConsequenceRuleController extends Controller
             'consequence_title'       => 'required|string|max:255',
             'consequence_description' => 'nullable|string',
             'due_days'                => 'required|integer|min:1',
+            'type'                    => 'required|in:financial,task,warning,suspension',
+            'fee_type_id'             => 'nullable|exists:fee_types,id',
         ]);
 
         $rule = ConsequenceRule::create([
@@ -49,6 +51,8 @@ class ConsequenceRuleController extends Controller
             'consequence_title'       => 'required|string|max:255',
             'consequence_description' => 'nullable|string',
             'due_days'                => 'required|integer|min:1',
+            'type'                    => 'required|in:financial,task,warning,suspension',
+            'fee_type_id'             => 'nullable|exists:fee_types,id',
         ]);
 
         $rule->update($validated);

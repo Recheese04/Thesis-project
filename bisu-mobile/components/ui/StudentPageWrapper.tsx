@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { API_BASE_URL } from '../../constants/Config';
 
+import { LinearGradient } from 'expo-linear-gradient';
 interface Props {
   children: React.ReactNode;
   activeRoute: string;
@@ -26,9 +27,12 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
   const STORAGE_BASE = API_BASE_URL.replace('/api', '/storage');
   const avatarUri = user?.profile_picture ? `${STORAGE_BASE}/${user.profile_picture}` : null;
 
+  // Ensure we have padding for the status bar so content doesn't overlap time/battery
+  const safeTopPadding = Math.max(insets.top, StatusBar.currentHeight || 24);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.navBar} />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
       <StudentDrawer 
         visible={drawerOpen} 
         onClose={() => setDrawerOpen(false)} 
@@ -37,43 +41,45 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
       />
 
       {!hideNav && (
-        <View style={{
-          backgroundColor: colors.navBar,
-          paddingTop: insets.top,
-          paddingHorizontal: 20,
-          paddingBottom: 12,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottomWidth: 1,
-          borderBottomColor: colors.navBarBorder,
-          shadowColor: colors.shadow,
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 2 },
-          elevation: 3,
-        }}>
+        <LinearGradient
+          colors={['#1e3a8a', '#3b82f6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            paddingTop: safeTopPadding + 10, // Add explicit padding to clear the notch/status bar completely
+            paddingHorizontal: 20,
+            paddingBottom: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            shadowColor: '#000',
+            shadowOpacity: 0.15,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 8,
+          }}
+        >
           <TouchableOpacity
             onPress={() => setDrawerOpen(true)}
             style={{
               width: 38, height: 38, borderRadius: 12,
-              backgroundColor: colors.accentSoft,
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
               alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <Menu size={20} color={colors.iconDefault} strokeWidth={2.5} />
+            <Menu size={20} color="#ffffff" strokeWidth={2.5} />
           </TouchableOpacity>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {avatarUri ? (
               <Image 
                 source={{ uri: avatarUri }} 
-                style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.border }} 
+                style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(255, 255, 255, 0.3)' }} 
               />
             ) : (
               <View style={{
                 width: 28, height: 28, borderRadius: 8,
-                backgroundColor: isDark ? '#6366f1' : '#4f46e5',
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
                 alignItems: 'center', justifyContent: 'center',
               }}>
                 <Text style={{ color: '#fff', fontWeight: '900', fontSize: 11 }}>
@@ -81,7 +87,7 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
                 </Text>
               </View>
             )}
-            <Text style={{ fontWeight: '800', color: colors.textPrimary, fontSize: 17, letterSpacing: -0.3 }}>
+            <Text style={{ fontWeight: '800', color: '#ffffff', fontSize: 17, letterSpacing: -0.3 }}>
               {title || 'TAPasok'}
             </Text>
           </View>
@@ -91,7 +97,7 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
               {isDark ? (
                 <Sun size={20} color="#fbbf24" />
               ) : (
-                <Moon size={20} color="#6366f1" />
+                <Moon size={20} color="#ffffff" />
               )}
             </TouchableOpacity>
 
@@ -99,22 +105,22 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
               onPress={() => router.push('/(student)/announcements')}
               style={{
                 width: 38, height: 38, borderRadius: 12,
-                backgroundColor: colors.accentSoft,
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Bell size={18} color={colors.iconDefault} strokeWidth={2} />
+              <Bell size={18} color="#ffffff" strokeWidth={2} />
               {unreadAnnouncements > 0 && (
                 <View style={{
                   position: 'absolute', top: 8, right: 10,
                   width: 8, height: 8, borderRadius: 4,
                   backgroundColor: '#ef4444',
-                  borderWidth: 1.5, borderColor: colors.accentSoft,
+                  borderWidth: 1.5, borderColor: '#3b82f6',
                 }} />
               )}
             </TouchableOpacity>
           </View>
-        </View>
+        </LinearGradient>
       )}
 
       {children}

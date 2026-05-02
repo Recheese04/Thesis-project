@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TextInput, TouchableOpacity, Alert, Modal, Pressable } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TextInput, TouchableOpacity, Alert, Modal, Pressable, Image } from 'react-native';
 import api from '../../services/api';
+import { LinearGradient } from 'expo-linear-gradient';
 import EmptyState from '../../components/ui/EmptyState';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
+import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { Search, Mail, Phone, MoreVertical, Copy, Plus, ArrowUpCircle, X } from 'lucide-react-native';
 
 export default function OfficerMembers() {
   const { isDark, colors } = useTheme();
+  const { membership } = useAuth();
   const [members, setMembers] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [orgDetails, setOrgDetails] = useState<any>(null);
@@ -15,7 +19,9 @@ export default function OfficerMembers() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [actionMember, setActionMember] = useState<any>(null);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
   const [showRolePicker, setShowRolePicker] = useState(false);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const cardBg = isDark ? '#1e293b' : '#fff';
@@ -29,13 +35,10 @@ export default function OfficerMembers() {
   const modalBg = isDark ? '#1e293b' : '#fff';
   const modalActionBg = isDark ? '#0f172a' : '#f8fafc';
 
+  const orgId = membership?.organization_id;
+
   const fetchData = async () => {
     try {
-      const orgRes = await api.get('/profile/my-organizations');
-      const orgs = Array.isArray(orgRes.data) ? orgRes.data : [];
-      const officerOrg = orgs.find((o: any) => o.designation !== 'Member');
-      const orgId = officerOrg?.organization_id ?? orgs[0]?.organization_id;
-      
       if (orgId) {
         const [orgInfoRes, membersRes] = await Promise.all([
           api.get(`/organizations/${orgId}`),
@@ -51,7 +54,7 @@ export default function OfficerMembers() {
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [orgId]);
 
   const handleRemoveMember = (member: any) => {
     setActionMember(null);
@@ -110,30 +113,74 @@ export default function OfficerMembers() {
     <OfficerPageWrapper activeRoute="members">
       <View style={{ backgroundColor: bg, flex: 1 }}>
         
-        <View style={{ backgroundColor: cardBg, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: borderLight }}>
-          <Text style={{ fontSize: 22, fontWeight: '800', color: textPrimary }}>Members</Text>
-          <Text style={{ color: textSecondary, fontSize: 11, marginTop: 4 }} numberOfLines={1}>
-             Managing - {orgDetails?.name || 'Campus Organization'}
-          </Text>
+        {/* Header Area with Tarsi */}
+        <View style={{ position: 'relative', overflow: 'hidden' }}>
+          
+          {/* Decorative Background Circles */}
+          <View style={{
+            position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#4ade80', opacity: 0.1, zIndex: 0
+          }} />
+          <View style={{
+            position: 'absolute', top: 60, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: '#22c55e', opacity: 0.08, zIndex: 0
+          }} />
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
-             {orgDetails?.invite_code ? (
-                <TouchableOpacity 
-                   style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? 'rgba(147,51,234,0.1)' : '#faf5ff', borderWidth: 1, borderColor: isDark ? 'rgba(147,51,234,0.3)' : '#e9d5ff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
-                   onPress={() => Alert.alert('Invite Code', orgDetails?.invite_code)}
-                >
-                   <Text style={{ fontSize: 10, fontWeight: '600', color: isDark ? '#c084fc' : '#9333ea', marginRight: 8, textTransform: 'uppercase' }}>Invite Code: <Text style={{ fontWeight: '800' }}>{orgDetails?.invite_code}</Text></Text>
-                   <Copy size={12} color={isDark ? '#c084fc' : '#9333ea'} />
-                </TouchableOpacity>
-             ) : <View />}
+          {/* Title & Subtitle */}
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
+                Members Directory
+              </Text>
+              <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
+                {orgDetails?.name || 'Loading...'}
+              </Text>
+            </View>
 
-             <TouchableOpacity 
-                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2563eb', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 }}
-                onPress={() => Alert.alert('Add Member', 'Search & Add UI could open here.')}
-             >
-                <Plus size={14} color="#fff" />
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12, marginLeft: 4 }}>Add</Text>
-             </TouchableOpacity>
+            {/* Quick Actions moved to the right */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+               {orgDetails?.invite_code ? (
+                  <TouchableOpacity 
+                     style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? 'rgba(147,51,234,0.1)' : '#faf5ff', borderWidth: 1, borderColor: isDark ? 'rgba(147,51,234,0.3)' : '#e9d5ff', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, marginRight: 8 }}
+                     onPress={() => Alert.alert('Invite Code', orgDetails?.invite_code)}
+                  >
+                     <Copy size={14} color={isDark ? '#c084fc' : '#9333ea'} />
+                  </TouchableOpacity>
+               ) : null}
+
+               <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
+                  onPress={() => Alert.alert('Add Member', 'Search & Add UI could open here.')}
+               >
+                  <Plus size={14} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12, marginLeft: 4 }}>Add</Text>
+               </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Mascot & Chat Area */}
+          <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
+            
+            {/* Flat Green Bar Background (Gradient) */}
+            <LinearGradient
+              colors={['#4ade80', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, zIndex: 0 }}
+            />
+
+            {/* Mascot Image Wrapper */}
+            <View style={{ 
+              position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10 
+            }}>
+              <Image 
+                source={require('../../tarsier-mascot/tar-lookingdown-nobg.png')} 
+                style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }} 
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Chat Bubble */}
+            <TarsiChatBubble 
+              message={`You have ${stats.total} members in ${orgDetails?.name || 'this organization'}, with ${stats.active} marked as active!`} 
+            />
           </View>
         </View>
 
@@ -179,7 +226,13 @@ export default function OfficerMembers() {
               const courseName = typeof m.user?.course === 'object' ? m.user?.course?.name : m.user?.course;
 
               return (
-                <View key={m.id} style={{ backgroundColor: cardBg, borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: border }}>
+                <Pressable 
+                  key={m.id} 
+                  onPress={() => { setSelectedMember(m); setProfileModalVisible(true); }}
+                  style={({ pressed }) => [
+                    { backgroundColor: cardBg, borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: border, opacity: pressed ? 0.9 : 1 }
+                  ]}
+                >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                       <View style={{ width: 45, height: 45, borderRadius: 16, backgroundColor: avatarBg, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
@@ -226,7 +279,7 @@ export default function OfficerMembers() {
                     </View>
                     <Text style={{ fontSize: 10, color: textPrimary, fontWeight: '800', marginLeft: 12 }}>{m.attendance_rate || 0}%</Text>
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           <View style={{ height: 32 }} />
@@ -276,6 +329,114 @@ export default function OfficerMembers() {
               </ScrollView>
             </View>
           </Pressable>
+        </Modal>
+
+        {/* Profile Modal */}
+        <Modal visible={profileModalVisible} transparent animationType="slide" onRequestClose={() => setProfileModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: modalBg, borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingBottom: 40, maxHeight: '85%' }}>
+              
+              <View style={{ padding: 20, flexDirection: 'row', justifyContent: 'flex-end' }}>
+                <TouchableOpacity onPress={() => setProfileModalVisible(false)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isDark ? '#334155' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={20} color={textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              {selectedMember && (
+                <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 20 }}>
+                  <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                    <View style={{ 
+                      width: 180, 
+                      height: 180, 
+                      borderRadius: 90, 
+                      backgroundColor: selectedMember.designation === 'President' ? '#9333ea' : '#f43f5e', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      marginBottom: 16, 
+                      borderWidth: 4,
+                      borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#fff',
+                      shadowColor: '#000', 
+                      shadowOffset: { width: 0, height: 15 }, 
+                      shadowOpacity: 0.2, 
+                      shadowRadius: 25,
+                      elevation: 10
+                    }}>
+                      <Text style={{ color: '#fff', fontSize: 68, fontWeight: '800' }}>{getInitials(selectedMember.user?.first_name, selectedMember.user?.last_name)}</Text>
+                    </View>
+                    <Text style={{ fontSize: 26, fontWeight: '800', color: textPrimary, textAlign: 'center' }}>{selectedMember.user?.first_name} {selectedMember.user?.last_name}</Text>
+                    <View style={{ backgroundColor: isDark ? 'rgba(147,51,234,0.15)' : '#f3e8ff', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, marginTop: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDark ? '#c084fc' : '#7c3aed' }}>{selectedMember.designation || 'Member'}</Text>
+                    </View>
+                  </View>
+
+                  <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: border }}>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Contact Details</Text>
+                    <View style={{ gap: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Mail size={16} color={colors.accent} />
+                        <View style={{ marginLeft: 16 }}>
+                          <Text style={{ fontSize: 10, color: textSecondary }}>Email Address</Text>
+                          <Text style={{ fontSize: 14, color: textPrimary, fontWeight: '600' }}>{selectedMember.user?.email}</Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Phone size={16} color={colors.accent} />
+                        <View style={{ marginLeft: 16 }}>
+                          <Text style={{ fontSize: 10, color: textSecondary }}>Phone Number</Text>
+                          <Text style={{ fontSize: 14, color: textPrimary, fontWeight: '600' }}>{selectedMember.user?.contact_number ?? 'Not provided'}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: border }}>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Academic Profile</Text>
+                    <View style={{ gap: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: isDark ? '#334155' : '#fff', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 14 }}>🆔</Text>
+                        </View>
+                        <View style={{ marginLeft: 16 }}>
+                          <Text style={{ fontSize: 10, color: textSecondary }}>Student Number</Text>
+                          <Text style={{ fontSize: 14, color: textPrimary, fontWeight: '800', fontFamily: 'monospace' }}>{selectedMember.user?.student_number}</Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: isDark ? '#334155' : '#fff', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 14 }}>🎓</Text>
+                        </View>
+                        <View style={{ marginLeft: 16, flex: 1 }}>
+                          <Text style={{ fontSize: 10, color: textSecondary }}>Course & Year</Text>
+                          <Text style={{ fontSize: 14, color: textPrimary, fontWeight: '600' }}>
+                            {typeof selectedMember.user?.course === 'object' ? selectedMember.user?.course?.name : selectedMember.user?.course}
+                            {selectedMember.user?.year_level ? ` · ${selectedMember.user?.year_level}` : ''}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={{ flex: 1, backgroundColor: isDark ? 'rgba(16,185,129,0.1)' : '#f0fdf4', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: isDark ? 'rgba(16,185,129,0.2)' : '#bbf7d0' }}>
+                      <Text style={{ fontSize: 10, color: isDark ? '#6ee7b7' : '#15803d', fontWeight: '800', marginBottom: 4 }}>Attendance</Text>
+                      <Text style={{ fontSize: 20, fontWeight: '800', color: isDark ? '#6ee7b7' : '#15803d' }}>{selectedMember.attendance_rate || 0}%</Text>
+                    </View>
+                    <View style={{ flex: 1, backgroundColor: isDark ? 'rgba(59,130,246,0.1)' : '#eff6ff', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: isDark ? 'rgba(59,130,246,0.2)' : '#bfdbfe' }}>
+                      <Text style={{ fontSize: 10, color: isDark ? '#60a5fa' : '#2563eb', fontWeight: '800', marginBottom: 4 }}>Status</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: isDark ? '#60a5fa' : '#2563eb', textTransform: 'capitalize' }}>{selectedMember.status || 'Active'}</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity 
+                    style={{ backgroundColor: '#2563eb', paddingVertical: 16, borderRadius: 16, marginTop: 24, alignItems: 'center', shadowColor: '#2563eb', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }}
+                    onPress={() => setProfileModalVisible(false)}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Close Profile</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
+            </View>
+          </View>
         </Modal>
 
       </View>

@@ -37,9 +37,11 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::disableForeignKeyConstraints();
         Schema::table('designations', function (Blueprint $table) {
             $table->dropUnique('unique_designation');
         });
+        Schema::enableForeignKeyConstraints();
 
         Schema::table('evaluation_responses', function (Blueprint $table) {
             $table->dropUnique('unique_evaluation_response');

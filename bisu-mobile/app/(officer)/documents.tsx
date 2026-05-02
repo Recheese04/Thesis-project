@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Linking, Alert, TextInput, Modal, Pressable } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Linking, Alert, TextInput, Modal, Pressable, Image } from 'react-native';
 import api from '../../services/api';
 import EmptyState from '../../components/ui/EmptyState';
 import { API_BASE_URL } from '../../constants/Config';
 import { Download, FileText, Trash2, Plus, Search, Calendar as CalendarIcon, HardDrive, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
+import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
 import * as DocumentPicker from 'expo-document-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const categories = ['ACADEMIC', 'ORGANIZATION', 'CERTIFICATE', 'FINANCIAL', 'OTHER'];
 
@@ -148,18 +150,68 @@ export default function OfficerDocuments() {
 
   return (
     <OfficerPageWrapper activeRoute="documents">
-      <View style={{ backgroundColor: cardBg, paddingTop: 24, paddingBottom: 16 }}>
-        <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-          <Text style={{ fontSize: 28, fontWeight: '800', color: isDark ? '#f8fafc' : '#0f2d5e' }}>Documents</Text>
-          <Text style={{ color: textSecondary, fontSize: 13, marginTop: 2 }}>Manage official organization documents and files.</Text>
+      <View style={{ zIndex: 20 }}>
+        
+        {/* Header Area with Tarsi */}
+        <View style={{ position: 'relative', overflow: 'hidden' }}>
           
-          <TouchableOpacity 
-            onPress={() => setIsUploadOpen(true)}
-            style={{ backgroundColor: primaryBtn, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginTop: 16, width: 160 }}
-          >
-            <Plus size={16} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 8, fontSize: 13 }}>Upload Document</Text>
-          </TouchableOpacity>
+          {/* Decorative Background Circles */}
+          <View style={{
+            position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#4ade80', opacity: 0.1, zIndex: 0
+          }} />
+          <View style={{
+            position: 'absolute', top: 60, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: '#22c55e', opacity: 0.08, zIndex: 0
+          }} />
+
+          {/* Title & Quick Actions */}
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
+                File Management
+              </Text>
+              <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
+                Documents
+              </Text>
+            </View>
+
+            {/* Quick Actions moved to the right */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+               <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f2d5e', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 }}
+                  onPress={() => setIsUploadOpen(true)}
+               >
+                  <Plus size={14} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12, marginLeft: 4 }}>Upload</Text>
+               </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Mascot & Chat Area */}
+          <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
+            
+            {/* Flat Green Bar Background (Gradient) */}
+            <LinearGradient
+              colors={['#4ade80', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, zIndex: 0 }}
+            />
+
+            {/* Mascot Image Wrapper */}
+            <View style={{ 
+              position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10 
+            }}>
+              <Image 
+                source={require('../../tarsier-mascot/tar-reading-nobg.png')} 
+                style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }} 
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Chat Bubble */}
+            <TarsiChatBubble 
+              message={`You have ${docs.length} uploaded document${docs.length !== 1 ? 's' : ''}! Need to find one? Search below.`} 
+            />
+          </View>
         </View>
 
         <View style={{ paddingHorizontal: 20, marginBottom: 8, zIndex: 20 }}>

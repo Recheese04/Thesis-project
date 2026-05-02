@@ -30,7 +30,7 @@ class ConsequenceService
             // If the rule is org-wide, use the event_id where the student was absent.
             $finalEventId = $rule->event_id ?? $eventId;
 
-            $financialConsequenceId = null;
+            $studentFeeId = null;
 
             // IF financial: create a record in student_fees
             if ($rule->type === 'financial' && $rule->fee_type_id) {
@@ -43,7 +43,7 @@ class ConsequenceService
                 ], [
                     'status'          => 'pending',
                 ]);
-                $financialConsequenceId = $fee->id;
+                $studentFeeId = $fee->id;
             }
 
             // Fix #3: Prevent duplicate consequence records for the same student, rule, and event
@@ -53,7 +53,7 @@ class ConsequenceService
                 'event_id'                 => $finalEventId,
             ], [
                 'type'                     => $rule->type,
-                'financial_consequence_id' => $financialConsequenceId,
+                'student_fee_id' => $studentFeeId,
                 'status'                   => 'pending',
                 'due_date'                 => Carbon::now()->addDays($rule->due_days)->toDateString(),
             ]);
@@ -110,8 +110,8 @@ class ConsequenceService
             // If it was financial, we might want to update the fee status too
             // Note: In some systems, the fee payment triggers the consequence completion.
             // Here we allow manual completion by an officer.
-            if ($consequence->financial_consequence_id) {
-                $fee = StudentFee::find($consequence->financial_consequence_id);
+            if ($consequence->student_fee_id) {
+                $fee = StudentFee::find($consequence->student_fee_id);
                 if ($fee && $fee->status !== 'paid') {
                     $fee->update(['status' => 'paid']);
                 }

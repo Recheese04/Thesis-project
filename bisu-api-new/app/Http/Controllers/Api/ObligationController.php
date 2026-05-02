@@ -100,7 +100,8 @@ class ObligationController extends Controller
                     'created_at'  => $c->created_at?->toDateString(),
                 ]);
 
-            $fees = MembershipFee::with('user')
+            // Fetch fees from student_fees table (includes automated fines)
+            $fees = \App\Models\StudentFee::with(['user', 'feeType'])
                 ->where('organization_id', $orgId)
                 ->orderByRaw("FIELD(status, 'pending', 'paid')")
                 ->orderBy('created_at', 'desc')
@@ -108,14 +109,14 @@ class ObligationController extends Controller
                 ->map(fn($f) => [
                     'id'          => $f->id,
                     'type'        => 'fee',
-                    'title'       => $f->name,
-                    'description' => $f->description,
+                    'title'       => $f->feeType->name ?? 'Fee',
+                    'description' => $f->feeType->description ?? '',
                     'user'        => [
                         'id'        => $f->user->id ?? null,
                         'name'      => trim(($f->user->first_name ?? '') . ' ' . ($f->user->last_name ?? '')),
                         'student_number' => $f->user->student_number ?? '',
                     ],
-                    'amount'      => $f->amount,
+                    'amount'      => $f->feeType->amount ?? 0,
                     'status'      => $f->status === 'paid' ? 'completed' : 'pending',
                     'due_date'    => null,
                     'completed_at'=> $f->status === 'paid' ? $f->updated_at?->toDateString() : null,

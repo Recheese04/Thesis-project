@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, ActivityIndicator,
-  RefreshControl, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform
+  RefreshControl, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, Image
 } from 'react-native';
 import api from '../../services/api';
 import EmptyState from '../../components/ui/EmptyState';
@@ -10,6 +10,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ClipboardEdit, CheckCircle2, ArrowLeft, Send, Clock, AlertCircle } from 'lucide-react-native';
 import EvaluationPopup from '../../components/ui/EvaluationPopup';
+import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 
 export default function StudentEvaluations() {
   const { isDark, colors } = useTheme();
@@ -102,12 +103,66 @@ export default function StudentEvaluations() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchEvals(); }} tintColor={colors.accent} />}
           showsVerticalScrollIndicator={false}
         >
-          <View style={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16 }}>
-            <Text style={{ fontSize: 24, fontWeight: '800', color: textPrimary, letterSpacing: -0.5 }}>Event Feedback</Text>
-            <Text style={{ fontSize: 14, color: accentColor, marginTop: 4, fontWeight: '500' }}>Rate your recent experiences</Text>
+          {/* Header Area with Tarsi */}
+          <View style={{ position: 'relative', overflow: 'hidden' }}>
+            
+            {/* Decorative Background Circles */}
+            <View style={{
+              position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#6366f1', opacity: 0.1, zIndex: 0
+            }} />
+            <View style={{
+              position: 'absolute', top: 60, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: '#818cf8', opacity: 0.08, zIndex: 0
+            }} />
+
+            {/* Title & Quick Actions */}
+            <View style={{ paddingHorizontal: 20, paddingTop: 20, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
+                  Feedback Center
+                </Text>
+                <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
+                  Event Feedback
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                 <View style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+                    <ClipboardEdit size={16} color={accentColor} />
+                 </View>
+              </View>
+            </View>
+
+            {/* Mascot & Chat Area */}
+            <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
+              
+              {/* Flat Green Bar Background (Gradient) */}
+              <LinearGradient
+                colors={['#4ade80', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, zIndex: 0 }}
+              />
+
+              {/* Mascot Image Wrapper */}
+              <View style={{ 
+                position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10 
+              }}>
+                <Image 
+                  source={require('../../tarsier-mascot/tar-evaluation-nobg.png')} 
+                  style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }} 
+                  resizeMode="contain"
+                />
+              </View>
+
+              {/* Chat Bubble */}
+              <TarsiChatBubble 
+                message={evaluations.filter(e => !e.has_responded && e.status === 'open').length > 0 
+                  ? `You have ${evaluations.filter(e => !e.has_responded && e.status === 'open').length} pending evaluation form${evaluations.filter(e => !e.has_responded && e.status === 'open').length !== 1 ? 's' : ''}! Your feedback helps us improve.` 
+                  : "All caught up! You've completed all your evaluations. Thank you for your feedback!"} 
+              />
+            </View>
           </View>
 
-          <View style={{ paddingHorizontal: 20 }}>
+          <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
             {/* Pending Section */}
             <Text style={{ fontSize: 11, fontWeight: '800', color: textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Pending Forms</Text>
             {evaluations.filter(e => !e.has_responded && e.status === 'open').length === 0 ? (

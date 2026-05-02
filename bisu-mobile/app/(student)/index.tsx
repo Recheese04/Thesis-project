@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, ActivityIndicator,
-  RefreshControl, TouchableOpacity,
+  RefreshControl, TouchableOpacity, Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import api from '../../services/api';
 import StudentPageWrapper from '../../components/ui/StudentPageWrapper';
-import { LinearGradient } from 'expo-linear-gradient';
+import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import {
   Calendar, CheckCircle2, Clock, Award,
   QrCode, CalendarDays, Activity, Bell, ChevronRight, CalendarOff, CheckCheck,
@@ -82,14 +83,89 @@ export default function StudentDashboard() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={colors.accent} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Welcome Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16 }}>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 }}>
-            Welcome back, {user?.first_name || 'there'} 👋
-          </Text>
-          <Text style={{ fontSize: 14, color: colors.accent, marginTop: 4, fontWeight: '500' }}>
-            Here's your organization activity overview
-          </Text>
+        {/* Header Area */}
+        <View style={{ paddingTop: 20, paddingBottom: 10, backgroundColor: isDark ? colors.card : '#ffffff', position: 'relative', overflow: 'hidden' }}>
+          
+          {/* Decorative Background Circles */}
+          <View style={{
+            position: 'absolute',
+            top: -40,
+            right: -40,
+            width: 200,
+            height: 200,
+            borderRadius: 100,
+            backgroundColor: '#4ade80',
+            opacity: 0.1,
+            zIndex: 0
+          }} />
+          <View style={{
+            position: 'absolute',
+            top: 60,
+            left: -20,
+            width: 120,
+            height: 120,
+            borderRadius: 60,
+            backgroundColor: '#22c55e',
+            opacity: 0.08,
+            zIndex: 0
+          }} />
+
+          {/* Greeting & Date */}
+          <View style={{ paddingHorizontal: 20, marginBottom: 16, zIndex: 1 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </Text>
+            <Text style={{ fontSize: 26, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 }}>
+              {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}, {user?.first_name || 'there'}!
+            </Text>
+          </View>
+
+          {/* Mascot & Chat Area */}
+          <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
+            
+            {/* Flat Green Bar Background (Gradient) */}
+            <LinearGradient
+              colors={['#4ade80', '#16a34a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 50,
+                zIndex: 0,
+              }}
+            />
+
+            {/* Mascot Image Wrapper (for clipping to half-body) */}
+            <View style={{ 
+              position: 'absolute', 
+              left: -20, 
+              bottom: 0, 
+              width: 210, 
+              height: 180, 
+              overflow: 'hidden',
+              zIndex: 10 
+            }}>
+              <Image 
+                source={require('../../tarsier-mascot/tar-wave-nobg.png')} 
+                style={{ 
+                  position: 'absolute', 
+                  left: -60, 
+                  bottom: -130, // Push his legs completely out of view
+                  width: 360, 
+                  height: 360, 
+                }} 
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Chat Bubble */}
+            <TarsiChatBubble 
+              message={`You have ${upcomingCount} upcoming events. Don't forget to check in! Your current attendance rate is ${attendancePct}%.`} 
+            />
+          </View>
         </View>
 
         {/* Dynamic Stats Grid */}

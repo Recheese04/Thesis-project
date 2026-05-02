@@ -11,8 +11,9 @@ import {
   LayoutDashboard, Users, Calendar, ClipboardList, Bell,
   MessageSquare, Wallet, QrCode, FileText, X, ChevronRight,
   ClipboardCheck, Bookmark, TrendingUp, AlertTriangle, DollarSign,
-  CreditCard
+  CreditCard, Repeat, CheckCircle2
 } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const DRAWER_WIDTH = Dimensions.get('window').width * 0.78;
 
@@ -35,11 +36,12 @@ interface MenuItemProps {
 
 export default function OfficerDrawer({ visible, onClose, activeRoute = 'index', unreadMessages = 2 }: OfficerDrawerProps) {
   const router = useRouter();
-  const { user, membership } = useAuth();
+  const { user, membership, officerDesignations, switchOrg } = useAuth();
   const { isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
   const [modalMounted, setModalMounted] = useState(false);
+  const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -130,6 +132,12 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
     </View>
   );
 
+  const handleSwitchOrg = async (orgId: number) => {
+    await switchOrg(orgId);
+    setShowOrgSwitcher(false);
+    onClose();
+  };
+
   if (!modalMounted) return null;
 
   return (
@@ -154,24 +162,37 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
       >
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }} style={{ flex: 1 }}>
           {/* Header */}
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            paddingHorizontal: 16, paddingTop: insets.top + 12, paddingBottom: 16,
-            borderBottomWidth: 1, borderBottomColor: headerBorder,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>B</Text>
+          <LinearGradient
+            colors={['#1e3a8a', '#3b82f6']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+              paddingHorizontal: 16, paddingTop: Math.max(insets.top, 24) + 12, paddingBottom: 16,
+              borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 8 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>{membership?.organization?.name?.[0] || 'B'}</Text>
               </View>
-              <View>
-                <Text style={{ fontWeight: '800', color: titleColor, fontSize: 15, lineHeight: 18 }}>TAPasok</Text>
-                <Text style={{ color: subtitleColor, fontSize: 11 }}>Officer Portal</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontWeight: '800', color: '#ffffff', fontSize: 15, lineHeight: 18 }} numberOfLines={1}>{membership?.organization?.name || 'TAPasok'}</Text>
+                <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 11 }}>Officer Portal</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: closeBtnBg, alignItems: 'center', justifyContent: 'center' }}>
-              <X size={16} color={closeBtnIcon} />
-            </TouchableOpacity>
-          </View>
+            
+            <View style={{ flexDirection: 'row', gap: 8, flexShrink: 0 }}>
+              {(officerDesignations && officerDesignations.length > 1) && (
+                <TouchableOpacity onPress={() => setShowOrgSwitcher(true)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Repeat size={16} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onClose} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
 
           {isTreasurer ? (
             <>
@@ -277,6 +298,47 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
           <ChevronRight size={16} color={chevronColor} />
         </TouchableOpacity>
       </Animated.View>
+
+      {/* Org Switcher Overlay (No Nested Modals) */}
+      {showOrgSwitcher && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setShowOrgSwitcher(false)} />
+          <View style={{ position: 'absolute', top: '25%', left: 20, right: 20, backgroundColor: drawerBg, borderRadius: 20, overflow: 'hidden', padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: titleColor }}>Switch Organization</Text>
+              <TouchableOpacity onPress={() => setShowOrgSwitcher(false)}>
+                <X size={20} color={subtitleColor} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={{ maxHeight: 300 }}>
+              {officerDesignations?.map((des) => {
+                const isCurrent = des.organization_id === membership?.organization_id;
+                return (
+                  <TouchableOpacity
+                    key={des.id}
+                    onPress={() => !isCurrent && handleSwitchOrg(des.organization_id)}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                      padding: 16, borderRadius: 12, marginBottom: 8,
+                      backgroundColor: isCurrent ? (isDark ? 'rgba(59,130,246,0.1)' : '#eff6ff') : (isDark ? '#334155' : '#f8fafc'),
+                      borderWidth: 1, borderColor: isCurrent ? '#3b82f6' : 'transparent',
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: isCurrent ? '#3b82f6' : titleColor }} numberOfLines={1}>
+                        {des.organization?.name}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: subtitleColor, marginTop: 2 }}>{des.designation}</Text>
+                    </View>
+                    {isCurrent && <CheckCircle2 size={20} color="#3b82f6" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      )}
     </Modal>
   );
 }

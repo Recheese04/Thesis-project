@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
 import api from '../../services/api';
 import { CreditCard, CheckCircle, XCircle } from 'lucide-react-native';
+import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useAuth } from '../../context/AuthContext';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
+import { useTheme } from '../../context/ThemeContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function OfficerRFIDScanner() {
   const [events, setEvents] = useState<any[]>([]);
@@ -13,6 +16,11 @@ export default function OfficerRFIDScanner() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [lastScan, setLastScan] = useState<any>(null);
   const { membership } = useAuth();
+  const { isDark, colors } = useTheme();
+  
+  const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
+  const textSecondary = isDark ? '#94a3b8' : '#64748b';
+  const border = isDark ? '#334155' : '#e2e8f0';
   
   const inputRef = useRef<TextInput>(null);
 
@@ -67,15 +75,63 @@ export default function OfficerRFIDScanner() {
   return (
     <OfficerPageWrapper activeRoute="rfid">
       <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
-        <View className="bg-white px-5 pt-5 pb-4 border-b border-slate-100 flex-row items-center justify-between">
-        <View>
-          <Text className="text-2xl font-extrabold text-slate-900">RFID Scanner</Text>
-          <Text className="text-slate-500 text-sm mt-1">Simulate hardware scanner</Text>
-        </View>
-        <View className="w-12 h-12 bg-emerald-50 rounded-full items-center justify-center">
-          <CreditCard size={22} color="#10b981" />
-        </View>
-      </View>
+         {/* Header Area with Tarsi */}
+         <View style={{ position: 'relative', overflow: 'hidden' }}>
+          
+          {/* Decorative Background Circles */}
+          <View style={{
+            position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#4ade80', opacity: 0.1, zIndex: 0
+          }} />
+          <View style={{
+            position: 'absolute', top: 60, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: '#22c55e', opacity: 0.08, zIndex: 0
+          }} />
+
+          {/* Title & Quick Actions */}
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
+                Hardware Simulation
+              </Text>
+              <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
+                RFID Scanner
+              </Text>
+            </View>
+
+            {/* Quick Actions moved to the right */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+               <View style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+                  <CreditCard size={16} color={isDark ? '#94a3b8' : '#10b981'} />
+               </View>
+            </View>
+          </View>
+
+          {/* Mascot & Chat Area */}
+          <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
+            
+            {/* Flat Green Bar Background (Gradient) */}
+            <LinearGradient
+              colors={['#4ade80', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, zIndex: 0 }}
+            />
+
+            {/* Mascot Image Wrapper */}
+            <View style={{ 
+              position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10 
+            }}>
+              <Image 
+                source={require('../../tarsier-mascot/tar-id-nobg.png')} 
+                style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }} 
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Chat Bubble */}
+            <TarsiChatBubble 
+              message="Ready to scan! Make sure the selected event matches the one you're checking in for." 
+            />
+          </View>
+         </View>
 
       <View className="px-5 pt-6 pb-4">
         {events.length === 0 ? (

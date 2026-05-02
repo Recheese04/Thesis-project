@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Image } from 'react-native';
 import api from '../../services/api';
+import { LinearGradient } from 'expo-linear-gradient';
 import EmptyState from '../../components/ui/EmptyState';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
+import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
 import { Download, Calendar as CalendarIcon, Users, CheckCircle2, XCircle, Search, List, Grid } from 'lucide-react-native';
 
 export default function OfficerAttendance() {
   const { isDark, colors } = useTheme();
+  const { membership } = useAuth();
+  const orgId = membership?.organization_id;
   // Dark mode colors
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const cardBg = isDark ? '#1e293b' : '#fff';
@@ -53,7 +57,7 @@ export default function OfficerAttendance() {
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchEvents(); }, []);
+  useEffect(() => { fetchEvents(); }, [orgId]);
 
   useEffect(() => {
     const q = searchQuery.toLowerCase();
@@ -162,16 +166,63 @@ export default function OfficerAttendance() {
   return (
     <OfficerPageWrapper activeRoute="attendance">
       <View style={{ flex: 1, backgroundColor: bg }}>
-         {/* HEADER */}
-         <View style={{ backgroundColor: cardBg, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: borderLight, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1, marginRight: 16 }}>
-               <Text style={{ fontSize: 22, fontWeight: '800', color: isDark ? '#f8fafc' : '#0f2d5e' }}>Attendance Monitoring</Text>
-               <Text style={{ fontSize: 11, color: textSecondary, marginTop: 4 }}>Track member attendance in real-time</Text>
+         {/* Header Area with Tarsi */}
+         <View style={{ position: 'relative', overflow: 'hidden' }}>
+          
+          {/* Decorative Background Circles */}
+          <View style={{
+            position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#4ade80', opacity: 0.1, zIndex: 0
+          }} />
+          <View style={{
+            position: 'absolute', top: 60, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: '#22c55e', opacity: 0.08, zIndex: 0
+          }} />
+
+          {/* Title & Quick Actions */}
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
+                Attendance Monitoring
+              </Text>
+              <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
+                {selectedEvent ? 'Live Tracker' : 'Attendance'}
+              </Text>
             </View>
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: cardBg }}>
-               <Download size={12} color={textSecondary} />
-               <Text style={{ fontSize: 11, fontWeight: '600', color: textPrimary, marginLeft: 6 }}>Export</Text>
-            </TouchableOpacity>
+
+            {/* Quick Actions moved to the right */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+               <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
+                  <Download size={14} color={isDark ? '#94a3b8' : '#0f2d5e'} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#f1f5f9' : '#0f2d5e', marginLeft: 6 }}>Export</Text>
+               </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Mascot & Chat Area */}
+          <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
+            
+            {/* Flat Green Bar Background (Gradient) */}
+            <LinearGradient
+              colors={['#4ade80', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, zIndex: 0 }}
+            />
+
+            {/* Mascot Image Wrapper */}
+            <View style={{ 
+              position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10 
+            }}>
+              <Image 
+                source={require('../../tarsier-mascot/tar-attendance-nobg.png')} 
+                style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }} 
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Chat Bubble */}
+            <TarsiChatBubble 
+              message={selectedEvent ? `Monitoring ${selectedEvent.title}. You have ${stats?.checked_in || 0} members checked in!` : "Great job tracking! Select an event below to monitor real-time attendance."} 
+            />
+          </View>
          </View>
 
          <ScrollView

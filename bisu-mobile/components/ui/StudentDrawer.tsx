@@ -11,6 +11,7 @@ import {
   LayoutDashboard, QrCode, User, Calendar, Activity,
   ClipboardList, Bell, MessageSquare, Wallet, X, ChevronRight,
 } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const DRAWER_WIDTH = Dimensions.get('window').width * 0.78;
 const DURATION_OPEN = 260;
@@ -188,30 +189,34 @@ export default function StudentDrawer({
         }}
       >
         {/* Header */}
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          paddingHorizontal: 16,
-          paddingTop: insets.top + 12,
-          paddingBottom: 16,
-          borderBottomWidth: 1, borderBottomColor: headerBorder,
-          backgroundColor: drawerBg,
-        }}>
+        <LinearGradient
+          colors={['#1e3a8a', '#3b82f6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: Math.max(insets.top, 24) + 12,
+            paddingBottom: 16,
+            borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+          }}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>B</Text>
             </View>
             <View>
-              <Text style={{ fontWeight: '800', color: titleColor, fontSize: 15, lineHeight: 18 }}>TAPasok</Text>
-              <Text style={{ color: subtitleColor, fontSize: 11 }}>Student Portal</Text>
+              <Text style={{ fontWeight: '800', color: '#ffffff', fontSize: 15, lineHeight: 18 }}>TAPasok</Text>
+              <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 11 }}>Student Portal</Text>
             </View>
           </View>
           <TouchableOpacity
             onPress={onClose}
-            style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: closeBtnBg, alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' }}
           >
-            <X size={16} color={closeBtnIcon} />
+            <X size={16} color="#ffffff" />
           </TouchableOpacity>
-        </View>
+        </LinearGradient>
 
         {/* Nav Items */}
         <ScrollView

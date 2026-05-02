@@ -12,6 +12,18 @@ const api = axios.create({
 api.interceptors.request.use(async (config) => {
   const token = await SecureStore.getItemAsync('auth_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  // Add the scoped organization context
+  const membershipStr = await SecureStore.getItemAsync('auth_membership');
+  if (membershipStr) {
+    try {
+      const membership = JSON.parse(membershipStr);
+      // Only set it if it hasn't been manually overridden for this specific request
+      if (membership?.organization_id && !config.headers['X-Organization-Id']) {
+        config.headers['X-Organization-Id'] = membership.organization_id.toString();
+      }
+    } catch (e) {}
+  }
   return config;
 });
 

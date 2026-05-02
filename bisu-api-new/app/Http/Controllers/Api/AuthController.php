@@ -34,6 +34,13 @@ class AuthController extends Controller
         // Create a new token (allow multi-device sessions — web + mobile)
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // Get all officer designations for switching
+        $officerDesignations = Designation::with('organization')
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('designation', '!=', 'Member')
+            ->get();
+
         return response()->json([
             'message' => 'Login successful',
             'token' => $token,
@@ -41,6 +48,7 @@ class AuthController extends Controller
             'role' => $role,
             'membership' => $membership,
             'organization_id' => $organizationId,
+            'officer_designations' => $officerDesignations,
         ], 200);
     }
 
@@ -57,11 +65,19 @@ class AuthController extends Controller
 
         [$role, $membership, $organizationId] = $this->resolveRole($user);
 
+        // Get all officer designations for switching
+        $officerDesignations = Designation::with('organization')
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('designation', '!=', 'Member')
+            ->get();
+
         return response()->json([
             'user' => $user,
             'role' => $role,
             'membership' => $membership,
             'organization_id' => $organizationId,
+            'officer_designations' => $officerDesignations,
         ]);
     }
 
