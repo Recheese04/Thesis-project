@@ -19,7 +19,8 @@ chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Update apache port to match Railway's $PORT if provided
 if [ -n "$PORT" ]; then
-    sed -i "s/80/$PORT/g" /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
+    echo "Listen $PORT" > /etc/apache2/ports.conf
+    sed -i "s/:80/:$PORT/g" /etc/apache2/sites-available/000-default.conf
 fi
 
 # Start Apache
