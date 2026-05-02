@@ -132,7 +132,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
             return response()->json([
             'message' => 'Profile picture updated.',
-            'url' => \Illuminate\Support\Facades\Storage::disk('public')->url($path),
+            'path'    => $path,
+            'url'     => \Illuminate\Support\Facades\Storage::disk('public')->url($path),
             ]);
         }
         );
@@ -373,10 +374,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/obligations/{id}', [ObligationController::class, 'update']);
         Route::delete('/obligations/{id}', [ObligationController::class, 'destroy']);
 
-        // Membership Fees
-        Route::get('/organizations/{orgId}/membership-fees', [\App\Http\Controllers\Api\MembershipFeeController::class, 'index']);
-        Route::post('/organizations/{orgId}/membership-fees', [\App\Http\Controllers\Api\MembershipFeeController::class, 'store']);
-        Route::put('/membership-fees/{feeId}/status', [\App\Http\Controllers\Api\MembershipFeeController::class, 'updateStatus']);
+        // Student Fees (Assigned Bills)
+        Route::get('/organizations/{orgId}/student-fees', [\App\Http\Controllers\Api\StudentFeeController::class, 'index']);
+        Route::post('/organizations/{orgId}/student-fees', [\App\Http\Controllers\Api\StudentFeeController::class, 'store']);
+        Route::post('/organizations/{orgId}/student-fees/bulk', [\App\Http\Controllers\Api\StudentFeeController::class, 'bulkAssign']);
+        Route::put('/student-fees/{feeId}/status', [\App\Http\Controllers\Api\StudentFeeController::class, 'updateStatus']);
+
+        // Fee Types
+        Route::get('/fee-types', [\App\Http\Controllers\Api\FeeTypeController::class, 'index']);
+        Route::post('/fee-types', [\App\Http\Controllers\Api\FeeTypeController::class, 'store']);
+        Route::put('/fee-types/{id}', [\App\Http\Controllers\Api\FeeTypeController::class, 'update']);
+        Route::delete('/fee-types/{id}', [\App\Http\Controllers\Api\FeeTypeController::class, 'destroy']);
 
         // Announcements
         Route::get('/organizations/{orgId}/announcements', [AnnouncementController::class, 'index']);
@@ -498,6 +506,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // AI Summarize (Gemini 1.5 Flash)
         Route::post('/summarize', [EvaluationController::class, 'summarize']);
+
+        // Consequences (Fix #2)
+        Route::get('/consequences/{user_id}/financial', [App\Http\Controllers\Api\ConsequenceController::class, 'financial']);
+        Route::get('/consequences/{user_id}/non-financial', [App\Http\Controllers\Api\ConsequenceController::class, 'nonFinancial']);
+        Route::post('/consequences/assign', [App\Http\Controllers\Api\ConsequenceController::class, 'assign']);
+        Route::patch('/consequences/{id}/complete', [App\Http\Controllers\Api\ConsequenceController::class, 'complete']);
 
         // AI Chatbot
         Route::post('/chatbot', [ChatbotController::class, 'handleChat']);

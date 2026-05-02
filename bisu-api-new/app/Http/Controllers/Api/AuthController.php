@@ -31,8 +31,7 @@ class AuthController extends Controller
 
         [$role, $membership, $organizationId] = $this->resolveRole($user);
 
-        // Revoke all existing tokens for this user before issuing a new one
-        $user->tokens()->delete();
+        // Create a new token (allow multi-device sessions — web + mobile)
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([

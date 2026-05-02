@@ -1,0 +1,35 @@
+{
+    "message":  "Login successful",
+    "token":  "258|Dx1FSeBVR49V5BWItZoaago884d0i3Ptzn3HYNie13a175b3",
+    "user":  {
+                 "id":  1,
+                 "student_number":  null,
+                 "first_name":  null,
+                 "middle_name":  null,
+                 "last_name":  null,
+                 "year_level":  null,
+                 "contact_number":  null,
+                 "college_id":  null,
+                 "course_id":  null,
+                 "rfid_uid":  null,
+                 "profile_picture":  null,
+                 "user_type_id":  1,
+                 "email":  "admin@example.com",
+                 "is_active":  true,
+                 "created_at":  "2026-02-14T14:39:21.000000Z",
+                 "updated_at":  "2026-02-14T14:39:21.000000Z",
+                 "profile_picture_url":  null,
+                 "college":  null,
+                 "course":  null,
+                 "user_type":  {
+                                   "id":  1,
+                                   "name":  "Admin",
+                                   "description":  null,
+                                   "created_at":  "2026-02-14T14:39:20.000000Z",
+                                   "updated_at":  "2026-02-14T14:39:20.000000Z"
+                               }
+             },
+    "role":  "admin",
+    "membership":  null,
+    "organization_id":  null
+}

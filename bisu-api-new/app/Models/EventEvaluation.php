@@ -18,10 +18,12 @@ class EventEvaluation extends Model
         'is_anonymous',
         'status',
         'created_by',
+        'expires_at',
     ];
 
     protected $casts = [
         'is_anonymous' => 'boolean',
+        'expires_at' => 'datetime',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────

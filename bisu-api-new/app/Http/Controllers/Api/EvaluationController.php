@@ -88,6 +88,7 @@ class EvaluationController extends Controller
                 'title'                             => 'nullable|string|max:255',
                 'description'                       => 'nullable|string',
                 'is_anonymous'                      => 'nullable|boolean',
+                'expires_at'                        => 'nullable|date',
                 'questions'                         => 'required|array|min:1',
                 'questions.*.question_text'         => 'required|string',
                 'questions.*.question_type'         => 'required|in:rating,text,multiple_choice,yes_no',
@@ -117,6 +118,7 @@ class EvaluationController extends Controller
                 'is_anonymous' => $data['is_anonymous'] ?? false,
                 'status'       => 'open',
                 'created_by'   => $user->id,
+                'expires_at'   => $data['expires_at'] ?? null,
             ]);
 
             foreach ($data['questions'] as $index => $q) {
@@ -249,6 +251,7 @@ class EvaluationController extends Controller
                     'title'             => $event->title,
                     'event_date'        => $event->event_date?->format('M d, Y'),
                     'evaluation_status' => $event->evaluation?->status ?? null,
+                    'expires_at'        => $event->evaluation?->expires_at ?? null,
                 ]);
 
             return response()->json(['events' => $events]);
@@ -597,6 +600,7 @@ class EvaluationController extends Controller
                         'is_anonymous'    => $evaluation->is_anonymous,
                         'questions_count' => $evaluation->questions->count(),
                         'has_responded'   => $hasResponded,
+                        'expires_at'      => $evaluation->expires_at,
                         'event'           => $evaluation->event ? [
                             'id'    => $evaluation->event->id,
                             'title' => $evaluation->event->title,

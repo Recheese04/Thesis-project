@@ -18,8 +18,16 @@ class ConsequenceRule extends Model
         'consequence_title',
         'consequence_description',
         'due_days',
+        'type',
+        'fee_type_id',
         'created_by',
     ];
+
+    public function feeType()
+    {
+        return $this->belongsTo(FeeType::class);
+    }
+
 
     public function organization()
     {

@@ -28,6 +28,12 @@ class AttendanceController extends Controller
                 return response()->json(['message' => 'Invalid QR code for this event'], 400);
             }
 
+            // Safety Check: Only allow check-in if event is ONGOING
+            if ($event->status !== 'ongoing') {
+                $statusMsg = $event->status === 'completed' ? 'This event is already completed.' : 'This event is not yet open for attendance.';
+                return response()->json(['message' => $statusMsg], 403);
+            }
+
             $user = auth()->user();
 
             $existing = Attendance::where('event_id', $data['event_id'])
@@ -78,6 +84,11 @@ class AttendanceController extends Controller
 
             if (!$event) {
                 return response()->json(['message' => 'Invalid QR code for this event'], 400);
+            }
+
+            // Safety Check: Only allow check-out if event is ONGOING
+            if ($event->status !== 'ongoing') {
+                return response()->json(['message' => 'Cannot check out. This event is already closed.'], 403);
             }
 
             $user = auth()->user();

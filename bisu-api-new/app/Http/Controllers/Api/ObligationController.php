@@ -21,27 +21,25 @@ class ObligationController extends Controller
         try {
             $userId = Auth::id();
 
-            // Pending fees
-            $fees = MembershipFee::with('organization')
+            // Fetch fees from student_fees table (includes automated fines)
+            $fees = \App\Models\StudentFee::with(['organization', 'feeType'])
                 ->where('user_id', $userId)
-                ->orderByRaw("FIELD(status, 'pending', 'paid')")
-                ->orderBy('created_at', 'desc')
                 ->get()
                 ->map(fn($f) => [
                     'id'           => $f->id,
                     'type'         => 'fee',
-                    'title'        => $f->name,
-                    'description'  => $f->description,
+                    'title'        => $f->feeType->name ?? 'Fee',
+                    'description'  => $f->feeType->description ?? null,
                     'organization' => $f->organization->name ?? '—',
-                    'amount'       => $f->amount,
+                    'amount'       => $f->feeType->amount ?? 0,
                     'status'       => $f->status === 'paid' ? 'completed' : 'pending',
                     'due_date'     => null,
                     'completed_at' => $f->status === 'paid' ? $f->updated_at?->toDateString() : null,
                     'created_at'   => $f->created_at?->toDateString(),
                 ]);
 
-            // Consequences assigned to me
-            $consequences = StudentConsequence::with(['consequenceRule.organization', 'event'])
+            // Consequences assigned to me (Tasks, etc.)
+            $consequences = StudentConsequence::with(['rule.organization', 'event'])
                 ->where('user_id', $userId)
                 ->orderByRaw("FIELD(status, 'pending', 'completed')")
                 ->orderBy('due_date', 'asc')
@@ -49,15 +47,16 @@ class ObligationController extends Controller
                 ->map(fn($c) => [
                     'id'           => $c->id,
                     'type'         => 'consequence',
-                    'title'        => $c->consequenceRule->consequence_title ?? 'Consequence',
-                    'description'  => $c->consequenceRule->consequence_description ?? null,
-                    'organization' => $c->consequenceRule->organization->name ?? '—',
+                    'title'        => $c->rule->consequence_title ?? 'Consequence',
+                    'description'  => $c->rule->consequence_description ?? null,
+                    'organization' => $c->rule->organization->name ?? '—',
                     'event_title'  => $c->event->title ?? null,
                     'status'       => $c->status,
                     'due_date'     => $c->due_date?->toDateString(),
                     'completed_at' => $c->completed_at?->toDateString(),
                     'notes'        => $c->notes,
                     'created_at'   => $c->created_at?->toDateString(),
+                    'consequence_type' => $c->type, // financial, task, etc.
                 ]);
 
             return response()->json([
@@ -69,6 +68,7 @@ class ObligationController extends Controller
             return response()->json(['message' => 'Error fetching obligations'], 500);
         }
     }
+
 
     /**
      * GET /api/organizations/{orgId}/obligations

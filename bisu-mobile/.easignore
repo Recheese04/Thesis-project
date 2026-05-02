@@ -1,0 +1,5 @@
+# Ignore other monorepo folders to speed up upload and avoid Windows symlink crash
+../bisu-api-new/
+../src/
+bisu-api-new/
+src/

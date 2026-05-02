@@ -100,16 +100,11 @@ class EventController extends Controller
 
             foreach ($rules as $rule) {
                 foreach ($absentUserIds as $userId) {
-                    \App\Models\StudentConsequence::firstOrCreate(
-                        [
-                            'consequence_rule_id' => $rule->id,
-                            'user_id'             => $userId,
-                            'event_id'            => $eventId,
-                        ],
-                        [
-                            'status'   => 'pending',
-                            'due_date' => now()->addDays($rule->due_days ?? 7)->toDateString(),
-                        ]
+                    // Use the smart service to assign (handles fee creation automatically)
+                    app(\App\Services\ConsequenceService::class)->assignConsequence(
+                        $userId, 
+                        $rule->id, 
+                        $eventId
                     );
                 }
             }

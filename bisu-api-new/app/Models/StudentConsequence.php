@@ -10,11 +10,24 @@ class StudentConsequence extends Model
         'consequence_rule_id',
         'user_id',
         'event_id',
+        'type',
+        'financial_consequence_id',
         'status',
         'due_date',
         'completed_at',
         'notes',
     ];
+
+    public function financialFee()
+    {
+        return $this->belongsTo(StudentFee::class, 'financial_consequence_id');
+    }
+
+    public function rule()
+    {
+        return $this->belongsTo(ConsequenceRule::class, 'consequence_rule_id');
+    }
+
 
     protected $casts = [
         'due_date'     => 'date',

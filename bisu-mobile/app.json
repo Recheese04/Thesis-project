@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "TAPasok",
+    "slug": "tapasok",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/tapasok-icon.png",
+    "scheme": "bisumobile",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.recheese.tapasok"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/tapasok-icon.png",
+        "backgroundColor": "#0f2d5e"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.recheese.bisumobile"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/tapasok-icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/tapasok-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0f2d5e",
+          "dark": {
+            "backgroundColor": "#0a1628"
+          }
+        }
+      ],
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "34c25ba7-33b4-4ebb-b9d4-34eed36e674f"
+      }
+    },
+    "owner": "recheeses-organization"
+  }
+}
