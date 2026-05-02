@@ -18,9 +18,13 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
-# Fix MPM module conflict (disable event/worker, keep prefork which is required for mod_php)
-RUN a2dismod mpm_event mpm_worker || true
-RUN a2enmod mpm_prefork || true
+# Fix MPM module conflict — directly manage symlinks instead of using a2dismod/a2enmod
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.conf \
+           /etc/apache2/mods-enabled/mpm_event.load \
+           /etc/apache2/mods-enabled/mpm_worker.conf \
+           /etc/apache2/mods-enabled/mpm_worker.load \
+    && ln -sf /etc/apache2/mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf \
+    && ln -sf /etc/apache2/mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load
 
 # Enable Apache modules for rewrite and CORS headers
 RUN a2enmod rewrite headers
