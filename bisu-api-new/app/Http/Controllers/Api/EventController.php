@@ -70,9 +70,13 @@ class EventController extends Controller
     {
         try {
             $event = Event::find($eventId);
-            if (!$event) return;
+            if (!$event) {
+                Log::warning("assignConsequences: Event #{$eventId} not found.");
+                return;
+            }
 
             $orgId = $event->organization_id;
+            Log::info("assignConsequences: Processing event #{$eventId} for org #{$orgId}");
 
             // Get consequence rules: event-specific + org-wide (event_id IS NULL)
             $rules = \App\Models\ConsequenceRule::where('organization_id', $orgId)
@@ -82,24 +86,39 @@ class EventController extends Controller
                 })
                 ->get();
 
-            if ($rules->isEmpty()) return;
+            Log::info("assignConsequences: Found {$rules->count()} rules for org #{$orgId}");
+
+            if ($rules->isEmpty()) {
+                Log::warning("assignConsequences: No consequence rules found for org #{$orgId}. Skipping.");
+                return;
+            }
 
             // All active members of this org
             $memberUserIds = \App\Models\Designation::where('organization_id', $orgId)
                 ->where('status', 'active')
                 ->pluck('user_id');
 
+            Log::info("assignConsequences: Found {$memberUserIds->count()} active members");
+
             // Members who actually checked in to this event
             $attendedUserIds = \App\Models\Attendance::where('event_id', $eventId)
                 ->pluck('user_id');
 
+            Log::info("assignConsequences: {$attendedUserIds->count()} members attended event #{$eventId}");
+
             // Absent = members who didn't check in
             $absentUserIds = $memberUserIds->diff($attendedUserIds);
 
-            if ($absentUserIds->isEmpty()) return;
+            Log::info("assignConsequences: {$absentUserIds->count()} members were absent");
+
+            if ($absentUserIds->isEmpty()) {
+                Log::info("assignConsequences: No absent members. Skipping.");
+                return;
+            }
 
             foreach ($rules as $rule) {
                 foreach ($absentUserIds as $userId) {
+                    Log::info("assignConsequences: Assigning rule #{$rule->id} to user #{$userId}");
                     // Use the smart service to assign (handles fee creation automatically)
                     app(\App\Services\ConsequenceService::class)->assignConsequence(
                         $userId, 

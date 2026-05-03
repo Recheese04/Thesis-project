@@ -271,7 +271,8 @@ class EvaluationController extends Controller
     public function getByEvent($eventId)
     {
         try {
-            $evaluation = EventEvaluation::with(['questions.options'])
+            $user = auth()->user();
+            $evaluation = EventEvaluation::with(['questions.options', 'event'])
                 ->where('event_id', $eventId)
                 ->first();
 
@@ -282,7 +283,29 @@ class EvaluationController extends Controller
                 ]);
             }
 
-            $userId    = auth()->id();
+            // Security check: Ensure student belongs to the organization
+            if (!$user->isAdmin()) {
+                $isMember = \App\Models\Designation::where('user_id', $user->id)
+                    ->where('organization_id', $evaluation->event->organization_id)
+                    ->where('status', 'active')
+                    ->exists();
+                
+                if (!$isMember) {
+                    return response()->json(['message' => 'Unauthorized. You are not a member of this organization.'], 403);
+                }
+
+                // Visibility check: Must be checked out ONLY
+                $hasCheckedOut = \App\Models\Attendance::where('event_id', $eventId)
+                    ->where('user_id', $user->id)
+                    ->whereNotNull('time_out')
+                    ->exists();
+                
+                if (!$hasCheckedOut) {
+                    return response()->json(['message' => 'Evaluation is not yet available. You must check out of the event first.'], 403);
+                }
+            }
+
+            $userId    = $user->id;
             $submitted = false;
 
             if ($userId) {
@@ -581,16 +604,34 @@ class EvaluationController extends Controller
             $user   = auth()->user();
             $userId = $user->id;
 
-            $evaluations = EventEvaluation::with(['event:id,title', 'questions:id,evaluation_id'])
+            // 1. Get organization IDs where the student is an active member
+            $orgIds = \App\Models\Designation::where('user_id', $userId)
+                ->where('status', 'active')
+                ->pluck('organization_id')
+                ->toArray();
+
+            if (empty($orgIds)) {
+                return response()->json(['evaluations' => []]);
+            }
+
+            // 2. Fetch evaluations that are OPEN
+            // AND belong to the student's organizations
+            // AND the student has personally checked out
+            $evaluations = EventEvaluation::with(['event:id,title,status', 'questions:id,evaluation_id'])
+                ->where('status', 'open')
+                ->whereHas('event', function($query) use ($orgIds, $userId) {
+                    $query->whereIn('organization_id', $orgIds)
+                          ->whereHas('attendances', function($aq) use ($userId) {
+                              $aq->where('user_id', $userId)
+                                ->whereNotNull('time_out');
+                          });
+                })
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->map(function ($evaluation) use ($userId) {
-                    $hasResponded = false;
-                    if ($userId) {
-                        $hasResponded = EvaluationResponse::where('evaluation_id', $evaluation->id)
-                            ->where('user_id', $userId)
-                            ->exists();
-                    }
+                    $hasResponded = EvaluationResponse::where('evaluation_id', $evaluation->id)
+                        ->where('user_id', $userId)
+                        ->exists();
 
                     return [
                         'id'              => $evaluation->id,
