@@ -142,7 +142,7 @@ export default function OfficerMyAttendance() {
             <Text style={{ fontSize: 11, fontWeight: '500', color: textSecondary, marginBottom: 8 }}>Attendance Rate</Text>
             <Text style={{ fontSize: 22, fontWeight: '800', color: textPrimary, marginBottom: 12 }}>{rate}%</Text>
             <View style={{ height: 6, width: '100%', backgroundColor: isDark ? '#334155' : '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
-               <View style={{ height: '100%', backgroundColor: '#2563eb', borderRadius: 3 }} style={{ width: `${rate}%` }} />
+               <View style={{ height: '100%', backgroundColor: '#2563eb', borderRadius: 3, width: `${rate}%` }} />
             </View>
           </View>
 

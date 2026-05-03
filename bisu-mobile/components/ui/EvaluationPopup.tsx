@@ -4,7 +4,7 @@ import {
   ActivityIndicator, TextInput, Alert, KeyboardAvoidingView,
   Platform, Dimensions
 } from 'react-native';
-import { X, Send, Star, MessageSquare, ThumbsUp, ListChecks, CheckCircle2, Clock, AlertCircle } from 'lucide-react-native';
+import { X, Send, Star, MessageSquare, ThumbsUp, ListChecks, CheckCircle2, Clock, AlertCircle, ClipboardList } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +17,12 @@ interface Props {
 }
 
 const { width, height } = Dimensions.get('window');
+
+const ClipboardEdit = ({ size, color }: { size: number; color: string }) => (
+  <View style={{ width: size, height: size }}>
+    <ClipboardList size={size} color={color} />
+  </View>
+);
 
 export default function EvaluationPopup({ visible, onClose, evaluation, onSuccess }: Props) {
   const { isDark } = useTheme();
@@ -253,7 +259,7 @@ export default function EvaluationPopup({ visible, onClose, evaluation, onSucces
               ) : null}
 
               {isExpired ? (
-                <View style={{ alignItems: 'center', py: 40 }}>
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
                    <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                       <AlertCircle size={32} color="#ef4444" />
                    </View>
@@ -303,10 +309,3 @@ export default function EvaluationPopup({ visible, onClose, evaluation, onSucces
     </Modal>
   );
 }
-
-const ClipboardEdit = ({ size, color }: { size: number; color: string }) => (
-  <View style={{ width: size, height: size }}>
-    <ClipboardList size={size} color={color} />
-  </View>
-);
-import { ClipboardList } from 'lucide-react-native';

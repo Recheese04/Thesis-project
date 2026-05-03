@@ -6,6 +6,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { Download, Calendar as CalendarIcon, Users, CheckCircle2, XCircle, Search, List, Grid } from 'lucide-react-native';
 
 export default function OfficerAttendance() {
@@ -298,12 +299,12 @@ export default function OfficerAttendance() {
                                     <Text style={{ fontSize: 10, fontWeight: '700', color: textSecondary }}>{groupedData[groupName].length} Student{groupedData[groupName].length !== 1 ? 's' : ''}</Text>
                                  </View>
                               </View>
-                              {groupedData[groupName].map(record => renderAttendee(record))}
+                              {groupedData[groupName].map((record: any) => renderAttendee(record))}
                            </View>
                         ))
                      ) : (
                         <View>
-                           {filteredAttendance.map(record => renderAttendee(record))}
+                           {filteredAttendance.map((record: any) => renderAttendee(record))}
                         </View>
                      )}
                   </View>

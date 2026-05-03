@@ -52,6 +52,7 @@ export default function OfficerEvents() {
 
   // Picker States
   const [showPicker, setShowPicker] = useState<'date' | 'start' | 'end' | null>(null);
+  const [tempDate, setTempDate] = useState<Date>(new Date());
 
   const fetchEvents = async () => {
     try {
@@ -107,8 +108,8 @@ export default function OfficerEvents() {
     setTitle(ev.title || '');
     setDescription(ev.description || '');
     setDate(ev.start_time ? ev.start_time.split(' ')[0] : ev.event_date);
-    setTime(ev.event_time || '');
-    setEndTime(ev.end_time || '');
+    setTime(ev.event_time ? ev.event_time.substring(0, 5) : '');
+    setEndTime(ev.end_time ? ev.end_time.substring(0, 5) : '');
     setLocation(ev.location || '');
     setStatus(ev.status || 'upcoming');
     setModalVisible(true);
@@ -123,6 +124,20 @@ export default function OfficerEvents() {
            await api.delete(`/events/${ev.id}`);
            setEvents(prev => prev.filter(e => e.id !== ev.id));
          } catch (e: any) { Alert.alert('Error', e.message); }
+      }}
+    ]);
+  };
+
+  const handleCloseEvent = (ev: any) => {
+    setActionEvent(null);
+    Alert.alert('Close Event', `Are you sure you want to close "${ev.title}"? This will auto-assign consequences to absent members.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Close Event', style: 'default', onPress: async () => {
+         try {
+           await api.post(`/events/${ev.id}/close`);
+           Alert.alert('Success', 'Event closed and consequences assigned.');
+           fetchEvents();
+         } catch (e: any) { Alert.alert('Error', e.response?.data?.message || e.message); }
       }}
     ]);
   };
@@ -572,6 +587,13 @@ export default function OfficerEvents() {
                 <ClipboardList size={18} color="#0f2d5e" />
                 <Text style={{ marginLeft: 12, fontWeight: '600', color: textPrimary }}>Evaluations</Text>
               </TouchableOpacity>
+              
+              {actionEvent?.status !== 'completed' && (
+                 <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 12, marginTop: 4, backgroundColor: isDark ? 'rgba(16,185,129,0.1)' : '#ecfdf5', borderRadius: 12 }} onPress={() => handleCloseEvent(actionEvent)}>
+                   <CheckCircle2 size={18} color="#10b981" />
+                   <Text style={{ marginLeft: 12, fontWeight: '600', color: '#10b981' }}>Close Event (Run Consequences)</Text>
+                 </TouchableOpacity>
+              )}
               
               <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 12, marginTop: 8, backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#fef2f2', borderRadius: 12 }} onPress={() => handleDelete(actionEvent)}>
                 <Trash2 size={18} color="#dc2626" />

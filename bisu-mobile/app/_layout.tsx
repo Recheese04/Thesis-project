@@ -15,14 +15,15 @@ function RootNavigator() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === 'login' || segments.length === 0 || segments[0] === 'index';
+    const seg0 = segments[0] as string | undefined;
+    const inAuthGroup = seg0 === 'login' || segments.length < 1 || seg0 === 'index';
 
     if (!token || !user) {
       if (!inAuthGroup) router.replace('/login');
     } else if (isOfficer) {
-      if (segments[0] !== '(officer)') router.replace('/(officer)');
+      if (seg0 !== '(officer)') router.replace('/(officer)');
     } else {
-      if (segments[0] !== '(student)') router.replace('/(student)');
+      if (seg0 !== '(student)') router.replace('/(student)');
     }
   }, [isLoading, token, user]);
 

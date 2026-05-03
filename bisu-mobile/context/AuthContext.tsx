@@ -7,6 +7,7 @@ interface User {
   first_name: string;
   last_name: string;
   email: string;
+  contact_number?: string;
   student_number?: string;
   user_type?: string;
   profile_picture?: string;
