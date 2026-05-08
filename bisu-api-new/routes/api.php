@@ -46,6 +46,10 @@ Route::any('/debug-user', function() {
 });
 
 
+Route::get('/payment-methods', function() {
+    return response()->json(\App\Models\PaymentMethod::all());
+});
+
 Route::middleware('auth:sanctum')->group(function () {
 
     // Auth
@@ -379,6 +383,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/organizations/{orgId}/student-fees', [\App\Http\Controllers\Api\StudentFeeController::class, 'store']);
         Route::post('/organizations/{orgId}/student-fees/bulk', [\App\Http\Controllers\Api\StudentFeeController::class, 'bulkAssign']);
         Route::put('/student-fees/{feeId}/status', [\App\Http\Controllers\Api\StudentFeeController::class, 'updateStatus']);
+        Route::post('/student-fees/{feeId}/pay', [\App\Http\Controllers\Api\StudentFeeController::class, 'pay']);
+        Route::post('/student-fees/{feeId}/checkout', [\App\Http\Controllers\Api\PayMongoController::class, 'createCheckoutSession']);
+
+        // Payment Method account info (officer can update)
+        Route::put('/payment-methods/{id}', function (Request $request, $id) {
+            $method = \App\Models\PaymentMethod::findOrFail($id);
+            $validated = $request->validate([
+                'account_number' => 'nullable|string|max:50',
+                'account_name' => 'nullable|string|max:255',
+            ]);
+            $method->update($validated);
+            return response()->json(['message' => 'Payment method updated.', 'method' => $method]);
+        });
 
         // Fee Types
         Route::get('/fee-types', [\App\Http\Controllers\Api\FeeTypeController::class, 'index']);

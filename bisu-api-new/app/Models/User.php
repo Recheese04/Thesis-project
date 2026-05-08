@@ -26,6 +26,8 @@ class User extends Authenticatable
         'course_id',
         'rfid_uid',
         'profile_picture',
+        'address_id',
+        'is_deleted',
     ];
 
     protected $hidden = [
@@ -33,7 +35,8 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'  => 'boolean',
+        'is_deleted' => 'boolean',
     ];
 
     protected $appends = ['profile_picture_url'];
@@ -64,6 +67,11 @@ class User extends Authenticatable
     public function course()
     {
         return $this->belongsTo(Course::class, 'course_id');
+    }
+
+    public function address()
+    {
+        return $this->belongsTo(Address::class);
     }
 
     public function attendances()

@@ -4,25 +4,25 @@ import api from '../../services/api';
 import EmptyState from '../../components/ui/EmptyState';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
+import PaymentModal from '../../components/ui/PaymentModal';
 import { useTheme } from '../../context/ThemeContext';
-import { Clock, CheckCircle, DollarSign, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react-native';
+import { Clock, CheckCircle, DollarSign, AlertTriangle, Calendar as CalendarIcon, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function OfficerMyObligations() {
   const { isDark, colors } = useTheme();
-  // Dark mode colors
-  const bg = isDark ? '#0f172a' : '#f8fafc';
-  const cardBg = isDark ? '#1e293b' : '#fff';
-  const border = isDark ? '#334155' : '#e2e8f0';
-  const borderLight = isDark ? '#1e293b' : '#f1f5f9';
-  const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
-  const textSecondary = isDark ? '#94a3b8' : '#64748b';
-  const textMuted = isDark ? '#64748b' : '#94a3b8';
-
   const [obligations, setObligations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'awaiting' | 'completed'>('pending');
+
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [selectedFeeId, setSelectedFeeId] = useState<number | null>(null);
+  const [selectedFeeAmount, setSelectedFeeAmount] = useState<string | null>(null);
+  const [selectedFeeTitle, setSelectedFeeTitle] = useState<string>('');
+  const [selectedFeeStatus, setSelectedFeeStatus] = useState<string>('');
+  const [selectedFeeRef, setSelectedFeeRef] = useState<string>('');
+  const [selectedFeeProof, setSelectedFeeProof] = useState<string>('');
 
   const fetchData = async () => {
     try {
@@ -38,23 +38,49 @@ export default function OfficerMyObligations() {
 
   useEffect(() => { fetchData(); }, []);
 
+  const openPaymentModal = (fee: any, amountStr: string) => {
+    setSelectedFeeId(fee.id);
+    setSelectedFeeTitle(fee.title || 'Fee');
+    setSelectedFeeAmount(amountStr);
+    setSelectedFeeStatus(fee.status);
+    setSelectedFeeRef(fee.reference_number || '');
+    setSelectedFeeProof(fee.proof || '');
+    setPaymentModalVisible(true);
+  };
+
   const pending = obligations.filter(o => o.status === 'pending');
+  const awaiting = obligations.filter(o => o.status === 'submitted');
   const completed = obligations.filter(o => o.status === 'paid' || o.status === 'completed');
   
   const total = obligations.length;
   const compCount = completed.length;
+  const awaitCount = awaiting.length;
   const pendCount = pending.length;
   const completionRate = total > 0 ? Math.round((compCount / total) * 100) : 0;
+
+  // Dark mode colors
+  const bg = isDark ? '#0f172a' : '#f8fafc';
+  const cardBg = isDark ? '#1e293b' : '#fff';
+  const border = isDark ? '#334155' : '#e2e8f0';
+  const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
+  const textSecondary = isDark ? '#94a3b8' : '#64748b';
+  const progressBg = isDark ? '#334155' : '#e2e8f0';
+  const progressFill = isDark ? colors.accent || '#818cf8' : '#0f172a';
+  const tabActiveBg = isDark ? '#334155' : '#fff';
+  const tabActiveBorder = isDark ? '#475569' : '#e2e8f0';
+  const tabActiveText = isDark ? '#f1f5f9' : '#0f172a';
+  const tabInactiveText = isDark ? '#64748b' : '#64748b';
+  const tabSep = isDark ? '#334155' : '#f1f5f9';
 
   if (loading && !refreshing) return (
     <OfficerPageWrapper activeRoute="my-obligations">
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: bg }}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     </OfficerPageWrapper>
   );
 
-  const activeList = activeTab === 'pending' ? pending : completed;
+  const activeList = activeTab === 'pending' ? pending : activeTab === 'awaiting' ? awaiting : completed;
 
   return (
     <OfficerPageWrapper activeRoute="my-obligations">
@@ -82,13 +108,6 @@ export default function OfficerMyObligations() {
                 My Obligations
               </Text>
             </View>
-
-            {/* Quick Actions moved to the right */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-               <View style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
-                  <AlertTriangle size={16} color={isDark ? '#94a3b8' : '#2563eb'} />
-               </View>
-            </View>
           </View>
 
           {/* Mascot & Chat Area */}
@@ -114,8 +133,8 @@ export default function OfficerMyObligations() {
             {/* Chat Bubble */}
             <TarsiChatBubble 
               message={pendCount > 0 
-                ? `You have ${pendCount} pending obligations to settle. Review them below.` 
-                : "Awesome! You have cleared all your pending obligations."} 
+                ? `You have ${pendCount} pending requirements to settle. Review them below.` 
+                : awaitCount > 0 ? `You have ${awaitCount} payments awaiting verification. Please be patient!` : "Awesome! You have cleared all your obligations."} 
             />
           </View>
         </View>
@@ -131,8 +150,8 @@ export default function OfficerMyObligations() {
                <View style={{ flex: 1, backgroundColor: cardBg, borderRadius: 12, padding: 16, marginRight: 8, borderWidth: 1, borderColor: border }}>
                  <Text style={{ fontSize: 10, color: textSecondary, marginBottom: 4 }}>Completion</Text>
                  <Text style={{ fontSize: 24, fontWeight: '800', color: textPrimary, marginBottom: 8 }}>{completionRate}%</Text>
-                 <View style={{ height: 6, backgroundColor: isDark ? '#334155' : '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
-                     <View style={{ width: `${completionRate}%`, height: '100%', backgroundColor: isDark ? '#60a5fa' : '#0f172a', borderRadius: 3 } as any} />
+                 <View style={{ height: 6, backgroundColor: progressBg, borderRadius: 3, overflow: 'hidden' }}>
+                     <View style={{ width: `${completionRate}%`, height: '100%', backgroundColor: progressFill, borderRadius: 3 }} />
                  </View>
                </View>
 
@@ -143,65 +162,90 @@ export default function OfficerMyObligations() {
             </View>
 
             <View style={{ flexDirection: 'row' }}>
-               <View style={{ flex: 1, backgroundColor: cardBg, borderRadius: 12, padding: 16, marginRight: 8, borderWidth: 1, borderColor: border }}>
-                 <Text style={{ fontSize: 10, color: textSecondary, marginBottom: 4 }}>Completed</Text>
-                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                   <CheckCircle size={20} color={isDark ? '#86efac' : '#16a34a'} />
-                   <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary, marginLeft: 8 }}>{compCount}</Text>
-                 </View>
-               </View>
+              <View style={{ flex: 1, backgroundColor: cardBg, borderRadius: 12, padding: 16, marginRight: 8, borderWidth: 1, borderColor: border }}>
+                <Text style={{ fontSize: 10, color: textSecondary, marginBottom: 4 }}>Completed</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <CheckCircle size={20} color="#16a34a" />
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary, marginLeft: 8 }}>{compCount}</Text>
+                </View>
+              </View>
 
-               <View style={{ flex: 1, backgroundColor: cardBg, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: border }}>
-                 <Text style={{ fontSize: 10, color: textSecondary, marginBottom: 4 }}>Pending</Text>
-                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                   <Clock size={20} color={isDark ? '#fdba74' : '#ea580c'} />
-                   <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary, marginLeft: 8 }}>{pendCount}</Text>
-                 </View>
-               </View>
+              <View style={{ flex: 1, backgroundColor: cardBg, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: border }}>
+                <Text style={{ fontSize: 10, color: textSecondary, marginBottom: 4 }}>Awaiting</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Clock size={20} color="#3b82f6" />
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary, marginLeft: 8 }}>{awaitCount}</Text>
+                </View>
+              </View>
             </View>
           </View>
 
-          {/* TABS CONTAINER */}
-          <View style={{ marginBottom: 20, flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: borderLight, paddingBottom: 10 }}>
+          {/* TABS */}
+          <View style={{ marginBottom: 20, flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: tabSep, paddingBottom: 10 }}>
             <Pressable 
               onPress={() => setActiveTab('pending')}
               style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20,
-                backgroundColor: activeTab === 'pending' ? cardBg : 'transparent',
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20,
+                backgroundColor: activeTab === 'pending' ? tabActiveBg : 'transparent',
                 borderWidth: 1,
-                borderColor: activeTab === 'pending' ? border : 'transparent',
-                marginRight: 8
+                borderColor: activeTab === 'pending' ? tabActiveBorder : 'transparent',
+                marginRight: 4
               }}
             >
-               <Text style={{ fontSize: 13, fontWeight: '700', color: activeTab === 'pending' ? textPrimary : textSecondary }}>
-                  Pending
+               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'pending' ? tabActiveText : tabInactiveText }}>
+                 Pending
                </Text>
-               <View style={{ backgroundColor: isDark ? 'rgba(217,119,6,0.15)' : '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#fbbf24' : '#d97706' }}>{pendCount}</Text>
+               <View style={{ backgroundColor: isDark ? 'rgba(251,191,36,0.15)' : '#fef3c7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
+                 <Text style={{ fontSize: 9, fontWeight: '700', color: '#d97706' }}>{pendCount}</Text>
+               </View>
+            </Pressable>
+
+            <Pressable 
+              onPress={() => setActiveTab('awaiting')}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20,
+                backgroundColor: activeTab === 'awaiting' ? tabActiveBg : 'transparent',
+                borderWidth: 1,
+                borderColor: activeTab === 'awaiting' ? tabActiveBorder : 'transparent',
+                marginRight: 4
+              }}
+            >
+               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'awaiting' ? tabActiveText : tabInactiveText }}>
+                 Awaiting
+               </Text>
+               <View style={{ backgroundColor: isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
+                 <Text style={{ fontSize: 9, fontWeight: '700', color: '#2563eb' }}>{awaitCount}</Text>
                </View>
             </Pressable>
 
             <Pressable 
               onPress={() => setActiveTab('completed')}
               style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20,
-                backgroundColor: activeTab === 'completed' ? cardBg : 'transparent',
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20,
+                backgroundColor: activeTab === 'completed' ? tabActiveBg : 'transparent',
                 borderWidth: 1,
-                borderColor: activeTab === 'completed' ? border : 'transparent',
+                borderColor: activeTab === 'completed' ? tabActiveBorder : 'transparent',
               }}
             >
-               <Text style={{ fontSize: 13, fontWeight: '700', color: activeTab === 'completed' ? textPrimary : textSecondary }}>
-                  Completed
+               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'completed' ? tabActiveText : tabInactiveText }}>
+                 Paid
                </Text>
-               <View style={{ backgroundColor: isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#86efac' : '#16a34a' }}>{compCount}</Text>
+               <View style={{ backgroundColor: isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
+                 <Text style={{ fontSize: 9, fontWeight: '700', color: '#16a34a' }}>{compCount}</Text>
                </View>
             </Pressable>
           </View>
 
           {activeList.length === 0 ? (
             <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-               <EmptyState icon="✅" message={`No ${activeTab} obligations.`} />
+                <EmptyState 
+                  icon={activeTab === 'pending' ? '🕒' : activeTab === 'awaiting' ? '⌛' : '✅'} 
+                  message={
+                    activeTab === 'pending' ? 'No pending requirements.' : 
+                    activeTab === 'awaiting' ? 'No fees awaiting verification.' : 
+                    'You have no completed obligations.'
+                  } 
+                />
             </View>
           ) : activeList.map((o) => {
             const isFee = o.type === 'fee';
@@ -209,25 +253,36 @@ export default function OfficerMyObligations() {
             const subtitle = o.organization || '—';
             const amountStr = o.amount ? `₱${parseFloat(o.amount).toFixed(2)}` : null;
             
+            const iconBg = isFee 
+              ? (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7') 
+              : (isDark ? 'rgba(234,88,12,0.15)' : '#ffedd5');
+            const typeBadgeBg = isFee
+              ? (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7')
+              : (isDark ? 'rgba(147,51,234,0.15)' : '#f3e8ff');
+
+            const isClickable = isFee && (o.status === 'pending' || o.status === 'submitted');
+            const Wrapper = isClickable ? TouchableOpacity : View;
+
             return (
-               <View key={`${o.type}-${o.id}`} style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: border, flexDirection: 'row' }}>
-                  
-                  {/* Left Icon */}
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: isFee ? (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7') : (isDark ? 'rgba(234,88,12,0.15)' : '#ffedd5'), alignItems: 'center', justifyContent: 'center', marginRight: 16, marginTop: 2 }}>
-                     {isFee ? <DollarSign size={20} color={isDark ? '#86efac' : '#16a34a'} /> : <AlertTriangle size={20} color={isDark ? '#fdba74' : '#ea580c'} />}
+               <Wrapper 
+                 key={`${o.type}-${o.id}`} 
+                 style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: o.status === 'submitted' ? (isDark ? '#3b82f6' : '#bfdbfe') : border, flexDirection: 'row', alignItems: 'center' }}
+                 onPress={isClickable ? () => openPaymentModal(o, amountStr!) : undefined}
+               >
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: iconBg, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                     {isFee ? <DollarSign size={20} color="#16a34a" /> : <AlertTriangle size={20} color="#ea580c" />}
                   </View>
                   
-                  {/* Content */}
                   <View style={{ flex: 1 }}>
                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                         <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary, marginRight: 8, marginBottom: 4 }}>{title}</Text>
                         
-                        <View style={{ backgroundColor: isFee ? (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7') : (isDark ? 'rgba(147,51,234,0.15)' : '#f3e8ff'), paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 6, marginBottom: 4 }}>
-                           <Text style={{ fontSize: 9, fontWeight: '700', color: isFee ? (isDark ? '#86efac' : '#15803d') : (isDark ? '#c084fc' : '#9333ea') }}>{isFee ? 'Fee' : 'Consequence'}</Text>
+                        <View style={{ backgroundColor: typeBadgeBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 6, marginBottom: 4 }}>
+                           <Text style={{ fontSize: 9, fontWeight: '700', color: isFee ? '#15803d' : '#9333ea' }}>{isFee ? (o.category || 'Fee') : 'Consequence'}</Text>
                         </View>
                         
-                        <View style={{ backgroundColor: activeTab === 'pending' ? (isDark ? 'rgba(217,119,6,0.15)' : '#fef3c7') : (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7'), paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 4 }}>
-                           <Text style={{ fontSize: 9, fontWeight: '700', color: activeTab === 'pending' ? (isDark ? '#fbbf24' : '#d97706') : (isDark ? '#86efac' : '#15803d'), textTransform: 'capitalize' }}>{activeTab}</Text>
+                        <View style={{ backgroundColor: o.status === 'submitted' ? (isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe') : o.status === 'pending' ? (isDark ? 'rgba(251,191,36,0.15)' : '#fef3c7') : (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7'), paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 4 }}>
+                           <Text style={{ fontSize: 9, fontWeight: '700', color: o.status === 'submitted' ? '#2563eb' : (o.status === 'pending' ? '#d97706' : '#15803d'), textTransform: 'capitalize' }}>{o.status === 'submitted' ? 'Awaiting Verification' : o.status}</Text>
                         </View>
                      </View>
 
@@ -236,7 +291,7 @@ export default function OfficerMyObligations() {
                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
                         {o.due_date && (
                            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, marginBottom: 4 }}>
-                              <CalendarIcon size={12} color={textMuted} />
+                              <CalendarIcon size={12} color={textSecondary} />
                               <Text style={{ fontSize: 10, color: textSecondary, marginLeft: 4 }}>Due {new Date(o.due_date).toLocaleDateString()}</Text>
                            </View>
                         )}
@@ -250,21 +305,44 @@ export default function OfficerMyObligations() {
                      {o.notes && (
                        <Text style={{ fontSize: 10, color: textSecondary, marginTop: 4 }}>{o.notes}</Text>
                      )}
-                     
-                     </View>
+                  </View>
                   
-                  {/* Right Action / Amount */}
                   {isFee && amountStr && (
                      <View style={{ justifyContent: 'center', alignItems: 'flex-end', marginLeft: 8 }}>
                         <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>{amountStr}</Text>
+                        {o.status === 'submitted' ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <Text style={{ fontSize: 10, color: '#2563eb', fontWeight: '700' }}>View Details</Text>
+                            <ChevronRight size={14} color="#2563eb" />
+                          </View>
+                        ) : activeTab === 'pending' ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <Text style={{ fontSize: 10, color: colors.accent, fontWeight: '700' }}>Pay Now</Text>
+                            <ChevronRight size={14} color={colors.accent} />
+                          </View>
+                        ) : null}
                      </View>
                   )}
-               </View>
+               </Wrapper>
             );
           })}
           
           <View style={{ height: 32 }} />
         </ScrollView>
+
+        <PaymentModal 
+          visible={paymentModalVisible}
+          onClose={() => setPaymentModalVisible(false)}
+          feeId={selectedFeeId}
+          amountStr={selectedFeeAmount}
+          title={selectedFeeTitle}
+          status={selectedFeeStatus}
+          initialReference={selectedFeeRef}
+          initialProof={selectedFeeProof}
+          onSuccess={() => {
+            fetchData();
+          }}
+        />
       </View>
     </OfficerPageWrapper>
   );

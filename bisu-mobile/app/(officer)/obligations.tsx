@@ -314,8 +314,8 @@ export default function OfficerObligations() {
                                   </View>
                                   <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: textPrimary }} numberOfLines={1}>{item.title || item.name || 'Fee'}</Text>
                                   <Text style={{ fontSize: 12, fontWeight: '800', color: isPaid ? (isDark ? '#86efac' : '#16a34a') : (isDark ? '#c4b5fd' : '#7c3aed'), marginLeft: 8 }}>{amt}</Text>
-                                  <View style={{ marginLeft: 8, backgroundColor: isPaid ? (isDark ? 'rgba(16,185,129,0.15)' : '#dcfce7') : (isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7'), paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
-                                    <Text style={{ fontSize: 9, fontWeight: '700', color: isPaid ? (isDark ? '#86efac' : '#16a34a') : (isDark ? '#fcd34d' : '#d97706') }}>{isPaid ? 'Paid' : 'Pending'}</Text>
+                                  <View style={{ marginLeft: 8, backgroundColor: isPaid ? (isDark ? 'rgba(16,185,129,0.15)' : '#dcfce7') : item.status === 'submitted' ? (isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe') : (isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7'), paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
+                                    <Text style={{ fontSize: 9, fontWeight: '700', color: isPaid ? (isDark ? '#86efac' : '#16a34a') : item.status === 'submitted' ? '#2563eb' : (isDark ? '#fcd34d' : '#d97706') }}>{isPaid ? 'Paid' : item.status === 'submitted' ? 'Awaiting' : 'Pending'}</Text>
                                   </View>
                                 </View>
                               );

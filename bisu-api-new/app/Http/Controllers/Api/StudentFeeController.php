@@ -95,4 +95,38 @@ class StudentFeeController extends Controller
             'message' => "Fee assigned to $count new members (" . count($userIds) . " total checked)."
         ]);
     }
+
+    public function pay(Request $request, $feeId)
+    {
+        $validated = $request->validate([
+            'payment_method_id' => 'required|exists:payment_methods,id',
+            'reference_number' => 'required|string|max:255',
+            'proof' => 'required|image|mimes:jpeg,png,webp,jpg|max:5120',
+        ]);
+
+        $fee = StudentFee::findOrFail($feeId);
+        
+        // Authorization: Ensure the fee belongs to the user (or admin/officer override)
+        if ($fee->user_id !== $request->user()->id && !$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if ($fee->proof) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($fee->proof);
+        }
+
+        $path = $request->file('proof')->store('proofs', 'public');
+        
+        $fee->update([
+            'payment_method_id' => $validated['payment_method_id'],
+            'reference_number' => $validated['reference_number'],
+            'proof' => $path,
+            'status' => 'submitted',
+        ]);
+
+        return response()->json([
+            'message' => 'Payment submitted successfully. Please wait for officer approval.',
+            'fee' => $fee->load(['feeType', 'paymentMethod'])
+        ]);
+    }
 }

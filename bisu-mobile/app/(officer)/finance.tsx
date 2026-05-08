@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Alert, Modal, Image } from 'react-native';
 import api from '../../services/api';
+import { API_BASE_URL } from '../../constants/Config';
 import EmptyState from '../../components/ui/EmptyState';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
@@ -9,7 +10,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import {
   Search, Users, ChevronDown, ChevronUp,
-  CheckCircle2, Clock, Plus, RefreshCw, CheckCircle, Wallet, X, DollarSign, Settings
+  CheckCircle2, Clock, Plus, CheckCircle, Wallet, X, Settings, Edit2
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -49,24 +50,48 @@ export default function OfficerFinance() {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [selectedFeeTypeId, setSelectedFeeTypeId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [reviewingFee, setReviewingFee] = useState<any>(null);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [showPaymentSettings, setShowPaymentSettings] = useState(false);
+  const [editingMethod, setEditingMethod] = useState<any>(null);
+  const [editAccountNum, setEditAccountNum] = useState('');
+  const [editAccountName, setEditAccountName] = useState('');
+  const [savingMethod, setSavingMethod] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
     try {
-      const [feesRes, membersRes, typesRes] = await Promise.all([
+      const [feesRes, membersRes, typesRes, methodsRes] = await Promise.all([
         api.get(`/organizations/${orgId}/student-fees`),
         api.get(`/organizations/${orgId}/members?status=active`),
         api.get(`/fee-types`),
+        api.get(`/payment-methods`),
       ]);
       setFees(Array.isArray(feesRes.data) ? feesRes.data : (feesRes.data.fees || []));
       setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
       setFeeTypes(typesRes.data.fees || []);
+      setPaymentMethods(Array.isArray(methodsRes.data) ? methodsRes.data : []);
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);
   }, [orgId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleSavePaymentMethod = async () => {
+    if (!editingMethod) return;
+    setSavingMethod(true);
+    try {
+      await api.put(`/payment-methods/${editingMethod.id}`, {
+        account_number: editAccountNum,
+        account_name: editAccountName,
+      });
+      setPaymentMethods(prev => prev.map(m => m.id === editingMethod.id ? { ...m, account_number: editAccountNum, account_name: editAccountName } : m));
+      setEditingMethod(null);
+      Alert.alert('Saved!', 'Payment method info updated.');
+    } catch { Alert.alert('Error', 'Failed to save.'); }
+    finally { setSavingMethod(false); }
+  };
 
   let totalExpected = 0;
   let totalCollected = 0;
@@ -192,6 +217,9 @@ export default function OfficerFinance() {
 
             {/* Quick Actions moved to the right */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+               <TouchableOpacity onPress={() => setShowPaymentSettings(true)} style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+                  <Wallet size={16} color={isDark ? '#94a3b8' : '#7c3aed'} />
+               </TouchableOpacity>
                <TouchableOpacity onPress={() => router.push('/(officer)/fees')} style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
                   <Settings size={16} color={isDark ? '#94a3b8' : '#2563eb'} />
                </TouchableOpacity>
@@ -349,7 +377,9 @@ export default function OfficerFinance() {
                         ) : student.items.map(item => {
                           const isPaid = item.status === 'paid' || item.status === 'completed';
                           const title = item.fee_type?.name || 'Fee';
+                          const isSubmitted = item.status === 'submitted';
                           const amt = item.fee_type?.amount ? parseFloat(item.fee_type.amount).toFixed(2) : '0.00';
+                          
                           return isPaid ? (
                             <View key={`fee-${item.id}`} style={{ backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : '#f0fdf4', borderWidth: 1, borderColor: isDark ? '#065f46' : '#bbf7d0', borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
                               <View style={{ flex: 1 }}>
@@ -367,19 +397,28 @@ export default function OfficerFinance() {
                               </TouchableOpacity>
                             </View>
                           ) : (
-                            <View key={`fee-${item.id}`} style={{ backgroundColor: cardBg, borderWidth: 1, borderColor: border, borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
+                            <View key={`fee-${item.id}`} style={{ backgroundColor: isSubmitted ? (isDark ? 'rgba(59,130,246,0.1)' : '#eff6ff') : cardBg, borderWidth: 1, borderColor: isSubmitted ? (isDark ? '#1e40af' : '#bfdbfe') : border, borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
                               <View style={{ flex: 1 }}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                                   <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>{title}</Text>
                                   <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>₱{amt}</Text>
                                 </View>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                  <Clock size={12} color="#f59e0b" />
-                                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#f59e0b', marginLeft: 4 }}>Pending</Text>
+                                  {isSubmitted ? (
+                                    <>
+                                      <Clock size={12} color="#3b82f6" />
+                                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#3b82f6', marginLeft: 4 }}>Review Needed</Text>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Clock size={12} color="#f59e0b" />
+                                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#f59e0b', marginLeft: 4 }}>Pending</Text>
+                                    </>
+                                  )}
                                 </View>
                               </View>
-                              <TouchableOpacity onPress={() => handleMarkPaid(item.id)} style={{ marginLeft: 16, backgroundColor: '#0fa968', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }}>
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>Mark Paid</Text>
+                              <TouchableOpacity onPress={() => setReviewingFee(item)} style={{ marginLeft: 16, backgroundColor: isSubmitted ? '#2563eb' : '#0fa968', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }}>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{isSubmitted ? 'Review' : 'Mark Paid'}</Text>
                               </TouchableOpacity>
                             </View>
                           );
@@ -445,6 +484,126 @@ export default function OfficerFinance() {
             <TouchableOpacity onPress={() => setShowGenerateModal(false)} style={{ backgroundColor: isDark ? '#334155' : '#fff', borderWidth: 1, borderColor: border, paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}>
               <Text style={{ color: textSecondary, fontSize: 14, fontWeight: '800' }}>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {/* REVIEW PAYMENT MODAL */}
+      <Modal visible={!!reviewingFee} transparent animationType="fade" onRequestClose={() => setReviewingFee(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: modalBg, width: '100%', borderRadius: 16, padding: 20, elevation: 10, borderWidth: isDark ? 1 : 0, borderColor: '#334155', maxHeight: '90%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: textPrimary }}>Review Payment</Text>
+              <TouchableOpacity onPress={() => setReviewingFee(null)}><X size={24} color={textSecondary} /></TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, color: textSecondary, marginBottom: 4 }}>Fee</Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: textPrimary }}>{reviewingFee?.fee_type?.name || 'Fee'}</Text>
+              </View>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, color: textSecondary, marginBottom: 4 }}>Amount Paid</Text>
+                <Text style={{ fontSize: 24, fontWeight: '900', color: '#0fa968' }}>
+                  ₱{reviewingFee?.fee_type?.amount ? parseFloat(reviewingFee.fee_type.amount).toFixed(2) : '0.00'}
+                </Text>
+              </View>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, color: textSecondary, marginBottom: 4 }}>Reference Number</Text>
+                <View style={{ backgroundColor: inputBg, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: inputBorder }}>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: textPrimary }}>
+                    {reviewingFee?.reference_number || 'No reference provided'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ marginBottom: 24 }}>
+                <Text style={{ fontSize: 13, color: textSecondary, marginBottom: 8 }}>Proof of Payment</Text>
+                {reviewingFee?.proof ? (
+                  <Image 
+                    source={{ uri: `${API_BASE_URL.replace('/api', '')}/storage/${reviewingFee.proof}` }} 
+                    style={{ width: '100%', height: 300, borderRadius: 12, backgroundColor: inputBg }}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <View style={{ width: '100%', height: 150, borderRadius: 12, backgroundColor: inputBg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: inputBorder, borderStyle: 'dashed' }}>
+                    <Text style={{ color: textSecondary }}>No receipt uploaded</Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+              <TouchableOpacity 
+                style={{ flex: 1, backgroundColor: isDark ? '#334155' : '#e2e8f0', paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}
+                onPress={() => setReviewingFee(null)}
+              >
+                <Text style={{ color: textPrimary, fontSize: 14, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={{ flex: 1, backgroundColor: '#0fa968', paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}
+                onPress={() => {
+                  handleMarkPaid(reviewingFee.id);
+                  setReviewingFee(null);
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>Approve Payment</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* PAYMENT SETTINGS MODAL */}
+      <Modal visible={showPaymentSettings} transparent animationType="fade" onRequestClose={() => { setShowPaymentSettings(false); setEditingMethod(null); }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: modalBg, width: '100%', borderRadius: 16, padding: 24, elevation: 10, borderWidth: isDark ? 1 : 0, borderColor: '#334155' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: textPrimary }}>Payment Settings</Text>
+              <TouchableOpacity onPress={() => { setShowPaymentSettings(false); setEditingMethod(null); }}><X size={20} color={textSecondary} /></TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 12, color: textSecondary, marginBottom: 20 }}>Set the account number & name students will see when paying.</Text>
+
+            {paymentMethods.map(method => {
+              const isEditing = editingMethod?.id === method.id;
+              const methodLabel = method.name === 'gcash' ? 'GCash' : method.name === 'paymaya' ? 'Maya' : method.name;
+              return (
+                <View key={method.id} style={{ borderWidth: 1, borderColor: isEditing ? '#0fa968' : border, borderRadius: 12, padding: 16, marginBottom: 12, backgroundColor: isEditing ? (isDark ? 'rgba(16,185,129,0.05)' : '#f0fdf4') : cardBg }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: textPrimary }}>{methodLabel}</Text>
+                    {!isEditing && (
+                      <TouchableOpacity onPress={() => { setEditingMethod(method); setEditAccountNum(method.account_number || ''); setEditAccountName(method.account_name || ''); }}>
+                        <Edit2 size={16} color={isDark ? '#94a3b8' : '#2563eb'} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {isEditing ? (
+                    <View>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: modalLabelColor, marginBottom: 4 }}>Account Number</Text>
+                      <TextInput style={{ borderWidth: 1, borderColor: modalInputBorder, borderRadius: 10, padding: 12, fontSize: 14, color: textPrimary, backgroundColor: inputBg, marginBottom: 12 }} value={editAccountNum} onChangeText={setEditAccountNum} placeholder="e.g. 09123456789" placeholderTextColor={textMuted} />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: modalLabelColor, marginBottom: 4 }}>Account Name</Text>
+                      <TextInput style={{ borderWidth: 1, borderColor: modalInputBorder, borderRadius: 10, padding: 12, fontSize: 14, color: textPrimary, backgroundColor: inputBg, marginBottom: 16 }} value={editAccountName} onChangeText={setEditAccountName} placeholder="e.g. Juan D. Cruz" placeholderTextColor={textMuted} />
+                      <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <TouchableOpacity onPress={() => setEditingMethod(null)} style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: isDark ? '#334155' : '#e2e8f0', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: textPrimary }}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleSavePaymentMethod} disabled={savingMethod} style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: '#0fa968', alignItems: 'center', opacity: savingMethod ? 0.7 : 1 }}>
+                          {savingMethod ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Save</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <View>
+                      <Text style={{ fontSize: 12, color: textSecondary }}>Number: <Text style={{ fontWeight: '700', color: textPrimary }}>{method.account_number || '—'}</Text></Text>
+                      <Text style={{ fontSize: 12, color: textSecondary, marginTop: 4 }}>Name: <Text style={{ fontWeight: '700', color: textPrimary }}>{method.account_name || '—'}</Text></Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
       </Modal>

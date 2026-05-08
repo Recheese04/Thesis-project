@@ -4,8 +4,9 @@ import api from '../../services/api';
 import EmptyState from '../../components/ui/EmptyState';
 import StudentPageWrapper from '../../components/ui/StudentPageWrapper';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
+import PaymentModal from '../../components/ui/PaymentModal';
 import { useTheme } from '../../context/ThemeContext';
-import { Clock, CheckCircle, DollarSign, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react-native';
+import { Clock, CheckCircle, DollarSign, AlertTriangle, Calendar as CalendarIcon, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function StudentObligations() {
@@ -13,7 +14,15 @@ export default function StudentObligations() {
   const [obligations, setObligations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'awaiting' | 'completed'>('pending');
+
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [selectedFeeId, setSelectedFeeId] = useState<number | null>(null);
+  const [selectedFeeAmount, setSelectedFeeAmount] = useState<string | null>(null);
+  const [selectedFeeTitle, setSelectedFeeTitle] = useState<string>('');
+  const [selectedFeeStatus, setSelectedFeeStatus] = useState<string>('');
+  const [selectedFeeRef, setSelectedFeeRef] = useState<string>('');
+  const [selectedFeeProof, setSelectedFeeProof] = useState<string>('');
 
   const fetchData = async () => {
     try {
@@ -29,11 +38,23 @@ export default function StudentObligations() {
 
   useEffect(() => { fetchData(); }, []);
 
+  const openPaymentModal = (fee: any, amountStr: string) => {
+    setSelectedFeeId(fee.id);
+    setSelectedFeeTitle(fee.title || 'Fee');
+    setSelectedFeeAmount(amountStr);
+    setSelectedFeeStatus(fee.status);
+    setSelectedFeeRef(fee.reference_number || '');
+    setSelectedFeeProof(fee.proof || '');
+    setPaymentModalVisible(true);
+  };
+
   const pending = obligations.filter(o => o.status === 'pending');
+  const awaiting = obligations.filter(o => o.status === 'submitted');
   const completed = obligations.filter(o => o.status === 'paid' || o.status === 'completed');
   
   const total = obligations.length;
   const compCount = completed.length;
+  const awaitCount = awaiting.length;
   const pendCount = pending.length;
   const completionRate = total > 0 ? Math.round((compCount / total) * 100) : 0;
 
@@ -59,7 +80,7 @@ export default function StudentObligations() {
     </StudentPageWrapper>
   );
 
-  const activeList = activeTab === 'pending' ? pending : completed;
+  const activeList = activeTab === 'pending' ? pending : activeTab === 'awaiting' ? awaiting : completed;
 
   return (
     <StudentPageWrapper activeRoute="obligations">
@@ -157,10 +178,10 @@ export default function StudentObligations() {
               </View>
 
               <View style={{ flex: 1, backgroundColor: cardBg, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: border }}>
-                <Text style={{ fontSize: 10, color: textSecondary, marginBottom: 4 }}>Pending</Text>
+                <Text style={{ fontSize: 10, color: textSecondary, marginBottom: 4 }}>Awaiting</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Clock size={20} color="#ea580c" />
-                  <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary, marginLeft: 8 }}>{pendCount}</Text>
+                  <Clock size={20} color="#3b82f6" />
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary, marginLeft: 8 }}>{awaitCount}</Text>
                 </View>
               </View>
             </View>
@@ -171,42 +192,67 @@ export default function StudentObligations() {
             <Pressable 
               onPress={() => setActiveTab('pending')}
               style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20,
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20,
                 backgroundColor: activeTab === 'pending' ? tabActiveBg : 'transparent',
                 borderWidth: 1,
                 borderColor: activeTab === 'pending' ? tabActiveBorder : 'transparent',
-                marginRight: 8
+                marginRight: 4
               }}
             >
-               <Text style={{ fontSize: 13, fontWeight: '700', color: activeTab === 'pending' ? tabActiveText : tabInactiveText }}>
+               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'pending' ? tabActiveText : tabInactiveText }}>
                  Pending
                </Text>
-               <View style={{ backgroundColor: isDark ? 'rgba(251,191,36,0.15)' : '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
-                 <Text style={{ fontSize: 10, fontWeight: '700', color: '#d97706' }}>{pendCount}</Text>
+               <View style={{ backgroundColor: isDark ? 'rgba(251,191,36,0.15)' : '#fef3c7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
+                 <Text style={{ fontSize: 9, fontWeight: '700', color: '#d97706' }}>{pendCount}</Text>
+               </View>
+            </Pressable>
+
+            <Pressable 
+              onPress={() => setActiveTab('awaiting')}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20,
+                backgroundColor: activeTab === 'awaiting' ? tabActiveBg : 'transparent',
+                borderWidth: 1,
+                borderColor: activeTab === 'awaiting' ? tabActiveBorder : 'transparent',
+                marginRight: 4
+              }}
+            >
+               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'awaiting' ? tabActiveText : tabInactiveText }}>
+                 Awaiting
+               </Text>
+               <View style={{ backgroundColor: isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
+                 <Text style={{ fontSize: 9, fontWeight: '700', color: '#2563eb' }}>{awaitCount}</Text>
                </View>
             </Pressable>
 
             <Pressable 
               onPress={() => setActiveTab('completed')}
               style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20,
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20,
                 backgroundColor: activeTab === 'completed' ? tabActiveBg : 'transparent',
                 borderWidth: 1,
                 borderColor: activeTab === 'completed' ? tabActiveBorder : 'transparent',
               }}
             >
-               <Text style={{ fontSize: 13, fontWeight: '700', color: activeTab === 'completed' ? tabActiveText : tabInactiveText }}>
-                 Completed
+               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'completed' ? tabActiveText : tabInactiveText }}>
+                 Paid
                </Text>
-               <View style={{ backgroundColor: isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
-                 <Text style={{ fontSize: 10, fontWeight: '700', color: '#16a34a' }}>{compCount}</Text>
+               <View style={{ backgroundColor: isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
+                 <Text style={{ fontSize: 9, fontWeight: '700', color: '#16a34a' }}>{compCount}</Text>
                </View>
             </Pressable>
           </View>
 
           {activeList.length === 0 ? (
             <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-               <EmptyState icon="✅" message={`No ${activeTab} obligations.`} />
+                <EmptyState 
+                  icon={activeTab === 'pending' ? '🕒' : activeTab === 'awaiting' ? '⌛' : '✅'} 
+                  message={
+                    activeTab === 'pending' ? 'No pending requirements.' : 
+                    activeTab === 'awaiting' ? 'No fees awaiting verification.' : 
+                    'You have no completed obligations.'
+                  } 
+                />
             </View>
           ) : activeList.map((o) => {
             const isFee = o.type === 'fee';
@@ -224,10 +270,16 @@ export default function StudentObligations() {
               ? (isDark ? 'rgba(251,191,36,0.15)' : '#fef3c7')
               : (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7');
 
+            const isClickable = isFee && (o.status === 'pending' || o.status === 'submitted');
+            const Wrapper = isClickable ? TouchableOpacity : View;
+
             return (
-               <View key={`${o.type}-${o.id}`} style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: border, flexDirection: 'row' }}>
-                  
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: iconBg, alignItems: 'center', justifyContent: 'center', marginRight: 16, marginTop: 2 }}>
+               <Wrapper 
+                 key={`${o.type}-${o.id}`} 
+                 style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: o.status === 'submitted' ? (isDark ? '#3b82f6' : '#bfdbfe') : border, flexDirection: 'row', alignItems: 'center' }}
+                 onPress={isClickable ? () => openPaymentModal(o, amountStr!) : undefined}
+               >
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: iconBg, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
                      {isFee ? <DollarSign size={20} color="#16a34a" /> : <AlertTriangle size={20} color="#ea580c" />}
                   </View>
                   
@@ -236,11 +288,11 @@ export default function StudentObligations() {
                         <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary, marginRight: 8, marginBottom: 4 }}>{title}</Text>
                         
                         <View style={{ backgroundColor: typeBadgeBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 6, marginBottom: 4 }}>
-                           <Text style={{ fontSize: 9, fontWeight: '700', color: isFee ? '#15803d' : '#9333ea' }}>{isFee ? 'Fee' : 'Consequence'}</Text>
+                           <Text style={{ fontSize: 9, fontWeight: '700', color: isFee ? '#15803d' : '#9333ea' }}>{isFee ? (o.category || 'Fee') : 'Consequence'}</Text>
                         </View>
                         
-                        <View style={{ backgroundColor: statusBadgeBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 4 }}>
-                           <Text style={{ fontSize: 9, fontWeight: '700', color: activeTab === 'pending' ? '#d97706' : '#15803d', textTransform: 'capitalize' }}>{activeTab}</Text>
+                        <View style={{ backgroundColor: o.status === 'submitted' ? (isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe') : o.status === 'pending' ? (isDark ? 'rgba(251,191,36,0.15)' : '#fef3c7') : (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7'), paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 4 }}>
+                           <Text style={{ fontSize: 9, fontWeight: '700', color: o.status === 'submitted' ? '#2563eb' : (o.status === 'pending' ? '#d97706' : '#15803d'), textTransform: 'capitalize' }}>{o.status === 'submitted' ? 'Awaiting Verification' : o.status}</Text>
                         </View>
                      </View>
 
@@ -263,20 +315,44 @@ export default function StudentObligations() {
                      {o.notes && (
                        <Text style={{ fontSize: 10, color: textSecondary, marginTop: 4 }}>{o.notes}</Text>
                      )}
-                     
                   </View>
                   
                   {isFee && amountStr && (
                      <View style={{ justifyContent: 'center', alignItems: 'flex-end', marginLeft: 8 }}>
                         <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>{amountStr}</Text>
+                        {o.status === 'submitted' ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <Text style={{ fontSize: 10, color: '#2563eb', fontWeight: '700' }}>View Details</Text>
+                            <ChevronRight size={14} color="#2563eb" />
+                          </View>
+                        ) : activeTab === 'pending' ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <Text style={{ fontSize: 10, color: colors.accent, fontWeight: '700' }}>Pay Now</Text>
+                            <ChevronRight size={14} color={colors.accent} />
+                          </View>
+                        ) : null}
                      </View>
                   )}
-               </View>
+               </Wrapper>
             );
           })}
           
           <View style={{ height: 32 }} />
         </ScrollView>
+
+        <PaymentModal 
+          visible={paymentModalVisible}
+          onClose={() => setPaymentModalVisible(false)}
+          feeId={selectedFeeId}
+          amountStr={selectedFeeAmount}
+          title={selectedFeeTitle}
+          status={selectedFeeStatus}
+          initialReference={selectedFeeRef}
+          initialProof={selectedFeeProof}
+          onSuccess={() => {
+            fetchData();
+          }}
+        />
       </View>
     </StudentPageWrapper>
   );

@@ -17,6 +17,13 @@ class StudentFee extends Model
         'fee_type_id',
         'status',
         'proof',
+        'reference_number',
+        'payment_method_id',
+        'is_deleted',
+    ];
+
+    protected $casts = [
+        'is_deleted' => 'boolean',
     ];
 
     public function organization()
@@ -32,5 +39,10 @@ class StudentFee extends Model
     public function feeType()
     {
         return $this->belongsTo(FeeType::class);
+    }
+
+    public function paymentMethod()
+    {
+        return $this->belongsTo(PaymentMethod::class);
     }
 }

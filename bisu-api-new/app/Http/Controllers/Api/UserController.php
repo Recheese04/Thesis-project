@@ -15,7 +15,7 @@ class UserController extends Controller
     public function index()
     {
         try {
-            $users = User::with(['college', 'course', 'userType'])
+            $users = User::with(['college', 'course', 'userType', 'address'])
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -44,7 +44,7 @@ class UserController extends Controller
     public function show($id)
     {
         try {
-            $user = User::with(['college', 'course', 'userType'])->findOrFail($id);
+            $user = User::with(['college', 'course', 'userType', 'address'])->findOrFail($id);
 
             if ($user->student_number) {
                 $allMemberships = Designation::with('organization')
@@ -88,6 +88,11 @@ class UserController extends Controller
                 'year_level'     => 'required|string|max:20',
                 'contact_number' => 'nullable|string|max:20',
                 'course_id'      => 'nullable|exists:courses,id',
+                'street'         => 'nullable|string|max:255',
+                'barangay'       => 'nullable|string|max:100',
+                'city'           => 'nullable|string|max:100',
+                'province'       => 'nullable|string|max:100',
+                'zip_code'       => 'nullable|string|max:10',
             ];
         }
 
@@ -128,6 +133,18 @@ class UserController extends Controller
             }
 
             $user = User::create($userPayload);
+
+            if ($needsStudent && !empty($data['street']) || !empty($data['city'])) {
+                $address = \App\Models\Address::create([
+                    'street'   => $data['street'] ?? null,
+                    'barangay' => $data['barangay'] ?? null,
+                    'city'     => $data['city'] ?? null,
+                    'province' => $data['province'] ?? null,
+                    'zip_code' => $data['zip_code'] ?? null,
+                ]);
+                $user->address_id = $address->id;
+                $user->save();
+            }
 
             if ($needsStudent && !empty($data['org_memberships'])) {
                 foreach ($data['org_memberships'] as $m) {
@@ -179,6 +196,11 @@ class UserController extends Controller
                 'year_level'     => 'required|string|max:20',
                 'contact_number' => 'nullable|string|max:20',
                 'course_id'      => 'nullable|exists:courses,id',
+                'street'         => 'nullable|string|max:255',
+                'barangay'       => 'nullable|string|max:100',
+                'city'           => 'nullable|string|max:100',
+                'province'       => 'nullable|string|max:100',
+                'zip_code'       => 'nullable|string|max:10',
             ];
         }
 
@@ -222,6 +244,28 @@ class UserController extends Controller
             }
 
             $user->update($userUpdate);
+
+            if ($needsStudent && (!empty($data['street']) || !empty($data['city']))) {
+                if ($user->address_id) {
+                    $user->address->update([
+                        'street'   => $data['street'] ?? null,
+                        'barangay' => $data['barangay'] ?? null,
+                        'city'     => $data['city'] ?? null,
+                        'province' => $data['province'] ?? null,
+                        'zip_code' => $data['zip_code'] ?? null,
+                    ]);
+                } else {
+                    $address = \App\Models\Address::create([
+                        'street'   => $data['street'] ?? null,
+                        'barangay' => $data['barangay'] ?? null,
+                        'city'     => $data['city'] ?? null,
+                        'province' => $data['province'] ?? null,
+                        'zip_code' => $data['zip_code'] ?? null,
+                    ]);
+                    $user->address_id = $address->id;
+                    $user->save();
+                }
+            }
 
             if ($needsStudent) {
                 // Deactivate all existing memberships then re-create from submitted list

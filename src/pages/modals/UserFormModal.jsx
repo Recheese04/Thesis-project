@@ -24,6 +24,11 @@ const EMPTY_FORM = {
   last_name: "", college_id: "", year_level: "", contact_number: "",
   course_id: "",
   org_memberships: [],
+  street: "",
+  barangay: "",
+  city: "",
+  province: "",
+  zip_code: "",
 };
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
@@ -211,6 +216,11 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, colleg
           organization_id: String(m.organization_id),
           designation:     m.designation ?? "Member",
         })),
+        street:          editUser.address?.street ?? "",
+        barangay:        editUser.address?.barangay ?? "",
+        city:            editUser.address?.city ?? "",
+        province:        editUser.address?.province ?? "",
+        zip_code:        editUser.address?.zip_code ?? "",
       });
       setStep(typeId === "2" || typeId === "3" ? 3 : 1);
     } else {
@@ -257,6 +267,41 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, colleg
       .catch(() => setCollegeCourses([]))
       .finally(() => setLoadingCourses(false));
   }, [form.college_id]);
+
+  // Address API States
+  const [provinces, setProvinces] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [barangays, setBarangays] = useState([]);
+  const [loadingAddress, setLoadingAddress] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoadingAddress(true);
+    axios.get("https://psgc.gitlab.io/api/provinces/")
+      .then(res => setProvinces(res.data.sort((a, b) => a.name.localeCompare(b.name))))
+      .catch(() => toast.error("Failed to load provinces"))
+      .finally(() => setLoadingAddress(false));
+  }, [open]);
+
+  const handleProvinceChange = (name) => {
+    const prov = provinces.find(p => p.name === name);
+    setForm(p => ({ ...p, province: name, city: "", barangay: "" }));
+    if (!prov) return;
+    setLoadingAddress(true);
+    axios.get(`https://psgc.gitlab.io/api/provinces/${prov.code}/cities-municipalities/`)
+      .then(res => setCities(res.data.sort((a, b) => a.name.localeCompare(b.name))))
+      .finally(() => setLoadingAddress(false));
+  };
+
+  const handleCityChange = (name) => {
+    const city = cities.find(c => c.name === name);
+    setForm(p => ({ ...p, city: name, barangay: "" }));
+    if (!city) return;
+    setLoadingAddress(true);
+    axios.get(`https://psgc.gitlab.io/api/cities-municipalities/${city.code}/barangays/`)
+      .then(res => setBarangays(res.data.sort((a, b) => a.name.localeCompare(b.name))))
+      .finally(() => setLoadingAddress(false));
+  };
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -498,6 +543,56 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, colleg
                     </span>
                   </div>
                 )}
+
+                <SLabel icon={Building2} text="Home Address" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-slate-700 font-semibold text-xs">Province</Label>
+                    <Select value={form.province} onValueChange={handleProvinceChange}>
+                      <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
+                        <SelectValue placeholder="Select province" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl max-h-60">
+                        {provinces.map(p => <SelectItem key={p.code} value={p.name} className="text-xs">{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-slate-700 font-semibold text-xs">City / Municipality</Label>
+                    <Select value={form.city} onValueChange={handleCityChange} disabled={!form.province}>
+                      <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
+                        <SelectValue placeholder="Select city" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl max-h-60">
+                        {cities.map(c => <SelectItem key={c.code} value={c.name} className="text-xs">{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-slate-700 font-semibold text-xs">Barangay</Label>
+                    <Select value={form.barangay} onValueChange={set("barangay")} disabled={!form.city}>
+                      <SelectTrigger className="border-slate-200 bg-white h-9 text-sm">
+                        <SelectValue placeholder="Select barangay" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl max-h-60">
+                        {barangays.map(b => <SelectItem key={b.code} value={b.name} className="text-xs">{b.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-slate-700 font-semibold text-xs">Street / House No.</Label>
+                    <Input value={form.street} onChange={set("street")} placeholder="e.g. 123 Rizal St."
+                      className="border-slate-200 focus:border-[#1e4db7] bg-white h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-slate-700 font-semibold text-xs">Zip Code</Label>
+                    <Input value={form.zip_code} onChange={set("zip_code")} placeholder="e.g. 6300"
+                      className="border-slate-200 focus:border-[#1e4db7] bg-white h-9 text-sm" />
+                  </div>
+                </div>
               </>
             )}
 
