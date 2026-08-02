@@ -45,6 +45,17 @@ class StudentFeeController extends Controller
         $fee = StudentFee::findOrFail($feeId);
         $fee->update(['status' => $validated['status']]);
 
+        // Notify the student when their payment is verified
+        if ($validated['status'] === 'paid') {
+            $fee->load('feeType');
+            \App\Services\ExpoPushService::sendToUsers(
+                [$fee->user_id],
+                '✅ Payment Verified',
+                'Your payment for "' . ($fee->feeType->name ?? 'fee') . '" has been approved!',
+                ['type' => 'payment_verified', 'fee_id' => $fee->id]
+            );
+        }
+
         return response()->json(['message' => 'Fee status updated successfully.']);
     }
 
@@ -90,6 +101,17 @@ class StudentFeeController extends Controller
                 $count++;
             }
         }
+
+        $feeType = FeeType::find($validated['fee_type_id']);
+
+        // Notify all assigned members
+        \App\Services\ExpoPushService::sendToOrganization(
+            (int) $orgId,
+            '💰 New Fee Posted',
+            'You have been assigned a new fee: ' . ($feeType->name ?? 'Organization Fee'),
+            ['type' => 'fee_assigned', 'organization_id' => (int) $orgId],
+            [$user->id]
+        );
 
         return response()->json([
             'message' => "Fee assigned to $count new members (" . count($userIds) . " total checked)."

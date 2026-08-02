@@ -48,6 +48,15 @@ class AnnouncementController extends Controller
 
         $announcement->load('creator:id,first_name,last_name');
 
+        // Send push notification to all org members
+        \App\Services\ExpoPushService::sendToOrganization(
+            (int) $orgId,
+            '📢 ' . $data['title'],
+            \Illuminate\Support\Str::limit($data['content'], 100),
+            ['type' => 'announcement', 'announcement_id' => $announcement->id],
+            [$user->id] // exclude the sender
+        );
+
         return response()->json($announcement, 201);
     }
 

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import api from '../services/api';
+import api, { setLogoutHandler } from '../services/api';
+import { unregisterPushToken } from '../hooks/useNotifications';
 
 interface User {
   id: number;
@@ -32,9 +33,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-// Exported so the api.ts 401 interceptor can call it
-export let globalLogout: (() => Promise<void>) | null = null;
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -44,6 +42,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const clearAuth = async () => {
+    // 0. Unregister push token before clearing credentials
+    try {
+      await unregisterPushToken();
+    } catch (_) {}
+
     // 1. Clear local state immediately for instant UI response
     setToken(null);
     setUser(null);
@@ -62,55 +65,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.post('/logout').catch(() => {});
   };
 
-  // Register the global logout so the api interceptor can call it
-  useEffect(() => {
-    globalLogout = clearAuth;
-  }, []);
+  const logout = clearAuth;
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const storedToken = await SecureStore.getItemAsync('auth_token');
-        const storedUser = await SecureStore.getItemAsync('auth_user');
-        const storedRole = await SecureStore.getItemAsync('auth_role');
-        const storedMembership = await SecureStore.getItemAsync('auth_membership');
-        const storedOfficerDesignations = await SecureStore.getItemAsync('auth_officer_designations');
+  const loadAuth = async () => {
+    try {
+      const storedToken = await SecureStore.getItemAsync('auth_token');
+      const storedUser = await SecureStore.getItemAsync('auth_user');
+      const storedRole = await SecureStore.getItemAsync('auth_role');
+      const storedMembership = await SecureStore.getItemAsync('auth_membership');
+      const storedOfficerDesignations = await SecureStore.getItemAsync('auth_officer_designations');
 
-        if (storedToken && storedUser) {
-          // Validate token is still valid with the backend
-          try {
-            const meRes = await api.get('/me', {
-              headers: { Authorization: `Bearer ${storedToken}` },
-            });
-            // Token valid — use fresh data from /me
-            const { user: freshUser, role: freshRole, membership: freshMembership, officer_designations } = meRes.data;
-            await SecureStore.setItemAsync('auth_user', JSON.stringify(freshUser));
-            await SecureStore.setItemAsync('auth_role', freshRole || 'student');
-            if (freshMembership) await SecureStore.setItemAsync('auth_membership', JSON.stringify(freshMembership));
-            if (officer_designations) await SecureStore.setItemAsync('auth_officer_designations', JSON.stringify(officer_designations));
+      if (storedToken && storedUser) {
+        // Validate token is still valid with the backend
+        try {
+          const meRes = await api.get('/me', {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          });
+          // Token valid — use fresh data from /me
+          const { user: freshUser, role: freshRole, membership: freshMembership, officer_designations } = meRes.data;
+          await SecureStore.setItemAsync('auth_user', JSON.stringify(freshUser));
+          await SecureStore.setItemAsync('auth_role', freshRole || 'student');
+          if (freshMembership) await SecureStore.setItemAsync('auth_membership', JSON.stringify(freshMembership));
+          if (officer_designations) await SecureStore.setItemAsync('auth_officer_designations', JSON.stringify(officer_designations));
 
+          setToken(storedToken);
+          setUser(freshUser);
+          setRole(freshRole || 'student');
+          setMembership(freshMembership || null);
+          setOfficerDesignations(officer_designations || []);
+        } catch (err: any) {
+          if (err.response?.status === 401) {
+            // Token expired — silently clear stored credentials (no navigation, no interceptor)
+            console.warn('[AuthContext] Session expired. Clearing stored credentials.');
+            await SecureStore.deleteItemAsync('auth_token');
+            await SecureStore.deleteItemAsync('auth_user');
+            await SecureStore.deleteItemAsync('auth_role');
+            await SecureStore.deleteItemAsync('auth_membership');
+            await SecureStore.deleteItemAsync('auth_officer_designations');
+          } else {
+            // Network error — still allow offline use with cached data
             setToken(storedToken);
-            setUser(freshUser);
-            setRole(freshRole || 'student');
-            setMembership(freshMembership || null);
-            setOfficerDesignations(officer_designations || []);
-          } catch (err: any) {
-            if (err.response?.status === 401) {
-              // Interceptor handles the actual logout, we just log and finish
-              console.warn('[AuthContext] Session invalid. Redirecting to login.');
-            } else {
-              // Network error — still allow offline use with cached data
-              setToken(storedToken);
-              setUser(JSON.parse(storedUser));
-              setRole(storedRole || 'student');
-              if (storedMembership) setMembership(JSON.parse(storedMembership));
-              if (storedOfficerDesignations) setOfficerDesignations(JSON.parse(storedOfficerDesignations));
-            }
+            setUser(JSON.parse(storedUser));
+            setRole(storedRole || 'student');
+            if (storedMembership) setMembership(JSON.parse(storedMembership));
+            if (storedOfficerDesignations) setOfficerDesignations(JSON.parse(storedOfficerDesignations));
           }
         }
-      } catch (_) {}
-      setIsLoading(false);
-    })();
+      }
+    } catch (_) {}
+    setIsLoading(false);
+
+    // Only register the logout handler AFTER the initial load is done,
+    // so the interceptor won't fire before the router is mounted
+    setLogoutHandler(logout);
+  };
+
+  useEffect(() => {
+    loadAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -130,8 +141,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOfficerDesignations(officer_designations || []);
   };
 
-  const logout = clearAuth;
-
   const updateUser = async (partial: Partial<User>) => {
     const updated = { ...user, ...partial } as User;
     setUser(updated);
@@ -144,7 +153,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!token) return;
     setIsLoading(true);
     try {
-      // Set the header temporarily for the /me request
       const meRes = await api.get('/me', {
         headers: { 
           Authorization: `Bearer ${token}`,

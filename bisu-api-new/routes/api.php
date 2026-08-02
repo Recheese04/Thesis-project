@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\ObligationController;
 use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ChatbotController;
+use App\Http\Controllers\Api\PushTokenController;
 use App\Models\Designation;
 use App\Models\User;
 
@@ -55,6 +56,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth
     Route::post('/logout', [AuthController::class , 'logout']);
     Route::get('/me', [AuthController::class , 'me']);
+
+    // Push Notifications
+    Route::post('/push-token/register', [PushTokenController::class, 'register']);
+    Route::post('/push-token/unregister', [PushTokenController::class, 'unregister']);
 
     // Student Profile
     Route::put('/profile', function (Request $request) {

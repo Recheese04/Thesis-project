@@ -5,6 +5,7 @@ import OfficerDrawer from './OfficerDrawer';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useNotificationBadge } from '../../context/NotificationContext';
 import { API_BASE_URL } from '../../constants/Config';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ export default function OfficerPageWrapper({ children, activeRoute, title }: Pro
   const router = useRouter();
   const { user } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
+  const { unreadCount, markAllRead } = useNotificationBadge();
   const insets = useSafeAreaInsets();
 
   const STORAGE_BASE = API_BASE_URL.replace('/api', '/storage');
@@ -27,6 +29,11 @@ export default function OfficerPageWrapper({ children, activeRoute, title }: Pro
 
   // Ensure we have padding for the status bar so content doesn't overlap time/battery
   const safeTopPadding = Math.max(insets.top, StatusBar.currentHeight || 24);
+
+  const handleBellPress = () => {
+    markAllRead(); // Clear the badge — Facebook style
+    router.push('/(officer)/announcements');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -74,8 +81,32 @@ export default function OfficerPageWrapper({ children, activeRoute, title }: Pro
               <Moon size={20} color="#ffffff" />
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/(officer)/announcements')}>
+          <TouchableOpacity 
+            onPress={handleBellPress}
+            style={{ position: 'relative' }}
+          >
             <Bell size={20} color="#ffffff" />
+            {unreadCount > 0 && (
+              <View style={{
+                position: 'absolute',
+                top: -6, right: -8,
+                minWidth: 18, height: 18,
+                borderRadius: 9,
+                backgroundColor: '#ef4444',
+                borderWidth: 2, borderColor: '#3b82f6',
+                alignItems: 'center', justifyContent: 'center',
+                paddingHorizontal: 4,
+              }}>
+                <Text style={{
+                  color: '#ffffff',
+                  fontSize: 10,
+                  fontWeight: '900',
+                  lineHeight: 12,
+                }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 

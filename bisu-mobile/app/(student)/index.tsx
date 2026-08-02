@@ -77,7 +77,7 @@ export default function StudentDashboard() {
   );
 
   return (
-    <StudentPageWrapper activeRoute="index" unreadAnnouncements={announcements.length}>
+    <StudentPageWrapper activeRoute="index">
       <ScrollView
         style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={colors.accent} />}

@@ -6,11 +6,16 @@ import '../global.css';
 
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { NotificationProvider } from '../context/NotificationContext';
+import { useNotifications } from '../hooks/useNotifications';
 
 function RootNavigator() {
   const { user, token, isLoading, isOfficer } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // Register for push notifications when user is authenticated
+  useNotifications(user?.id);
 
   useEffect(() => {
     if (isLoading) return;
@@ -44,7 +49,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <RootNavigator />
+        <NotificationProvider>
+          <RootNavigator />
+        </NotificationProvider>
       </AuthProvider>
     </ThemeProvider>
   );

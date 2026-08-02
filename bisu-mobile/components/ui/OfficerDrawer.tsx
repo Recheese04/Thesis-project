@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useNotificationBadge } from '../../context/NotificationContext';
 import {
   LayoutDashboard, Users, Calendar, ClipboardList, Bell,
   MessageSquare, Wallet, QrCode, FileText, X, ChevronRight,
@@ -38,6 +39,7 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
   const router = useRouter();
   const { user, membership, officerDesignations, switchOrg } = useAuth();
   const { isDark } = useTheme();
+  const { unreadCount, markAllRead } = useNotificationBadge();
   const insets = useSafeAreaInsets();
 
   const [modalMounted, setModalMounted] = useState(false);
@@ -115,8 +117,8 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
       <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: active ? '#fff' : (tc || menuTextColor) }}>{label}</Text>
       {badge ? (
         typeof badge === 'number' ? (
-          <View style={{ backgroundColor: '#10b981', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{badge}</Text>
+          <View style={{ backgroundColor: '#ef4444', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>{badge > 99 ? '99+' : badge}</Text>
           </View>
         ) : (
           badge
@@ -213,7 +215,16 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
               />
 
               <MenuSection label="Communication" />
-              <MenuItem icon={<Bell size={18} color={ic('announcements')} />} label="Announcements" active={activeRoute === 'announcements'} onPress={() => navigate('/(officer)/announcements')} />
+              <MenuItem 
+                icon={<Bell size={18} color={ic('announcements')} />} 
+                label="Announcements" 
+                active={activeRoute === 'announcements'} 
+                badge={unreadCount || undefined}
+                onPress={() => {
+                  markAllRead();
+                  navigate('/(officer)/announcements');
+                }} 
+              />
 
               <MenuSection label="My Student" />
               <MenuItem 
@@ -247,7 +258,16 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
               <MenuItem icon={<FileText size={18} color={ic('documents')} />} label="Documents" active={activeRoute === 'documents'} onPress={() => navigate('/(officer)/documents')} />
 
               <MenuSection label="Communication" />
-              <MenuItem icon={<Bell size={18} color={ic('announcements')} />} label="Announcements" active={activeRoute === 'announcements'} onPress={() => navigate('/(officer)/announcements')} />
+              <MenuItem 
+                icon={<Bell size={18} color={ic('announcements')} />} 
+                label="Announcements" 
+                active={activeRoute === 'announcements'} 
+                badge={unreadCount || undefined}
+                onPress={() => {
+                  markAllRead();
+                  navigate('/(officer)/announcements');
+                }} 
+              />
 
               <MenuSection label="Compliance" />
               <MenuItem icon={<AlertTriangle size={18} color={ic('consequences')} />} label="Consequence Rules" active={activeRoute === 'consequences'} onPress={() => navigate('/(officer)/consequences')} />
@@ -278,6 +298,8 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
             paddingBottom: insets.bottom > 0 ? insets.bottom : 16,
             borderTopWidth: 1, borderTopColor: footerBorder,
             backgroundColor: footerBg,
+            zIndex: 10,
+            elevation: 10,
           }}
           onPress={() => navigate('/(officer)/profile')}
         >

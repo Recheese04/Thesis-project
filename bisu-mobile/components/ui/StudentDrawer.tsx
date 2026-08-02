@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useNotificationBadge } from '../../context/NotificationContext';
 import {
   LayoutDashboard, QrCode, User, Calendar, Activity,
   ClipboardList, Bell, MessageSquare, Wallet, X, ChevronRight,
@@ -20,8 +21,8 @@ const DURATION_CLOSE = 220;
 interface StudentDrawerProps {
   visible: boolean;
   onClose: () => void;
-  unreadAnnouncements?: number;
   unreadMessages?: number;
+  unreadAnnouncements?: number;
   activeRoute?: string;
 }
 
@@ -57,8 +58,8 @@ const MenuItem = ({ icon, label, onPress, active = false, badge, rightLabel, tex
     <View style={{ marginRight: 12, opacity: active ? 1 : 0.6 }}>{icon}</View>
     <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: active ? '#fff' : (textColor || '#334155') }}>{label}</Text>
     {badge ? (
-      <View style={{ backgroundColor: '#10b981', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{badge}</Text>
+      <View style={{ backgroundColor: '#ef4444', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>{badge > 99 ? '99+' : badge}</Text>
       </View>
     ) : null}
     {rightLabel ? (
@@ -72,12 +73,13 @@ const MenuItem = ({ icon, label, onPress, active = false, badge, rightLabel, tex
 
 export default function StudentDrawer({
   visible, onClose,
-  unreadAnnouncements = 0, unreadMessages = 0,
+  unreadMessages = 0,
   activeRoute = 'index',
 }: StudentDrawerProps) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { isDark } = useTheme();
+  const { unreadCount, markAllRead } = useNotificationBadge();
   const insets = useSafeAreaInsets();
 
   const drawerBg = isDark ? '#1e293b' : '#fff';
@@ -235,7 +237,17 @@ export default function StudentDrawer({
           <MenuItem icon={<ClipboardList size={18} color={iconColor('evaluations')} />} label="Evaluations" active={activeRoute === 'evaluations'} onPress={() => navigate('/(student)/evaluations')} textColor={menuTextColor} />
 
           <MenuSection label="Communication" color={sectionColor} />
-          <MenuItem icon={<Bell size={18} color={iconColor('announcements')} />} label="Announcements" active={activeRoute === 'announcements'} badge={unreadAnnouncements || undefined} onPress={() => navigate('/(student)/announcements')} textColor={menuTextColor} />
+          <MenuItem
+            icon={<Bell size={18} color={iconColor('announcements')} />}
+            label="Announcements"
+            active={activeRoute === 'announcements'}
+            badge={unreadCount || undefined}
+            onPress={() => {
+              markAllRead();
+              navigate('/(student)/announcements');
+            }}
+            textColor={menuTextColor}
+          />
 
           <MenuSection label="Requirements" color={sectionColor} />
           <MenuItem icon={<Wallet size={18} color={iconColor('obligations')} />} label="Obligations" active={activeRoute === 'obligations'} onPress={() => navigate('/(student)/obligations')} textColor={menuTextColor} />
@@ -251,6 +263,8 @@ export default function StudentDrawer({
             paddingBottom: insets.bottom > 0 ? insets.bottom : 16,
             borderTopWidth: 1, borderTopColor: footerBorder,
             backgroundColor: footerBg,
+            zIndex: 10,
+            elevation: 10,
           }}
           onPress={() => navigate('/(student)/profile')}
         >

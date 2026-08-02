@@ -238,6 +238,15 @@ class EventController extends Controller
             $event = Event::create($data);
             $event->load(['organization.college']);
 
+            // Notify all org members about the new event
+            \App\Services\ExpoPushService::sendToOrganization(
+                (int) $orgId,
+                '📅 New Event: ' . $data['title'],
+                'Date: ' . $data['event_date'] . ($data['location'] ?? '' ? ' | 📍 ' . $data['location'] : ''),
+                ['type' => 'new_event', 'event_id' => $event->id],
+                [$user->id]
+            );
+
             return response()->json([
                 'message' => 'Event has been created successfully!',
                 'event'   => $event,

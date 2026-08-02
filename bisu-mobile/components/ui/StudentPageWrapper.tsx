@@ -6,6 +6,7 @@ import StudentDrawer from './StudentDrawer';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useNotificationBadge } from '../../context/NotificationContext';
 import { API_BASE_URL } from '../../constants/Config';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,12 +24,22 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
   const router = useRouter();
   const { user } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
+  const { unreadCount, markAllRead } = useNotificationBadge();
   
   const STORAGE_BASE = API_BASE_URL.replace('/api', '/storage');
   const avatarUri = user?.profile_picture ? `${STORAGE_BASE}/${user.profile_picture}` : null;
 
   // Ensure we have padding for the status bar so content doesn't overlap time/battery
   const safeTopPadding = Math.max(insets.top, StatusBar.currentHeight || 24);
+
+  // Use the global notification count (from push notifications)
+  // Fall back to unreadAnnouncements prop for backward compatibility
+  const badgeCount = unreadCount > 0 ? unreadCount : unreadAnnouncements;
+
+  const handleBellPress = () => {
+    markAllRead(); // Clear the badge — Facebook style
+    router.push('/(student)/announcements');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -37,7 +48,7 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
         visible={drawerOpen} 
         onClose={() => setDrawerOpen(false)} 
         activeRoute={activeRoute} 
-        unreadAnnouncements={unreadAnnouncements}
+        unreadAnnouncements={badgeCount}
       />
 
       {!hideNav && (
@@ -90,7 +101,7 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
             </TouchableOpacity>
 
             <TouchableOpacity 
-              onPress={() => router.push('/(student)/announcements')}
+              onPress={handleBellPress}
               style={{
                 width: 38, height: 38, borderRadius: 12,
                 backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -98,13 +109,26 @@ export default function StudentPageWrapper({ children, activeRoute, title, hideN
               }}
             >
               <Bell size={18} color="#ffffff" strokeWidth={2} />
-              {unreadAnnouncements > 0 && (
+              {badgeCount > 0 && (
                 <View style={{
-                  position: 'absolute', top: 8, right: 10,
-                  width: 8, height: 8, borderRadius: 4,
+                  position: 'absolute',
+                  top: 4, right: 4,
+                  minWidth: 18, height: 18,
+                  borderRadius: 9,
                   backgroundColor: '#ef4444',
-                  borderWidth: 1.5, borderColor: '#3b82f6',
-                }} />
+                  borderWidth: 2, borderColor: '#3b82f6',
+                  alignItems: 'center', justifyContent: 'center',
+                  paddingHorizontal: 4,
+                }}>
+                  <Text style={{
+                    color: '#ffffff',
+                    fontSize: 10,
+                    fontWeight: '900',
+                    lineHeight: 12,
+                  }}>
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </Text>
+                </View>
               )}
             </TouchableOpacity>
           </View>
