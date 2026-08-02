@@ -50,7 +50,14 @@ Route::any('/debug-user', function() {
 
 
 Route::get('/payment-methods', function() {
-    return response()->json(\App\Models\PaymentMethod::all());
+    $methods = \App\Models\PaymentMethod::all();
+    if ($methods->isEmpty()) {
+        \App\Models\PaymentMethod::create(['name' => 'GCash', 'code' => 'gcash']);
+        \App\Models\PaymentMethod::create(['name' => 'Maya', 'code' => 'maya']);
+        \App\Models\PaymentMethod::create(['name' => 'Cash', 'code' => 'cash']);
+        $methods = \App\Models\PaymentMethod::all();
+    }
+    return response()->json($methods);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
