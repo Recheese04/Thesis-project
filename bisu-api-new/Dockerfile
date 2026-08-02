@@ -46,16 +46,13 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 RUN composer install --no-dev --optimize-autoloader
 
 # Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
 
 # Update Apache Config to point to public/
 RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
 
-# Copy entrypoint script and make it executable
-COPY docker-entrypoint.sh* bisu-api-new/docker-entrypoint.sh* /tmp/
-RUN (cp /tmp/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh 2>/dev/null || cp /tmp/bisu-api-new/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh 2>/dev/null || cp /var/www/html/bisu-api-new/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh 2>/dev/null) && chmod +x /usr/local/bin/docker-entrypoint.sh
-
-
+# Copy entrypoint script safely using shell cp
+RUN (cp docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh 2>/dev/null || cp bisu-api-new/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh 2>/dev/null) && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Start with entrypoint (clears caches, runs migrations, then starts Apache)
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
