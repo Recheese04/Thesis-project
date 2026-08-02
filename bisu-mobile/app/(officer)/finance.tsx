@@ -12,6 +12,8 @@ import {
   Search, Users, ChevronDown, ChevronUp,
   CheckCircle2, Clock, Plus, CheckCircle, Wallet, X, Settings, Edit2
 } from 'lucide-react-native';
+import LinearGradient from '../../components/ui/SafeLinearGradient';
+
 const METHOD_LOGOS: Record<string, any> = {
   gcash: require('../../assets/images/gcash.png'),
   paymaya: require('../../assets/images/paymaya.jpg'),
