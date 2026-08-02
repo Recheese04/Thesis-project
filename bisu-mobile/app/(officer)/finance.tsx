@@ -12,7 +12,10 @@ import {
   Search, Users, ChevronDown, ChevronUp,
   CheckCircle2, Clock, Plus, CheckCircle, Wallet, X, Settings, Edit2
 } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+const METHOD_LOGOS: Record<string, any> = {
+  gcash: require('../../assets/images/gcash.png'),
+  paymaya: require('../../assets/images/paymaya.jpg'),
+};
 
 export default function OfficerFinance() {
   const { membership } = useAuth();
@@ -572,7 +575,16 @@ export default function OfficerFinance() {
               return (
                 <View key={method.id} style={{ borderWidth: 1, borderColor: isEditing ? '#0fa968' : border, borderRadius: 12, padding: 16, marginBottom: 12, backgroundColor: isEditing ? (isDark ? 'rgba(16,185,129,0.05)' : '#f0fdf4') : cardBg }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: textPrimary }}>{methodLabel}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      {METHOD_LOGOS[method.name] && (
+                        <Image 
+                          source={METHOD_LOGOS[method.name]} 
+                          style={{ width: 28, height: 28, borderRadius: 6 }} 
+                          resizeMode="contain" 
+                        />
+                      )}
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: textPrimary }}>{methodLabel}</Text>
+                    </View>
                     {!isEditing && (
                       <TouchableOpacity onPress={() => { setEditingMethod(method); setEditAccountNum(method.account_number || ''); setEditAccountName(method.account_name || ''); }}>
                         <Edit2 size={16} color={isDark ? '#94a3b8' : '#2563eb'} />
