@@ -9,7 +9,7 @@ class PaymentMethod extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'account_number', 'account_name'];
+    protected $fillable = ['name', 'code', 'account_number', 'account_name', 'instructions', 'qr_code', 'is_active'];
 
     /**
      * A payment method can be used in many student fees.

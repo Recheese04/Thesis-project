@@ -52,9 +52,13 @@ Route::any('/debug-user', function() {
 Route::get('/payment-methods', function() {
     $methods = \App\Models\PaymentMethod::all();
     if ($methods->isEmpty()) {
-        \App\Models\PaymentMethod::create(['name' => 'GCash', 'code' => 'gcash']);
-        \App\Models\PaymentMethod::create(['name' => 'Maya', 'code' => 'maya']);
-        \App\Models\PaymentMethod::create(['name' => 'Cash', 'code' => 'cash']);
+        try {
+            \App\Models\PaymentMethod::create(['name' => 'GCash', 'account_number' => '', 'account_name' => '']);
+            \App\Models\PaymentMethod::create(['name' => 'Maya', 'account_number' => '', 'account_name' => '']);
+            \App\Models\PaymentMethod::create(['name' => 'Cash', 'account_number' => '', 'account_name' => '']);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error seeding payment methods: ' . $e->getMessage());
+        }
         $methods = \App\Models\PaymentMethod::all();
     }
     return response()->json($methods);
