@@ -10,9 +10,10 @@ import { useTheme } from '../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import {
   Search, Users, ChevronDown, ChevronUp,
-  CheckCircle2, Clock, Plus, CheckCircle, Wallet, X, Settings, Edit2
+  CheckCircle2, Clock, Plus, CheckCircle, Wallet, X, Settings, Edit2, FileText, Printer
 } from 'lucide-react-native';
 import LinearGradient from '../../components/ui/SafeLinearGradient';
+import * as Print from 'expo-print';
 
 const METHOD_LOGOS: Record<string, any> = {
   gcash: require('../../assets/images/gcash.png'),
@@ -63,6 +64,7 @@ export default function OfficerFinance() {
   const [editAccountNum, setEditAccountNum] = useState('');
   const [editAccountName, setEditAccountName] = useState('');
   const [savingMethod, setSavingMethod] = useState(false);
+  const [showReports, setShowReports] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
@@ -195,6 +197,65 @@ export default function OfficerFinance() {
     } finally { setIsGenerating(false); }
   };
 
+  const handlePrintReport = async () => {
+    const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const feeTypeMap: Record<string, { name: string; amount: number; paid: number; pending: number }> = {};
+    fees.forEach(f => {
+      const ftName = f.fee_type?.name || 'Unknown';
+      const amt = parseFloat(f.fee_type?.amount || '0');
+      if (!feeTypeMap[ftName]) feeTypeMap[ftName] = { name: ftName, amount: amt, paid: 0, pending: 0 };
+      if (f.status === 'paid' || f.status === 'completed') feeTypeMap[ftName].paid++;
+      else feeTypeMap[ftName].pending++;
+    });
+    const feeTypeRows = Object.values(feeTypeMap).map(ft =>
+      `<tr><td>${ft.name}</td><td style="text-align:right">₱${ft.amount.toFixed(2)}</td><td style="text-align:center">${ft.paid}</td><td style="text-align:center">${ft.pending}</td><td style="text-align:right">₱${(ft.amount * ft.paid).toFixed(2)}</td></tr>`
+    ).join('');
+    const studentRows = studentList.map(s => {
+      const badge = s.feeStatus === 'Fully Paid' ? '<span style="color:#16a34a;font-weight:700">✓ Paid</span>'
+        : s.feeStatus === 'Pending' ? '<span style="color:#ea580c;font-weight:700">⏳ Pending</span>'
+        : '<span style="color:#94a3b8">No Fees</span>';
+      const itemDetails = s.items.map(i => `${i.fee_type?.name || 'Fee'}: ${i.status === 'paid' || i.status === 'completed' ? '✓' : '✗'}`).join(', ');
+      return `<tr><td>${s.name}</td><td>${s.student_number}</td><td style="text-align:center">${badge}</td><td style="font-size:10px">${itemDetails || '—'}</td></tr>`;
+    }).join('');
+    const html = `<html><head><style>
+      body{font-family:Helvetica,Arial,sans-serif;padding:30px;color:#1e293b}
+      h1{font-size:22px;margin-bottom:4px;color:#0f172a} h2{font-size:16px;margin-top:24px;margin-bottom:8px;color:#334155;border-bottom:2px solid #e2e8f0;padding-bottom:4px}
+      .meta{font-size:12px;color:#64748b;margin-bottom:20px}
+      .summary{display:flex;gap:16px;margin-bottom:20px}
+      .stat{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center}
+      .stat .val{font-size:22px;font-weight:800;color:#0f172a} .stat .lbl{font-size:11px;color:#64748b;margin-top:2px}
+      .green .val{color:#16a34a} .orange .val{color:#ea580c} .blue .val{color:#2563eb}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+      th{background:#f1f5f9;padding:8px 6px;text-align:left;font-weight:700;border-bottom:2px solid #e2e8f0}
+      td{padding:6px;border-bottom:1px solid #f1f5f9}
+      tr:nth-child(even){background:#fafafa}
+      .footer{margin-top:30px;font-size:10px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:10px}
+    </style></head><body>
+      <h1>📊 Finance Report</h1>
+      <div class="meta">Generated on ${today}</div>
+      <div class="summary">
+        <div class="stat green"><div class="val">₱${totalCollected.toFixed(2)}</div><div class="lbl">Collected</div></div>
+        <div class="stat orange"><div class="val">₱${pendingAmount.toFixed(2)}</div><div class="lbl">Pending</div></div>
+        <div class="stat blue"><div class="val">${percentCollected}%</div><div class="lbl">Completion</div></div>
+      </div>
+      <div class="summary">
+        <div class="stat"><div class="val">${fullyPaidMembersCount}</div><div class="lbl">Fully Paid</div></div>
+        <div class="stat"><div class="val">${pendingMembersCount}</div><div class="lbl">Pending</div></div>
+        <div class="stat"><div class="val">${noFeesMembersCount}</div><div class="lbl">No Fees</div></div>
+      </div>
+      <h2>Fee Type Breakdown</h2>
+      <table><thead><tr><th>Fee Type</th><th style="text-align:right">Amount</th><th style="text-align:center">Paid</th><th style="text-align:center">Pending</th><th style="text-align:right">Collected</th></tr></thead><tbody>${feeTypeRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8">No fee types yet</td></tr>'}</tbody></table>
+      <h2>Student Payment Status</h2>
+      <table><thead><tr><th>Name</th><th>Student #</th><th style="text-align:center">Status</th><th>Details</th></tr></thead><tbody>${studentRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8">No students yet</td></tr>'}</tbody></table>
+      <div class="footer">Organization Finance Report • TapaSok App</div>
+    </body></html>`;
+    try {
+      await Print.printAsync({ html });
+    } catch (e: any) {
+      Alert.alert('Print Error', e.message || 'Could not open print dialog.');
+    }
+  };
+
   if (loading && !refreshing) return (
     <OfficerPageWrapper activeRoute="finance">
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: bg }}>
@@ -233,6 +294,9 @@ export default function OfficerFinance() {
 
             {/* Quick Actions moved to the right */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+               <TouchableOpacity onPress={() => setShowReports(true)} style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+                  <FileText size={16} color={isDark ? '#94a3b8' : '#ea580c'} />
+               </TouchableOpacity>
                <TouchableOpacity onPress={() => setShowPaymentSettings(true)} style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
                   <Wallet size={16} color={isDark ? '#94a3b8' : '#7c3aed'} />
                </TouchableOpacity>
@@ -629,6 +693,103 @@ export default function OfficerFinance() {
                 </View>
               );
             })}
+          </View>
+        </View>
+      </Modal>
+
+      {/* REPORTS MODAL */}
+      <Modal visible={showReports} transparent animationType="fade" onRequestClose={() => setShowReports(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: modalBg, width: '100%', borderRadius: 16, padding: 24, elevation: 10, borderWidth: isDark ? 1 : 0, borderColor: '#334155', maxHeight: '90%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: textPrimary }}>📊 Finance Report</Text>
+              <TouchableOpacity onPress={() => setShowReports(false)}><X size={20} color={textSecondary} /></TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Summary Cards */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                <View style={{ flex: 1, backgroundColor: isDark ? '#064e3b' : '#ecfdf5', borderRadius: 12, padding: 14, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#16a34a' }}>₱{totalCollected.toFixed(2)}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: textSecondary, marginTop: 2 }}>Collected</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: isDark ? '#431407' : '#fff7ed', borderRadius: 12, padding: 14, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#ea580c' }}>₱{pendingAmount.toFixed(2)}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: textSecondary, marginTop: 2 }}>Pending</Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+                <View style={{ flex: 1, backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: border }}>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#16a34a' }}>{fullyPaidMembersCount}</Text>
+                  <Text style={{ fontSize: 9, color: textSecondary }}>Fully Paid</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: border }}>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#ea580c' }}>{pendingMembersCount}</Text>
+                  <Text style={{ fontSize: 9, color: textSecondary }}>Pending</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: border }}>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: textMuted }}>{noFeesMembersCount}</Text>
+                  <Text style={{ fontSize: 9, color: textSecondary }}>No Fees</Text>
+                </View>
+              </View>
+
+              {/* Completion Bar */}
+              <View style={{ marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: textPrimary }}>Collection Progress</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0fa968' }}>{percentCollected}%</Text>
+                </View>
+                <View style={{ height: 10, backgroundColor: isDark ? '#334155' : '#e2e8f0', borderRadius: 5, overflow: 'hidden' }}>
+                  <View style={{ height: '100%', width: `${percentCollected}%`, backgroundColor: '#0fa968', borderRadius: 5 }} />
+                </View>
+              </View>
+
+              {/* Fee Type Breakdown */}
+              <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary, marginBottom: 10 }}>Fee Type Breakdown</Text>
+              {feeTypes.length === 0 ? (
+                <Text style={{ fontSize: 12, color: textMuted, textAlign: 'center', paddingVertical: 12 }}>No fee types created yet</Text>
+              ) : (
+                feeTypes.map((ft: any) => {
+                  const ftFees = fees.filter(f => f.fee_type_id === ft.id);
+                  const ftPaid = ftFees.filter(f => f.status === 'paid' || f.status === 'completed').length;
+                  const ftPending = ftFees.length - ftPaid;
+                  const ftCollected = ftPaid * parseFloat(ft.amount || '0');
+                  return (
+                    <View key={ft.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: border }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: textPrimary }}>{ft.name}</Text>
+                        <Text style={{ fontSize: 11, color: textSecondary }}>₱{parseFloat(ft.amount || '0').toFixed(2)} each</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#16a34a' }}>₱{ftCollected.toFixed(2)}</Text>
+                        <Text style={{ fontSize: 10, color: textSecondary }}>{ftPaid} paid · {ftPending} pending</Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+
+              {/* Student List */}
+              <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary, marginTop: 20, marginBottom: 10 }}>Student Status</Text>
+              {studentList.slice(0, 50).map(s => (
+                <View key={s.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: border }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: textPrimary }} numberOfLines={1}>{s.name}</Text>
+                    <Text style={{ fontSize: 10, color: textSecondary }}>{s.student_number || '—'}</Text>
+                  </View>
+                  <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: s.feeStatus === 'Fully Paid' ? (isDark ? '#064e3b' : '#dcfce7') : s.feeStatus === 'Pending' ? (isDark ? '#431407' : '#ffedd5') : (isDark ? '#1e293b' : '#f1f5f9') }}>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: s.feeStatus === 'Fully Paid' ? '#16a34a' : s.feeStatus === 'Pending' ? '#ea580c' : textMuted }}>{s.feeStatus}</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            {/* Print Button */}
+            <TouchableOpacity onPress={handlePrintReport} style={{ marginTop: 16, backgroundColor: '#0fa968', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+              <Printer size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>Print / Save as PDF</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
