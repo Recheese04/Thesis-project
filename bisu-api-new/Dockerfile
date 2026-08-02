@@ -35,7 +35,13 @@ WORKDIR /var/www/html
 # Copy project files
 COPY . .
 
+# If built from root repository context, pull bisu-api-new contents to /var/www/html
+RUN if [ -f "bisu-api-new/composer.json" ]; then \
+        cp -a bisu-api-new/. /var/www/html/; \
+    fi
+
 # Install Composer
+ENV COMPOSER_ALLOW_SUPERUSER=1
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 RUN composer install --no-dev --optimize-autoloader
 
