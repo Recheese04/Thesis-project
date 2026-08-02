@@ -10,10 +10,13 @@ return new class extends Migration {
      */
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
+        Schema::dropIfExists('group_chat_members');
         Schema::dropIfExists('messages');
         Schema::dropIfExists('groupchat_messages');
         Schema::dropIfExists('direct_message');
         Schema::dropIfExists('group_chats');
+        Schema::enableForeignKeyConstraints();
     }
 
     /**
