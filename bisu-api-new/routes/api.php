@@ -104,7 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
             $user = $request->user();
             if (!$user->student_number)
                 return response()->json([]);
-            return Designation::with('organization')
+            return \App\Models\Designation::with('organization')
             ->where('user_id', $user->id)
             ->where('status', 'active')
             ->get();
@@ -115,7 +115,7 @@ Route::middleware('auth:sanctum')->group(function () {
             $user = $request->user();
             if (!$user->student_number)
                 return response()->json([]);
-            return Designation::with('organization')
+            return \App\Models\Designation::with('organization')
             ->where('user_id', $user->id)
             ->where('status', 'pending')
             ->get();
