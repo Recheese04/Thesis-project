@@ -1,14 +1,18 @@
 #!/bin/bash
 set -e
 
-# Clear all caches to ensure fresh config on every deploy
+# Ensure CACHE_STORE defaults to file to prevent database cache table bootstrap crashes
+export CACHE_STORE="${CACHE_STORE:-file}"
+export CACHE_DRIVER="${CACHE_DRIVER:-file}"
+
+# Run any pending migrations FIRST so database tables exist
+php artisan migrate --force 2>&1 || echo "WARNING: Migration failed, check logs"
+
+# Clear all caches
 php artisan config:clear
 php artisan route:clear
-php artisan cache:clear
+php artisan cache:clear || true
 php artisan view:clear
-
-# Run any pending migrations (don't crash the server if they fail)
-php artisan migrate --force 2>&1 || echo "WARNING: Migration failed, check logs"
 
 # Generate optimized config/routes for production
 php artisan config:cache
