@@ -53,9 +53,8 @@ Route::get('/payment-methods', function() {
     $methods = \App\Models\PaymentMethod::all();
     if ($methods->isEmpty()) {
         try {
-            \App\Models\PaymentMethod::create(['name' => 'GCash', 'account_number' => '', 'account_name' => '']);
-            \App\Models\PaymentMethod::create(['name' => 'Maya', 'account_number' => '', 'account_name' => '']);
-            \App\Models\PaymentMethod::create(['name' => 'Cash', 'account_number' => '', 'account_name' => '']);
+            \App\Models\PaymentMethod::firstOrCreate(['name' => 'gcash']);
+            \App\Models\PaymentMethod::firstOrCreate(['name' => 'paymaya']);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Error seeding payment methods: ' . $e->getMessage());
         }
