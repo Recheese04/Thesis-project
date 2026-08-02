@@ -15,6 +15,7 @@ import {
 const METHOD_LOGOS: Record<string, any> = {
   gcash: require('../../assets/images/gcash.png'),
   paymaya: require('../../assets/images/paymaya.jpg'),
+  maya: require('../../assets/images/paymaya.jpg'),
 };
 
 export default function OfficerFinance() {
@@ -64,16 +65,26 @@ export default function OfficerFinance() {
   const fetchData = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
     try {
-      const [feesRes, membersRes, typesRes, methodsRes] = await Promise.all([
+      const [feesRes, membersRes, typesRes, methodsRes] = await Promise.allSettled([
         api.get(`/organizations/${orgId}/student-fees`),
         api.get(`/organizations/${orgId}/members?status=active`),
         api.get(`/fee-types`),
         api.get(`/payment-methods`),
       ]);
-      setFees(Array.isArray(feesRes.data) ? feesRes.data : (feesRes.data.fees || []));
-      setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
-      setFeeTypes(typesRes.data.fees || []);
-      setPaymentMethods(Array.isArray(methodsRes.data) ? methodsRes.data : []);
+
+      if (feesRes.status === 'fulfilled') {
+        const data = feesRes.value.data;
+        setFees(Array.isArray(data) ? data : (data.fees || []));
+      }
+      if (membersRes.status === 'fulfilled') {
+        setMembers(Array.isArray(membersRes.value.data) ? membersRes.value.data : []);
+      }
+      if (typesRes.status === 'fulfilled') {
+        setFeeTypes(typesRes.value.data.fees || []);
+      }
+      if (methodsRes.status === 'fulfilled') {
+        setPaymentMethods(Array.isArray(methodsRes.value.data) ? methodsRes.value.data : []);
+      }
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);
