@@ -50,17 +50,21 @@ Route::any('/debug-user', function() {
 
 
 Route::get('/payment-methods', function() {
-    $methods = \App\Models\PaymentMethod::all();
-    if ($methods->isEmpty()) {
-        try {
+    try {
+        $methods = \App\Models\PaymentMethod::all();
+        if ($methods->isEmpty()) {
             \App\Models\PaymentMethod::firstOrCreate(['name' => 'gcash']);
             \App\Models\PaymentMethod::firstOrCreate(['name' => 'paymaya']);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Error seeding payment methods: ' . $e->getMessage());
+            $methods = \App\Models\PaymentMethod::all();
         }
-        $methods = \App\Models\PaymentMethod::all();
+        return response()->json($methods);
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::error('Payment methods error: ' . $e->getMessage());
+        return response()->json([
+            ['id' => 1, 'name' => 'gcash', 'account_number' => null, 'account_name' => null],
+            ['id' => 2, 'name' => 'paymaya', 'account_number' => null, 'account_name' => null]
+        ]);
     }
-    return response()->json($methods);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
