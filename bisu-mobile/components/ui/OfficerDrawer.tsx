@@ -91,6 +91,7 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
   const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase();
   const designation = membership?.designation?.toLowerCase() || '';
   const isTreasurer = designation.includes('treasurer');
+  const isAdviser = designation === 'adviser';
 
   const ic = (route: string) => activeRoute === route ? 'white' : (isDark ? '#94a3b8' : '#64748b');
 
@@ -226,17 +227,21 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
                 }} 
               />
 
-              <MenuSection label="My Student" />
-              <MenuItem 
-                icon={<QrCode size={18} color={ic('my-checkin')} />} 
-                label="Check In" 
-                active={activeRoute === 'my-checkin'} 
-                onPress={() => navigate('/(officer)/my-checkin')} 
-                badge={<ScanBadge />}
-              />
-              <MenuItem icon={<Calendar size={18} color={ic('my-events')} />} label="My Events" active={activeRoute === 'my-events'} onPress={() => navigate('/(officer)/my-events')} />
-              <MenuItem icon={<ClipboardList size={18} color={ic('my-attendance')} />} label="My Attendance" active={activeRoute === 'my-attendance'} onPress={() => navigate('/(officer)/my-attendance')} />
-              <MenuItem icon={<Bookmark size={18} color={ic('my-obligations')} />} label="Obligations" active={activeRoute === 'my-obligations'} onPress={() => navigate('/(officer)/my-obligations')} />
+              {!isAdviser && (
+                <>
+                  <MenuSection label="My Student" />
+                  <MenuItem 
+                    icon={<QrCode size={18} color={ic('my-checkin')} />} 
+                    label="Check In" 
+                    active={activeRoute === 'my-checkin'} 
+                    onPress={() => navigate('/(officer)/my-checkin')} 
+                    badge={<ScanBadge />}
+                  />
+                  <MenuItem icon={<Calendar size={18} color={ic('my-events')} />} label="My Events" active={activeRoute === 'my-events'} onPress={() => navigate('/(officer)/my-events')} />
+                  <MenuItem icon={<ClipboardList size={18} color={ic('my-attendance')} />} label="My Attendance" active={activeRoute === 'my-attendance'} onPress={() => navigate('/(officer)/my-attendance')} />
+                  <MenuItem icon={<Bookmark size={18} color={ic('my-obligations')} />} label="Obligations" active={activeRoute === 'my-obligations'} onPress={() => navigate('/(officer)/my-obligations')} />
+                </>
+              )}
             </>
           ) : (
             <>
@@ -273,17 +278,21 @@ export default function OfficerDrawer({ visible, onClose, activeRoute = 'index',
               <MenuItem icon={<AlertTriangle size={18} color={ic('consequences')} />} label="Consequence Rules" active={activeRoute === 'consequences'} onPress={() => navigate('/(officer)/consequences')} />
               <MenuItem icon={<Wallet size={18} color={ic('obligations')} />} label="Obligations" active={activeRoute === 'obligations'} activeColor="#8b5cf6" onPress={() => navigate('/(officer)/obligations')} />
 
-              <MenuSection label="My Student" />
-              <MenuItem 
-                icon={<QrCode size={18} color={ic('my-checkin')} />} 
-                label="Check In" 
-                active={activeRoute === 'my-checkin'} 
-                onPress={() => navigate('/(officer)/my-checkin')} 
-                badge={<ScanBadge />}
-              />
-              <MenuItem icon={<Calendar size={18} color={ic('my-events')} />} label="My Events" active={activeRoute === 'my-events'} onPress={() => navigate('/(officer)/my-events')} />
-              <MenuItem icon={<ClipboardList size={18} color={ic('my-attendance')} />} label="My Attendance" active={activeRoute === 'my-attendance'} onPress={() => navigate('/(officer)/my-attendance')} />
-              <MenuItem icon={<Bookmark size={18} color={ic('my-obligations')} />} label="My Obligations" active={activeRoute === 'my-obligations'} onPress={() => navigate('/(officer)/my-obligations')} />
+              {!isAdviser && (
+                <>
+                  <MenuSection label="My Student" />
+                  <MenuItem 
+                    icon={<QrCode size={18} color={ic('my-checkin')} />} 
+                    label="Check In" 
+                    active={activeRoute === 'my-checkin'} 
+                    onPress={() => navigate('/(officer)/my-checkin')} 
+                    badge={<ScanBadge />}
+                  />
+                  <MenuItem icon={<Calendar size={18} color={ic('my-events')} />} label="My Events" active={activeRoute === 'my-events'} onPress={() => navigate('/(officer)/my-events')} />
+                  <MenuItem icon={<ClipboardList size={18} color={ic('my-attendance')} />} label="My Attendance" active={activeRoute === 'my-attendance'} onPress={() => navigate('/(officer)/my-attendance')} />
+                  <MenuItem icon={<Bookmark size={18} color={ic('my-obligations')} />} label="My Obligations" active={activeRoute === 'my-obligations'} onPress={() => navigate('/(officer)/my-obligations')} />
+                </>
+              )}
             </>
           )}
 

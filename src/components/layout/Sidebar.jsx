@@ -128,7 +128,10 @@ const getOfficerMenu = (position, membershipRole) => {
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
-        if (isAdviser) return true; // advisers see everything
+        if (isAdviser) {
+          if (section.label === 'My Student') return false;
+          return true;
+        }
         if (!item.positions || item.positions === ALL_POSITIONS || item.positions.length === 0) return true; // visible to all
         return item.positions.some((p) => p.toLowerCase() === pos);
       }),
