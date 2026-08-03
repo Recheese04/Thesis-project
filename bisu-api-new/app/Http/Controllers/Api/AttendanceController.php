@@ -138,29 +138,34 @@ class AttendanceController extends Controller
                 ->get()
                 ->map(function ($record) {
                 $user = $record->user;
+                $userPayload = $user ? [
+                    'id'             => $user->id,
+                    'name'           => trim($user->first_name . ' ' . $user->last_name),
+                    'student_id'     => $user->student_number,
+                    'student_number' => $user->student_number,
+                    'year_level'     => $user->year_level,
+                    'course'         => $user->course ? $user->course->name : null,
+                    'college'        => $user->college ? [
+                        'id'   => $user->college->id,
+                        'name' => $user->college->name,
+                    ] : null,
+                ] : null;
+
                 return [
-                'id' => $record->id,
-                'event_id' => $record->event_id,
-                'attendance_type' => $record->attendance_type,
-                'time_in' => $record->time_in,
-                'time_out' => $record->time_out,
-                'status' => $record->status,
-                'remarks' => $record->remarks,
-                'is_active' => $record->is_active,
-                'formatted_duration' => $record->formatted_duration,
-                'created_at' => $record->created_at,
-                'updated_at' => $record->updated_at,
-                'user' => $user ? [
-                'id' => $user->id,
-                'name' => trim($user->first_name . ' ' . $user->last_name),
-                'student_number' => $user->student_number,
-                'year_level' => $user->year_level,
-                'course' => $user->course ? $user->course->name : null,
-                'college' => $user->college ? [
-                'id' => $user->college->id,
-                'name' => $user->college->name,
-                ] : null,
-                ] : null,
+                    'id'                 => $record->id,
+                    'event_id'           => $record->event_id,
+                    'student_id'         => $user?->id,          // top-level for fallback display
+                    'attendance_type'    => $record->attendance_type,
+                    'time_in'            => $record->time_in,
+                    'time_out'           => $record->time_out,
+                    'status'             => $record->status,
+                    'remarks'            => $record->remarks,
+                    'is_active'          => $record->is_active,
+                    'formatted_duration' => $record->formatted_duration,
+                    'created_at'         => $record->created_at,
+                    'updated_at'         => $record->updated_at,
+                    'user'               => $userPayload,
+                    'student'            => $userPayload, // alias expected by admin frontend
                 ];
             });
 
