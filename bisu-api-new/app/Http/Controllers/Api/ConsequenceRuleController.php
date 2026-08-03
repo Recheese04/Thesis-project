@@ -38,6 +38,49 @@ class ConsequenceRuleController extends Controller
             'created_by'      => Auth::id(),
         ]);
 
+        // Auto-assign rule to members
+        try {
+            $activeMembers = \App\Models\Designation::where('organization_id', $orgId)
+                ->where('status', 'active')
+                ->pluck('user_id');
+
+            $dueDate = now()->addDays($rule->due_days)->toDateString();
+
+            foreach ($activeMembers as $userId) {
+                if ($rule->event_id) {
+                    // Event-specific: check if member attended
+                    $attended = \App\Models\Attendance::where('event_id', $rule->event_id)
+                        ->where('user_id', $userId)
+                        ->exists();
+
+                    if (!$attended) {
+                        \App\Models\StudentConsequence::firstOrCreate([
+                            'consequence_rule_id' => $rule->id,
+                            'user_id'             => $userId,
+                            'event_id'            => $rule->event_id,
+                        ], [
+                            'type'                => $rule->type ?? 'task',
+                            'status'              => 'pending',
+                            'due_date'            => $dueDate,
+                        ]);
+                    }
+                } else {
+                    // Org-wide: assign to all active members
+                    \App\Models\StudentConsequence::firstOrCreate([
+                        'consequence_rule_id' => $rule->id,
+                        'user_id'             => $userId,
+                        'event_id'            => null,
+                    ], [
+                        'type'                => $rule->type ?? 'task',
+                        'status'              => 'pending',
+                        'due_date'            => $dueDate,
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error auto-assigning consequence rule: ' . $e->getMessage());
+        }
+
         return response()->json($rule, 201);
     }
 
