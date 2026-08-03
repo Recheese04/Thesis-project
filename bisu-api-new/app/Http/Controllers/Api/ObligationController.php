@@ -118,6 +118,26 @@ class ObligationController extends Controller
                 $this->autoAssignConsequencesForOrg($orgId);
             }
 
+            // Fetch fees from student_fees table
+            $fees = \App\Models\StudentFee::with(['organization', 'feeType'])
+                ->where('user_id', $userId)
+                ->get()
+                ->map(fn($f) => [
+                    'id'               => $f->id,
+                    'type'             => 'fee',
+                    'title'            => $f->feeType?->name ?? 'Fee',
+                    'category'         => $f->feeType?->type ?? 'Other',
+                    'description'      => $f->feeType?->description ?? null,
+                    'organization'     => $f->organization?->name ?? '—',
+                    'amount'           => $f->feeType?->amount ?? 0,
+                    'status'           => ($f->status === 'paid' || $f->status === 'completed') ? 'completed' : ($f->status === 'submitted' ? 'submitted' : 'pending'),
+                    'reference_number' => $f->reference_number,
+                    'proof'            => $f->proof,
+                    'due_date'         => null,
+                    'completed_at'     => $f->status === 'paid' ? $f->updated_at?->toDateString() : null,
+                    'created_at'       => $f->created_at?->toDateString(),
+                ]);
+
             // Consequences assigned to me (Tasks, etc.)
             $consequences = StudentConsequence::with(['consequenceRule.organization', 'rule.organization', 'event'])
                 ->where('user_id', $userId)
@@ -143,7 +163,7 @@ class ObligationController extends Controller
                 });
 
             return response()->json([
-                'fees'         => [],
+                'fees'         => $fees,
                 'consequences' => $consequences,
             ]);
         } catch (\Exception $e) {
