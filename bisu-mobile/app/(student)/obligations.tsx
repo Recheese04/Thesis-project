@@ -28,9 +28,8 @@ export default function StudentObligations() {
     try {
       const res = await api.get('/student/obligations');
       const data = res.data || {};
-      const fees = Array.isArray(data.fees) ? data.fees : [];
       const consequences = Array.isArray(data.consequences) ? data.consequences : [];
-      setObligations([...fees, ...consequences]);
+      setObligations(consequences);
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);

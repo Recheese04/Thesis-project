@@ -80,42 +80,33 @@ export default function OfficerObligations() {
   // ─── Aggregate per-member ───────────────────────────────────────────────────
   type StudentEntry = {
     id: number; name: string; student_number: string;
-    fees: any[]; consequences: any[];
+    consequences: any[];
     status: 'Has Pending' | 'Clear' | 'No Items';
   };
   const studentMap: Record<number, StudentEntry> = {};
 
   members.forEach((m: any) => {
     const uid = m.user_id;
-    if (!studentMap[uid]) studentMap[uid] = { id: uid, name: `${m.user?.first_name || ''} ${m.user?.last_name || ''}`.trim() || '—', student_number: m.user?.student_number || '', fees: [], consequences: [], status: 'No Items' };
-  });
-
-  fees.forEach(item => {
-    const uid = item.user?.id; if (!uid) return;
-    if (!studentMap[uid]) studentMap[uid] = { id: uid, name: item.user?.name || '—', student_number: item.user?.student_number || '', fees: [], consequences: [], status: 'No Items' };
-    studentMap[uid].fees.push(item);
+    if (!studentMap[uid]) studentMap[uid] = { id: uid, name: `${m.user?.first_name || ''} ${m.user?.last_name || ''}`.trim() || '—', student_number: m.user?.student_number || '', consequences: [], status: 'No Items' };
   });
 
   consequences.forEach(item => {
     const uid = item.user?.id; if (!uid) return;
-    if (!studentMap[uid]) studentMap[uid] = { id: uid, name: item.user?.name || '—', student_number: item.user?.student_number || '', fees: [], consequences: [], status: 'No Items' };
+    if (!studentMap[uid]) studentMap[uid] = { id: uid, name: item.user?.name || '—', student_number: item.user?.student_number || '', consequences: [], status: 'No Items' };
     studentMap[uid].consequences.push(item);
   });
 
   let hasPendingCount = 0;
   let clearCount = 0;
   let noItemsCount = 0;
-  let totalFeesPending = 0;
   let totalConsequencesPending = 0;
 
   const studentList = Object.values(studentMap).map(s => {
-    const hasPendingFee = s.fees.some(f => f.status !== 'paid' && f.status !== 'completed');
     const hasPendingConsequence = s.consequences.some(c => c.status !== 'completed');
-    const hasAnyItems = s.fees.length > 0 || s.consequences.length > 0;
+    const hasAnyItems = s.consequences.length > 0;
     if (!hasAnyItems) { s.status = 'No Items'; noItemsCount++; }
-    else if (hasPendingFee || hasPendingConsequence) { s.status = 'Has Pending'; hasPendingCount++; }
+    else if (hasPendingConsequence) { s.status = 'Has Pending'; hasPendingCount++; }
     else { s.status = 'Clear'; clearCount++; }
-    s.fees.forEach(f => { if (f.status !== 'paid' && f.status !== 'completed') totalFeesPending++; });
     s.consequences.forEach(c => { if (c.status !== 'completed') totalConsequencesPending++; });
     return s;
   }).sort((a, b) => a.name.localeCompare(b.name));
@@ -159,7 +150,7 @@ export default function OfficerObligations() {
             
             <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
-                Member Fees & Tasks
+                Member Consequence Tasks
               </Text>
               <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
                 Obligations
@@ -196,30 +187,20 @@ export default function OfficerObligations() {
 
             {/* Chat Bubble */}
             <TarsiChatBubble 
-              message={`You have ${hasPendingCount} member${hasPendingCount !== 1 ? 's' : ''} with pending obligations. Keep tracking!`} 
+              message={`You have ${hasPendingCount} member${hasPendingCount !== 1 ? 's' : ''} with pending consequences. Keep tracking!`} 
             />
           </View>
         </View>
 
           {/* SUMMARY CARDS */}
           <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1, backgroundColor: isDark ? 'rgba(139,92,246,0.1)' : '#faf5ff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: isDark ? 'rgba(139,92,246,0.3)' : '#e9d5ff' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                  <DollarSign size={14} color="#8b5cf6" />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#8b5cf6', marginLeft: 6 }}>Pending Fees</Text>
-                </View>
-                <Text style={{ fontSize: 22, fontWeight: '900', color: isDark ? '#c4b5fd' : '#6d28d9' }}>{totalFeesPending}</Text>
-                <Text style={{ fontSize: 10, color: isDark ? '#a78bfa' : '#7c3aed', marginTop: 4 }}>unpaid obligations</Text>
+            <View style={{ flex: 1, backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#fff7ed', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: isDark ? 'rgba(239,68,68,0.3)' : '#fed7aa' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <AlertTriangle size={14} color="#f97316" />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#f97316', marginLeft: 6 }}>Consequences</Text>
               </View>
-              <View style={{ flex: 1, backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#fff7ed', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: isDark ? 'rgba(239,68,68,0.3)' : '#fed7aa' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                  <AlertTriangle size={14} color="#f97316" />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#f97316', marginLeft: 6 }}>Consequences</Text>
-                </View>
-                <Text style={{ fontSize: 22, fontWeight: '900', color: isDark ? '#fdba74' : '#c2410c' }}>{totalConsequencesPending}</Text>
-                <Text style={{ fontSize: 10, color: isDark ? '#fb923c' : '#ea580c', marginTop: 4 }}>pending tasks</Text>
-              </View>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: isDark ? '#fdba74' : '#c2410c' }}>{totalConsequencesPending}</Text>
+              <Text style={{ fontSize: 10, color: isDark ? '#fb923c' : '#ea580c', marginTop: 4 }}>pending tasks</Text>
             </View>
 
             {/* Member summary row */}
@@ -243,7 +224,7 @@ export default function OfficerObligations() {
           <View style={{ paddingHorizontal: 20 }}>
             <View style={{ backgroundColor: cardPanelBg, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: cardPanelBorder, elevation: 2 }}>
               <Text style={{ fontSize: 16, fontWeight: '800', color: textPrimary, marginBottom: 4 }}>Member Obligations</Text>
-              <Text style={{ fontSize: 11, color: textSecondary, marginBottom: 16 }}>Fees & consequence tasks per member</Text>
+              <Text style={{ fontSize: 11, color: textSecondary, marginBottom: 16 }}>Consequence tasks per member</Text>
 
               {/* TABS */}
               <View style={{ backgroundColor: tabBg, borderRadius: 12, flexDirection: 'row', padding: 4, marginBottom: 16 }}>
@@ -270,7 +251,6 @@ export default function OfficerObligations() {
                 const hasPending = student.status === 'Has Pending';
                 const statusColor = hasPending ? (isDark ? '#fcd34d' : '#d97706') : student.status === 'Clear' ? (isDark ? '#86efac' : '#16a34a') : textMuted;
                 const statusBg = hasPending ? (isDark ? 'rgba(217,119,6,0.15)' : '#fef3c7') : student.status === 'Clear' ? (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7') : (isDark ? '#334155' : '#f1f5f9');
-                const pendingFees = student.fees.filter(f => f.status !== 'paid' && f.status !== 'completed').length;
                 const pendingCons = student.consequences.filter(c => c.status !== 'completed').length;
 
                 return (
@@ -282,9 +262,8 @@ export default function OfficerObligations() {
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>{student.name}</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 }}>
-                          {pendingFees > 0 && <Text style={{ fontSize: 10, color: isDark ? '#c4b5fd' : '#7c3aed' }}>💰 {pendingFees} fee{pendingFees !== 1 ? 's' : ''}</Text>}
                           {pendingCons > 0 && <Text style={{ fontSize: 10, color: isDark ? '#fdba74' : '#c2410c' }}>⚠️ {pendingCons} task{pendingCons !== 1 ? 's' : ''}</Text>}
-                          {pendingFees === 0 && pendingCons === 0 && student.status === 'Clear' && <Text style={{ fontSize: 10, color: isDark ? '#86efac' : '#16a34a' }}>✓ All clear</Text>}
+                          {pendingCons === 0 && student.status === 'Clear' && <Text style={{ fontSize: 10, color: isDark ? '#86efac' : '#16a34a' }}>✓ All clear</Text>}
                           {student.status === 'No Items' && <Text style={{ fontSize: 10, color: textMuted }}>No obligations</Text>}
                         </View>
                       </View>
@@ -297,32 +276,6 @@ export default function OfficerObligations() {
                     {isOpen && (
                       <View style={{ borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: border, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, padding: 12, marginTop: -6, paddingTop: 16, backgroundColor: isDark ? '#0f172a' : '#fafafa' }}>
                         
-                        {/* FEES SECTION */}
-                        {student.fees.length > 0 && (
-                          <View style={{ marginBottom: student.consequences.length > 0 ? 12 : 0 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingBottom: 6, borderBottomWidth: 1, borderColor: borderLight }}>
-                              <DollarSign size={12} color="#8b5cf6" />
-                              <Text style={{ fontSize: 11, fontWeight: '800', color: isDark ? '#c4b5fd' : '#7c3aed', marginLeft: 4, textTransform: 'uppercase', letterSpacing: 0.8 }}>Fees</Text>
-                            </View>
-                            {student.fees.map(item => {
-                              const isPaid = item.status === 'paid' || item.status === 'completed';
-                              const amt = item.amount ? `₱${parseFloat(item.amount).toFixed(2)}` : '';
-                              return (
-                                <View key={`fee-${item.id}`} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderColor: borderLight, marginBottom: 2 }}>
-                                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: isPaid ? (isDark ? 'rgba(16,185,129,0.15)' : '#dcfce7') : (isDark ? 'rgba(139,92,246,0.15)' : '#f3e8ff'), alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                                    {isPaid ? <CheckCircle size={14} color={isDark ? '#86efac' : '#16a34a'} /> : <Clock size={14} color={isDark ? '#c4b5fd' : '#7c3aed'} />}
-                                  </View>
-                                  <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: textPrimary }} numberOfLines={1}>{item.title || item.name || 'Fee'}</Text>
-                                  <Text style={{ fontSize: 12, fontWeight: '800', color: isPaid ? (isDark ? '#86efac' : '#16a34a') : (isDark ? '#c4b5fd' : '#7c3aed'), marginLeft: 8 }}>{amt}</Text>
-                                  <View style={{ marginLeft: 8, backgroundColor: isPaid ? (isDark ? 'rgba(16,185,129,0.15)' : '#dcfce7') : item.status === 'submitted' ? (isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe') : (isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7'), paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
-                                    <Text style={{ fontSize: 9, fontWeight: '700', color: isPaid ? (isDark ? '#86efac' : '#16a34a') : item.status === 'submitted' ? '#2563eb' : (isDark ? '#fcd34d' : '#d97706') }}>{isPaid ? 'Paid' : item.status === 'submitted' ? 'Awaiting' : 'Pending'}</Text>
-                                  </View>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        )}
-
                         {/* CONSEQUENCES SECTION */}
                         {student.consequences.length > 0 && (
                           <View>
@@ -362,7 +315,7 @@ export default function OfficerObligations() {
                           </View>
                         )}
 
-                        {student.fees.length === 0 && student.consequences.length === 0 && (
+                        {student.consequences.length === 0 && (
                           <Text style={{ fontSize: 12, color: textMuted, textAlign: 'center', paddingVertical: 12, fontStyle: 'italic' }}>No obligations assigned</Text>
                         )}
                       </View>

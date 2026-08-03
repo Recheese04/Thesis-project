@@ -63,7 +63,7 @@ class ObligationController extends Controller
                 ]);
 
             return response()->json([
-                'fees'         => $fees,
+                'fees'         => [],
                 'consequences' => $consequences,
             ]);
         } catch (\Exception $e) {
@@ -103,33 +103,9 @@ class ObligationController extends Controller
                     'created_at'  => $c->created_at?->toDateString(),
                 ]);
 
-            // Fetch fees from student_fees table (includes automated fines)
-            $fees = \App\Models\StudentFee::with(['user', 'feeType'])
-                ->where('organization_id', $orgId)
-                ->orderByRaw("FIELD(status, 'pending', 'paid')")
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->map(fn($f) => [
-                    'id'          => $f->id,
-                    'type'        => 'fee',
-                    'title'       => $f->feeType?->name ?? 'Fee',
-                    'category'    => $f->feeType?->type ?? 'Other',
-                    'description' => $f->feeType?->description ?? '',
-                    'user'        => [
-                        'id'        => $f->user?->id ?? null,
-                        'name'      => trim(($f->user?->first_name ?? '') . ' ' . ($f->user?->last_name ?? '')),
-                        'student_number' => $f->user?->student_number ?? '',
-                    ],
-                    'amount'      => $f->feeType?->amount ?? 0,
-                    'status'      => ($f->status === 'paid' || $f->status === 'completed') ? 'completed' : ($f->status === 'submitted' ? 'submitted' : 'pending'),
-                    'due_date'    => null,
-                    'completed_at'=> $f->status === 'paid' ? $f->updated_at?->toDateString() : null,
-                    'created_at'  => $f->created_at?->toDateString(),
-                ]);
-
             return response()->json([
                 'consequences' => $consequences,
-                'fees'         => $fees,
+                'fees'         => [],
             ]);
         } catch (\Exception $e) {
             Log::error('Obligation index error: ' . $e->getMessage());

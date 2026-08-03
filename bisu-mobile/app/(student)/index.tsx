@@ -37,9 +37,8 @@ export default function StudentDashboard() {
       setEvents(Array.isArray(eventsRes.data) ? eventsRes.data : []);
       
       const oblData = oblRes.data || {};
-      const fees = Array.isArray(oblData.fees) ? oblData.fees : [];
       const consequences = Array.isArray(oblData.consequences) ? oblData.consequences : [];
-      setObligations([...fees, ...consequences]);
+      setObligations(consequences);
       
       setAnnouncements(Array.isArray(annRes.data) ? annRes.data : []);
       const attData = Array.isArray(attRes.data) ? attRes.data : [];
