@@ -583,21 +583,34 @@ export default function AttendanceManagement() {
 
   useEffect(() => {
     (async () => {
-      if (!selectedYearId) {
-        setLoadingBase(false);
-        return;
-      }
+      setLoadingBase(true);
       try {
-        const [evRes, stuRes] = await Promise.all([
-          axios.get(`/api/events?school_year_id=${selectedYearId}`, authH()),
+        const yearParam = selectedYearId ? `?school_year_id=${selectedYearId}` : '';
+        const [evResult, stuResult] = await Promise.allSettled([
+          axios.get(`/api/events${yearParam}`, authH()),
           axios.get("/api/students", authH()),
         ]);
-        setEvents(evRes.data);
-        setStudents(stuRes.data);
-        if (evRes.data.length) setSelectedEvent(String(evRes.data[0].id));
-        else setSelectedEvent("");
-      } catch {
-        toast.error("Failed to load events / students.");
+
+        let loadedEvents = [];
+        let loadedStudents = [];
+
+        if (evResult.status === "fulfilled" && Array.isArray(evResult.value.data)) {
+          loadedEvents = evResult.value.data;
+          setEvents(loadedEvents);
+          if (loadedEvents.length) setSelectedEvent(String(loadedEvents[0].id));
+          else setSelectedEvent("");
+        } else {
+          toast.error("Failed to load events.");
+        }
+
+        if (stuResult.status === "fulfilled" && Array.isArray(stuResult.value.data)) {
+          loadedStudents = stuResult.value.data;
+          setStudents(loadedStudents);
+        } else {
+          toast.error("Failed to load students.");
+        }
+      } catch (err) {
+        toast.error("Failed to load attendance data.");
       } finally {
         setLoadingBase(false);
       }
