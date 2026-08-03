@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\StudentConsequence;
-use App\Models\MembershipFee;
 use App\Models\ConsequenceRule;
+use App\Models\Designation;
+use App\Models\Attendance;
+use App\Models\Event;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -13,54 +15,132 @@ use Illuminate\Support\Facades\Log;
 class ObligationController extends Controller
 {
     /**
+     * Auto-detect completed events and absent members, automatically assigning
+     * consequence tasks according to the organization's consequence rules.
+     */
+    private function autoAssignConsequencesForOrg($orgId): void
+    {
+        try {
+            $rules = ConsequenceRule::where('organization_id', $orgId)->get();
+            if ($rules->isEmpty()) return;
+
+            $activeMemberUserIds = Designation::where('organization_id', $orgId)
+                ->where('status', 'active')
+                ->pluck('user_id');
+
+            if ($activeMemberUserIds->isEmpty()) return;
+
+            foreach ($rules as $rule) {
+                $dueDate = now()->addDays($rule->due_days ?? 3)->toDateString();
+
+                if ($rule->event_id) {
+                    // Specific event rule: find absent members from this event
+                    $attendedUserIds = Attendance::where('event_id', $rule->event_id)
+                        ->pluck('user_id');
+
+                    $absentUserIds = $activeMemberUserIds->diff($attendedUserIds);
+
+                    foreach ($absentUserIds as $userId) {
+                        StudentConsequence::firstOrCreate([
+                            'consequence_rule_id' => $rule->id,
+                            'user_id'             => $userId,
+                            'event_id'            => $rule->event_id,
+                        ], [
+                            'type'                => $rule->type ?? 'task',
+                            'status'              => 'pending',
+                            'due_date'            => $dueDate,
+                        ]);
+                    }
+                } else {
+                    // Org-wide rule: check for completed/past events in this org
+                    $completedEvents = Event::where('organization_id', $orgId)
+                        ->where(function ($q) {
+                            $q->where('status', 'completed')
+                              ->orWhereRaw("CONCAT(event_date, ' ', COALESCE(end_time, event_time, '23:59:59')) <= NOW()");
+                        })
+                        ->get();
+
+                    if ($completedEvents->isNotEmpty()) {
+                        foreach ($completedEvents as $event) {
+                            $attendedUserIds = Attendance::where('event_id', $event->id)
+                                ->pluck('user_id');
+
+                            $absentUserIds = $activeMemberUserIds->diff($attendedUserIds);
+
+                            foreach ($absentUserIds as $userId) {
+                                StudentConsequence::firstOrCreate([
+                                    'consequence_rule_id' => $rule->id,
+                                    'user_id'             => $userId,
+                                    'event_id'            => $event->id,
+                                ], [
+                                    'type'                => $rule->type ?? 'task',
+                                    'status'              => 'pending',
+                                    'due_date'            => $dueDate,
+                                ]);
+                            }
+                        }
+                    } else {
+                        // General org-wide rule when no past events exist
+                        foreach ($activeMemberUserIds as $userId) {
+                            StudentConsequence::firstOrCreate([
+                                'consequence_rule_id' => $rule->id,
+                                'user_id'             => $userId,
+                                'event_id'            => null,
+                            ], [
+                                'type'                => $rule->type ?? 'task',
+                                'status'              => 'pending',
+                                'due_date'            => $dueDate,
+                            ]);
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error("autoAssignConsequencesForOrg error (org #{$orgId}): " . $e->getMessage());
+        }
+    }
+
+    /**
      * GET /api/student/obligations
-     * Student view: all my obligations (fees + consequences) across orgs
+     * Student view: all my consequence obligations across orgs
      */
     public function myObligations()
     {
         try {
             $userId = Auth::id();
 
-            // Fetch fees from student_fees table (includes automated fines)
-            $fees = \App\Models\StudentFee::with(['organization', 'feeType'])
-                ->where('user_id', $userId)
-                ->get()
-                ->map(fn($f) => [
-                    'id'           => $f->id,
-                    'type'         => 'fee',
-                    'title'        => $f->feeType?->name ?? 'Fee',
-                    'category'     => $f->feeType?->type ?? 'Other',
-                    'description'  => $f->feeType?->description ?? null,
-                    'organization' => $f->organization?->name ?? '—',
-                    'amount'       => $f->feeType?->amount ?? 0,
-                    'status'       => ($f->status === 'paid' || $f->status === 'completed') ? 'completed' : ($f->status === 'submitted' ? 'submitted' : 'pending'),
-                    'reference_number' => $f->reference_number,
-                    'proof'        => $f->proof,
-                    'due_date'     => null,
-                    'completed_at' => $f->status === 'paid' ? $f->updated_at?->toDateString() : null,
-                    'created_at'   => $f->created_at?->toDateString(),
-                ]);
+            // Auto-assign any missing absent consequences for user's organizations
+            $orgIds = Designation::where('user_id', $userId)
+                ->where('status', 'active')
+                ->pluck('organization_id');
+
+            foreach ($orgIds as $orgId) {
+                $this->autoAssignConsequencesForOrg($orgId);
+            }
 
             // Consequences assigned to me (Tasks, etc.)
-            $consequences = StudentConsequence::with(['rule.organization', 'event'])
+            $consequences = StudentConsequence::with(['consequenceRule.organization', 'rule.organization', 'event'])
                 ->where('user_id', $userId)
                 ->orderByRaw("FIELD(status, 'pending', 'completed')")
                 ->orderBy('due_date', 'asc')
                 ->get()
-                ->map(fn($c) => [
-                    'id'           => $c->id,
-                    'type'         => 'consequence',
-                    'title'        => $c->rule?->consequence_title ?? 'Consequence',
-                    'description'  => $c->rule?->consequence_description ?? null,
-                    'organization' => $c->rule?->organization?->name ?? '—',
-                    'event_title'  => $c->event?->title ?? null,
-                    'status'       => $c->status,
-                    'due_date'     => $c->due_date?->toDateString(),
-                    'completed_at' => $c->completed_at?->toDateString(),
-                    'notes'        => $c->notes,
-                    'created_at'   => $c->created_at?->toDateString(),
-                    'consequence_type' => $c->type, // financial, task, etc.
-                ]);
+                ->map(function ($c) {
+                    $ruleObj = $c->consequenceRule ?? $c->rule;
+                    return [
+                        'id'           => $c->id,
+                        'type'         => 'consequence',
+                        'title'        => $ruleObj?->consequence_title ?? 'Consequence Task',
+                        'description'  => $ruleObj?->consequence_description ?? null,
+                        'organization' => $ruleObj?->organization?->name ?? '—',
+                        'event_title'  => $c->event?->title ?? null,
+                        'status'       => $c->status,
+                        'due_date'     => $c->due_date?->toDateString(),
+                        'completed_at' => $c->completed_at?->toDateString(),
+                        'notes'        => $c->notes,
+                        'created_at'   => $c->created_at?->toDateString(),
+                        'consequence_type' => $c->type ?? 'task',
+                    ];
+                });
 
             return response()->json([
                 'fees'         => [],
@@ -72,7 +152,6 @@ class ObligationController extends Controller
         }
     }
 
-
     /**
      * GET /api/organizations/{orgId}/obligations
      * Officer view: all obligations for this org's members
@@ -80,28 +159,35 @@ class ObligationController extends Controller
     public function index($orgId)
     {
         try {
-            $consequences = StudentConsequence::with(['consequenceRule', 'user', 'event'])
+            // Auto-assign any missing absent consequences for this org's completed events
+            $this->autoAssignConsequencesForOrg($orgId);
+
+            $consequences = StudentConsequence::with(['consequenceRule', 'rule', 'user', 'event'])
                 ->whereHas('consequenceRule', fn($q) => $q->where('organization_id', $orgId))
+                ->orWhereHas('rule', fn($q) => $q->where('organization_id', $orgId))
                 ->orderByRaw("FIELD(status, 'pending', 'completed')")
                 ->orderBy('due_date', 'asc')
                 ->get()
-                ->map(fn($c) => [
-                    'id'          => $c->id,
-                    'type'        => 'consequence',
-                    'title'       => $c->consequenceRule?->consequence_title ?? 'Consequence',
-                    'description' => $c->consequenceRule?->consequence_description ?? '',
-                    'user'        => [
-                        'id'        => $c->user?->id,
-                        'name'      => trim(($c->user?->first_name ?? '') . ' ' . ($c->user?->last_name ?? '')),
-                        'student_number' => $c->user?->student_number ?? '',
-                    ],
-                    'event_title' => $c->event?->title ?? null,
-                    'status'      => $c->status,
-                    'due_date'    => $c->due_date?->toDateString(),
-                    'completed_at'=> $c->completed_at?->toDateString(),
-                    'notes'       => $c->notes,
-                    'created_at'  => $c->created_at?->toDateString(),
-                ]);
+                ->map(function ($c) {
+                    $ruleObj = $c->consequenceRule ?? $c->rule;
+                    return [
+                        'id'          => $c->id,
+                        'type'        => 'consequence',
+                        'title'       => $ruleObj?->consequence_title ?? 'Consequence Task',
+                        'description' => $ruleObj?->consequence_description ?? '',
+                        'user'        => [
+                            'id'             => $c->user?->id,
+                            'name'           => trim(($c->user?->first_name ?? '') . ' ' . ($c->user?->last_name ?? '')),
+                            'student_number' => $c->user?->student_number ?? '',
+                        ],
+                        'event_title' => $c->event?->title ?? null,
+                        'status'      => $c->status,
+                        'due_date'    => $c->due_date?->toDateString(),
+                        'completed_at'=> $c->completed_at?->toDateString(),
+                        'notes'       => $c->notes,
+                        'created_at'  => $c->created_at?->toDateString(),
+                    ];
+                });
 
             return response()->json([
                 'consequences' => $consequences,
@@ -128,7 +214,6 @@ class ObligationController extends Controller
                 'notes'               => 'nullable|string|max:500',
             ]);
 
-            // Get the rule for default due_days
             $rule = ConsequenceRule::findOrFail($data['consequence_rule_id']);
 
             $consequence = StudentConsequence::create([
@@ -136,7 +221,8 @@ class ObligationController extends Controller
                 'user_id'             => $data['user_id'],
                 'event_id'            => $data['event_id'] ?? null,
                 'status'              => 'pending',
-                'due_date'            => $data['due_date'] ?? now()->addDays($rule->due_days)->toDateString(),
+                'type'                => $rule->type ?? 'task',
+                'due_date'            => $data['due_date'] ?? now()->addDays($rule->due_days ?? 3)->toDateString(),
                 'notes'               => $data['notes'] ?? null,
             ]);
 
