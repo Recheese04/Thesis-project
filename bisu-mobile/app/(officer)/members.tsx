@@ -36,6 +36,7 @@ export default function OfficerMembers() {
   const modalActionBg = isDark ? '#0f172a' : '#f8fafc';
 
   const orgId = membership?.organization_id;
+  const isAdviser = (membership?.designation || '').toLowerCase() === 'adviser';
 
   const fetchData = async () => {
     try {
@@ -147,13 +148,15 @@ export default function OfficerMembers() {
                   </TouchableOpacity>
                ) : null}
 
-               <TouchableOpacity 
-                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
-                  onPress={() => Alert.alert('Add Member', 'Search & Add UI could open here.')}
-               >
-                  <Plus size={14} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12, marginLeft: 4 }}>Add</Text>
-               </TouchableOpacity>
+               {!isAdviser && (
+                 <TouchableOpacity 
+                    style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
+                    onPress={() => Alert.alert('Add Member', 'Search & Add UI could open here.')}
+                 >
+                    <Plus size={14} color="#fff" />
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12, marginLeft: 4 }}>Add</Text>
+                 </TouchableOpacity>
+               )}
             </View>
           </View>
 
@@ -219,10 +222,11 @@ export default function OfficerMembers() {
           {filtered.length === 0
             ? <EmptyState icon="👥" message="No members found." />
             : filtered.map(m => {
-              const avatarBg = m.designation === 'President' ? '#9333ea' : '#f43f5e';
-              const isOfficer = ['President', 'Vice President', 'Officer'].includes(m.designation);
-              const badgeBg = isOfficer ? (isDark ? 'rgba(147,51,234,0.15)' : '#f3e8ff') : (isDark ? 'rgba(37,99,235,0.15)' : '#dbeafe');
-              const badgeText = isOfficer ? (isDark ? '#c084fc' : '#7c3aed') : (isDark ? '#93c5fd' : '#2563eb');
+              const avatarBg = m.designation === 'President' ? '#9333ea' : m.designation === 'Adviser' ? '#f59e0b' : '#f43f5e';
+              const isOfficer = m.designation && m.designation !== 'Member';
+              const isAdviser = m.designation === 'Adviser';
+              const badgeBg = isAdviser ? (isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7') : isOfficer ? (isDark ? 'rgba(147,51,234,0.15)' : '#f3e8ff') : (isDark ? 'rgba(37,99,235,0.15)' : '#dbeafe');
+              const badgeText = isAdviser ? (isDark ? '#fbbf24' : '#d97706') : isOfficer ? (isDark ? '#c084fc' : '#7c3aed') : (isDark ? '#93c5fd' : '#2563eb');
               const courseName = typeof m.user?.course === 'object' ? m.user?.course?.name : m.user?.course;
 
               return (
@@ -299,10 +303,12 @@ export default function OfficerMembers() {
                 <Text style={{ marginLeft: 12, fontWeight: '600', color: textPrimary }}>Change Designation</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#fef2f2', borderRadius: 12 }} onPress={() => handleRemoveMember(actionMember)}>
-                <X size={18} color="#dc2626" />
-                <Text style={{ marginLeft: 12, fontWeight: '600', color: '#dc2626' }}>Remove Member</Text>
-              </TouchableOpacity>
+              {!isAdviser && (
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#fef2f2', borderRadius: 12 }} onPress={() => handleRemoveMember(actionMember)}>
+                  <X size={18} color="#dc2626" />
+                  <Text style={{ marginLeft: 12, fontWeight: '600', color: '#dc2626' }}>Remove Member</Text>
+                </TouchableOpacity>
+              )}
               <View style={{ height: 16 }} />
             </View>
           </Pressable>
@@ -317,7 +323,7 @@ export default function OfficerMembers() {
                 <TouchableOpacity onPress={() => setShowRolePicker(false)}><X size={20} color={textMuted} /></TouchableOpacity>
               </View>
               <ScrollView showsVerticalScrollIndicator={false}>
-                {['President', 'Vice President', 'Secretary', 'Treasurer', 'Auditor', 'P.R.O.', 'Officer', 'Member'].map(role => (
+                {['President', 'Vice President', 'Secretary', 'Treasurer', 'Auditor', 'P.R.O.', 'Adviser', 'Officer', 'Member'].map(role => (
                   <TouchableOpacity 
                     key={role} 
                     style={{ padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 8, backgroundColor: actionMember?.designation === role ? (isDark ? 'rgba(147,51,234,0.1)' : '#faf5ff') : cardBg, borderColor: actionMember?.designation === role ? (isDark ? 'rgba(147,51,234,0.3)' : '#e9d5ff') : border }}

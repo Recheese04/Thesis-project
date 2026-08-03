@@ -508,6 +508,7 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
   const [orgName, setOrgName] = useState('');
   const [authLoading, setAuthLoading] = useState(!orgIdProp);  // false immediately if prop given
   const [authError, setAuthError] = useState(null);
+  const [isAdviser, setIsAdviser] = useState(false);
 
   useEffect(() => {
     if (orgIdProp) { setOrgId(orgIdProp); return; }          // prop wins
@@ -522,6 +523,9 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
         }
         setOrgId(me.organization_id);
         setOrgName(me?.membership?.organization?.name ?? '');
+        // Detect adviser role — advisers can change designations but cannot add/remove members
+        const desig = (me?.membership?.designation || '').toLowerCase();
+        setIsAdviser(desig === 'adviser');
       } catch (err) {
         setAuthError(err.message);
       } finally {
@@ -640,14 +644,19 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
             <ArrowUpCircle className="w-4 h-4 text-purple-500" />
             Change Designation
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="gap-2 text-red-600 cursor-pointer focus:text-red-600"
-            onClick={() => setRemoveTarget(membership)}
-          >
-            <X className="w-4 h-4" />
-            Remove Member
-          </DropdownMenuItem>
+          {/* Advisers cannot remove members — view + designate only */}
+          {!isAdviser && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2 text-red-600 cursor-pointer focus:text-red-600"
+                onClick={() => setRemoveTarget(membership)}
+              >
+                <X className="w-4 h-4" />
+                Remove Member
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -710,14 +719,17 @@ export default function OfficerMembers({ orgId: orgIdProp }) {
                 <Copy className="w-3.5 h-3.5 ml-1 opacity-50" />
               </div>
             )}
-            <Button
-              onClick={() => setShowAdd(true)}
-              className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 h-9 text-sm shrink-0"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add Member</span>
-              <span className="sm:hidden">Add</span>
-            </Button>
+            {/* Advisers are view-only — they cannot add new members */}
+            {!isAdviser && (
+              <Button
+                onClick={() => setShowAdd(true)}
+                className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 h-9 text-sm shrink-0"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span className="hidden sm:inline">Add Member</span>
+                <span className="sm:hidden">Add</span>
+              </Button>
+            )}
           </div>
         </div>
 

@@ -26,16 +26,19 @@ rm -f /etc/apache2/mods-enabled/mpm_*.conf /etc/apache2/mods-enabled/mpm_*.load
 ln -sf /etc/apache2/mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf
 ln -sf /etc/apache2/mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load
 
-# Default to port 8080 if PORT is not set (Railway's default)
-PORT="${PORT:-80}"
-echo "=== Configuring Apache to listen on port: $PORT ==="
+# Configure Apache to listen on 80, 8080, and $PORT to prevent 502 Bad Gateway
+PORT="${PORT:-8080}"
+echo "=== Configuring Apache to listen on ports: 80, 8080, $PORT ==="
 
-# Write the port config
-echo "Listen $PORT" > /etc/apache2/ports.conf
+echo "Listen 80" > /etc/apache2/ports.conf
+echo "Listen 8080" >> /etc/apache2/ports.conf
+if [ "$PORT" != "80" ] && [ "$PORT" != "8080" ]; then
+    echo "Listen $PORT" >> /etc/apache2/ports.conf
+fi
 
-# Rewrite VirtualHost to use the correct port
+# Rewrite VirtualHost to catch requests on any of those ports
 cat > /etc/apache2/sites-available/000-default.conf <<EOF
-<VirtualHost *:${PORT}>
+<VirtualHost *:80 *:8080 *:${PORT}>
     ServerAdmin webmaster@localhost
     DocumentRoot /var/www/html/public
 
