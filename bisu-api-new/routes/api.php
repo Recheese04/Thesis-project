@@ -281,53 +281,49 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/students', function () {
             try {
                 $query = User::whereNotNull('student_number')
-                    ->with(['college:id,name,code', 'course:id,name,code'])
-                    ->select('id', 'student_number', 'first_name', 'last_name', 'year_level', 'college_id', 'course_id', 'email', 'is_active');
+                    ->with(['college', 'course']);
 
                 if (request()->has('year_level') && request()->year_level != 'all') {
                     $query->where('year_level', request()->year_level);
                 }
 
                 return $query
-                ->orderBy('last_name')
-                ->orderBy('first_name')
-                ->get()
-                ->map(function ($user) {
-                            return [
-                            'id' => $user->id,
-                            'name' => trim($user->first_name . ' ' . $user->last_name),
-                            'first_name' => $user->first_name,
-                            'last_name' => $user->last_name,
-                            'student_id' => $user->student_number,
-                            'email' => $user->email,
+                    ->orderBy('last_name')
+                    ->orderBy('first_name')
+                    ->get()
+                    ->map(function ($user) {
+                        return [
+                            'id'         => $user->id,
+                            'name'       => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')),
+                            'first_name' => $user->first_name ?? '',
+                            'last_name'  => $user->last_name ?? '',
+                            'student_id' => $user->student_number ?? '',
+                            'email'      => $user->email ?? '',
                             'year_level' => $user->year_level,
                             'college_id' => $user->college_id,
-                            'course_id' => $user->course_id,
-                            'course' => $user->course ? $user->course->name : null,
-                            'is_active' => $user->is_active ?? true,
-                            'college' => $user->college ? [
-                            'id' => $user->college->id,
-                            'name' => $user->college->name,
-                            'code' => $user->college->code ?? null,
+                            'course_id'  => $user->course_id,
+                            'course'     => $user->course?->name ?? null,
+                            'is_active'  => (bool)($user->is_active ?? true),
+                            'college'    => $user->college ? [
+                                'id'   => $user->college->id,
+                                'name' => $user->college->name,
+                                'code' => $user->college->code ?? null,
                             ] : null,
-                            'program' => $user->course ? [
-                            'id' => $user->course->id,
-                            'name' => $user->course->name,
-                            'code' => $user->course->code ?? null,
+                            'program'    => $user->course ? [
+                                'id'   => $user->course->id,
+                                'name' => $user->course->name,
+                                'code' => $user->course->code ?? null,
                             ] : null,
-                            ];
-                        }
-                        );
-                    }
-                    catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error('Students API error: ' . $e->getMessage());
-                        return response()->json([
-                        'error' => 'Failed to load students',
-                        'message' => $e->getMessage()
-                        ], 500);
-                    }
-                }
-                );
+                        ];
+                    });
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Students API error: ' . $e->getMessage());
+                return response()->json([
+                    'error'   => 'Failed to load students',
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+        });
 
                 // User Types
                 Route::get('/user-types', [UserTypeController::class , 'index']);
