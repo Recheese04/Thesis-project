@@ -28,9 +28,8 @@ export default function OfficerMyObligations() {
     try {
       const res = await api.get('/student/obligations');
       const data = res.data || {};
-      const fees = Array.isArray(data.fees) ? data.fees : [];
       const consequences = Array.isArray(data.consequences) ? data.consequences : [];
-      setObligations([...fees, ...consequences]);
+      setObligations(consequences);
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);
@@ -242,7 +241,7 @@ export default function OfficerMyObligations() {
                   icon={activeTab === 'pending' ? '🕒' : activeTab === 'awaiting' ? '⌛' : '✅'} 
                   message={
                     activeTab === 'pending' ? 'No pending requirements.' : 
-                    activeTab === 'awaiting' ? 'No fees awaiting verification.' : 
+                    activeTab === 'awaiting' ? 'No obligations awaiting verification.' : 
                     'You have no completed obligations.'
                   } 
                 />
