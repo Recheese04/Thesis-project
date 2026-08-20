@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class UserController extends Controller
 {
@@ -299,14 +300,44 @@ class UserController extends Controller
         }
     }
 
+    private function deleteUserDependencies(array $ids)
+    {
+        Designation::whereIn('user_id', $ids)->delete();
+        DB::table('personal_access_tokens')->where('tokenable_type', User::class)->whereIn('tokenable_id', $ids)->delete();
+
+        if (Schema::hasTable('push_tokens')) {
+            DB::table('push_tokens')->whereIn('user_id', $ids)->delete();
+        }
+        if (Schema::hasTable('attendances')) {
+            DB::table('attendances')->whereIn('user_id', $ids)->delete();
+        }
+        if (Schema::hasTable('student_fees')) {
+            DB::table('student_fees')->whereIn('user_id', $ids)->delete();
+        }
+        if (Schema::hasTable('student_consequences')) {
+            DB::table('student_consequences')->whereIn('user_id', $ids)->delete();
+        }
+        if (Schema::hasTable('evaluation_responses')) {
+            DB::table('evaluation_responses')->whereIn('user_id', $ids)->delete();
+        }
+        if (Schema::hasTable('group_chat_members')) {
+            DB::table('group_chat_members')->whereIn('user_id', $ids)->delete();
+        }
+        if (Schema::hasTable('direct_messages')) {
+            DB::table('direct_messages')->whereIn('sender_id', $ids)->orWhereIn('receiver_id', $ids)->delete();
+        }
+        if (Schema::hasTable('messages')) {
+            DB::table('messages')->whereIn('user_id', $ids)->delete();
+        }
+    }
+
     public function destroy($id)
     {
         DB::beginTransaction();
         try {
             $user = User::findOrFail($id);
 
-            Designation::where('user_id', $user->id)->delete();
-            $user->tokens()->delete();
+            $this->deleteUserDependencies([$user->id]);
             $user->delete();
 
             DB::commit();
@@ -315,7 +346,7 @@ class UserController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('User delete error: ' . $e->getMessage());
-            return response()->json(['message' => 'Error deleting account', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Error deleting account: ' . $e->getMessage()], 500);
         }
     }
 
@@ -403,8 +434,7 @@ class UserController extends Controller
         DB::beginTransaction();
         try {
             $ids = $request->user_ids;
-            Designation::whereIn('user_id', $ids)->delete();
-            DB::table('personal_access_tokens')->whereIn('tokenable_id', $ids)->delete();
+            $this->deleteUserDependencies($ids);
             User::whereIn('id', $ids)->delete();
 
             DB::commit();
@@ -412,7 +442,7 @@ class UserController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('User bulk delete error: ' . $e->getMessage());
-            return response()->json(['message' => 'Error deleting accounts', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Error deleting accounts: ' . $e->getMessage()], 500);
         }
     }
 
