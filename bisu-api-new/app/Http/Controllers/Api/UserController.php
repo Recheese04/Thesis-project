@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Designation;
+use App\Models\Organization;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -523,6 +524,37 @@ class UserController extends Controller
         } catch (\Exception $e) {
             Log::error('User bulk status error: ' . $e->getMessage());
             return response()->json(['message' => 'Error updating status', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function bulkAssignOrg(Request $request)
+    {
+        $request->validate([
+            'user_ids'        => 'required|array|min:1',
+            'user_ids.*'      => 'required|exists:users,id',
+            'organization_id' => 'required|exists:organizations,id',
+            'designation'     => 'nullable|string|max:100',
+        ]);
+
+        try {
+            $ids = $request->user_ids;
+            $orgId = $request->organization_id;
+            $designation = $request->designation ?: 'Member';
+
+            foreach ($ids as $userId) {
+                Designation::updateOrCreate(
+                    ['user_id' => $userId, 'organization_id' => $orgId],
+                    ['designation' => $designation, 'status' => 'active']
+                );
+            }
+
+            $org = Organization::find($orgId);
+            $orgName = $org ? ($org->code ?: $org->name) : 'Organization';
+
+            return response()->json(['message' => count($ids) . " user(s) assigned to {$orgName} as {$designation}."]);
+        } catch (\Throwable $e) {
+            Log::error('User bulk assign org error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error assigning organization: ' . $e->getMessage()], 500);
         }
     }
 }

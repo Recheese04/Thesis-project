@@ -260,6 +260,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/users', [UserController::class , 'index']);
         Route::delete('/users/bulk-delete', [UserController::class , 'bulkDestroy']);
         Route::put('/users/bulk-status', [UserController::class , 'bulkStatus']);
+        Route::post('/users/bulk-assign-org', [UserController::class , 'bulkAssignOrg']);
         Route::post('/users/import', [UserController::class , 'importStudents']);
         Route::get('/users/{id}', [UserController::class , 'show'])->where('id', '[0-9]+');
         Route::post('/users', [UserController::class , 'store']);

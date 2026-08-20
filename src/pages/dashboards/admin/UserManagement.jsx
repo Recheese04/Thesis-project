@@ -159,6 +159,9 @@ export default function UserManagement() {
   // Selection & Bulk Action States
   const [selectedUserIds, setSelectedUserIds] = useState([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkAssignOrgOpen, setBulkAssignOrgOpen] = useState(false);
+  const [bulkOrgId, setBulkOrgId] = useState("");
+  const [bulkDesignation, setBulkDesignation] = useState("Member");
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Pagination State
@@ -237,6 +240,26 @@ export default function UserManagement() {
     }
     navigator.clipboard.writeText(emails);
     toast.success("Emails Copied!", { description: `Copied ${selected.length} email addresses to clipboard.` });
+  };
+
+  const handleBulkAssignOrg = async () => {
+    if (selectedUserIds.length === 0 || !bulkOrgId) return;
+    try {
+      setBulkActionLoading(true);
+      const res = await axios.post("/api/users/bulk-assign-org", {
+        user_ids: selectedUserIds,
+        organization_id: bulkOrgId,
+        designation: bulkDesignation,
+      }, authH());
+      toast.success("Organization Assigned!", { description: res.data.message || `Assigned ${selectedUserIds.length} accounts.` });
+      setBulkAssignOrgOpen(false);
+      setBulkOrgId("");
+      fetchUsers();
+    } catch (err) {
+      toast.error("Assignment Failed", { description: err.response?.data?.message || err.message || "Could not assign organization." });
+    } finally {
+      setBulkActionLoading(false);
+    }
   };
 
   const handleBulkDelete = async () => {
@@ -800,6 +823,10 @@ export default function UserManagement() {
               className="h-8 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs gap-1.5 font-medium shadow-sm">
               <UserX className="w-3.5 h-3.5" /> Deactivate
             </Button>
+            <Button size="sm" onClick={() => setBulkAssignOrgOpen(true)} disabled={bulkActionLoading}
+              className="h-8 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs gap-1.5 font-medium shadow-sm">
+              <Building2 className="w-3.5 h-3.5" /> Assign Org
+            </Button>
             <Button size="sm" onClick={handleCopyEmails} variant="outline"
               className="h-8 border-white/20 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs gap-1.5 font-medium">
               <Copy className="w-3.5 h-3.5" /> Copy Emails
@@ -844,6 +871,89 @@ export default function UserManagement() {
         count={selectedUserIds.length}
         selectedUsers={selectedUsersList}
       />
+      <BulkAssignOrgDialog
+        open={bulkAssignOrgOpen}
+        onClose={() => setBulkAssignOrgOpen(false)}
+        onConfirm={handleBulkAssignOrg}
+        organizations={organizations}
+        count={selectedUserIds.length}
+        bulkOrgId={bulkOrgId}
+        setBulkOrgId={setBulkOrgId}
+        bulkDesignation={bulkDesignation}
+        setBulkDesignation={setBulkDesignation}
+        loading={bulkActionLoading}
+      />
     </TooltipProvider>
+  );
+}
+
+function BulkAssignOrgDialog({ open, onClose, onConfirm, organizations, count, bulkOrgId, setBulkOrgId, bulkDesignation, setBulkDesignation, loading }) {
+  return (
+    <AlertDialog open={open} onOpenChange={onClose}>
+      <AlertDialogContent className="max-w-md rounded-2xl p-6 bg-white border border-slate-200 shadow-xl">
+        <AlertDialogHeader className="space-y-2">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#0f2d5e] flex items-center justify-center">
+            <Building2 className="w-6 h-6 text-[#0f2d5e]" />
+          </div>
+          <AlertDialogTitle className="text-lg font-bold text-slate-800">
+            Assign Organization & Designation
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-xs text-slate-500">
+            Select an organization and role to assign to <span className="font-semibold text-slate-700">{count} selected account(s)</span>.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="space-y-4 my-3 text-left">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-slate-700">Select Organization</Label>
+            <Select value={bulkOrgId} onValueChange={setBulkOrgId}>
+              <SelectTrigger className="w-full h-9 text-xs border-slate-200 bg-white">
+                <SelectValue placeholder="Choose organization…" />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.map(org => (
+                  <SelectItem key={org.id} value={String(org.id)} className="text-xs">
+                    {org.name} ({org.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-slate-700">Designation / Role</Label>
+            <Select value={bulkDesignation} onValueChange={setBulkDesignation}>
+              <SelectTrigger className="w-full h-9 text-xs border-slate-200 bg-white">
+                <SelectValue placeholder="Select designation…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Member" className="text-xs">Member</SelectItem>
+                <SelectItem value="Officer" className="text-xs">Officer</SelectItem>
+                <SelectItem value="President" className="text-xs">President</SelectItem>
+                <SelectItem value="Vice President" className="text-xs">Vice President</SelectItem>
+                <SelectItem value="Secretary" className="text-xs">Secretary</SelectItem>
+                <SelectItem value="Treasurer" className="text-xs">Treasurer</SelectItem>
+                <SelectItem value="Auditor" className="text-xs">Auditor</SelectItem>
+                <SelectItem value="PIO" className="text-xs">PIO</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <AlertDialogFooter className="gap-2 sm:gap-0 mt-4">
+          <AlertDialogCancel onClick={onClose} className="rounded-xl text-xs h-9 border-slate-200 hover:bg-slate-50">
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => { e.preventDefault(); onConfirm(); }}
+            disabled={!bulkOrgId || loading}
+            className="rounded-xl text-xs h-9 bg-[#0f2d5e] hover:bg-[#1e4db7] text-white shadow-sm gap-1.5"
+          >
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Building2 className="w-3.5 h-3.5" />}
+            Assign Organization
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
