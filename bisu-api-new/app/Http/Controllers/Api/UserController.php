@@ -302,32 +302,27 @@ class UserController extends Controller
 
     private function deleteUserDependencies(array $ids)
     {
-        Designation::whereIn('user_id', $ids)->delete();
-        DB::table('personal_access_tokens')->where('tokenable_type', User::class)->whereIn('tokenable_id', $ids)->delete();
+        try { Designation::whereIn('user_id', $ids)->delete(); } catch (\Throwable $t) {}
+        try { DB::table('personal_access_tokens')->where('tokenable_type', User::class)->whereIn('tokenable_id', $ids)->delete(); } catch (\Throwable $t) {}
 
-        if (Schema::hasTable('push_tokens')) {
-            DB::table('push_tokens')->whereIn('user_id', $ids)->delete();
-        }
-        if (Schema::hasTable('attendances')) {
-            DB::table('attendances')->whereIn('user_id', $ids)->delete();
-        }
-        if (Schema::hasTable('student_fees')) {
-            DB::table('student_fees')->whereIn('user_id', $ids)->delete();
-        }
-        if (Schema::hasTable('student_consequences')) {
-            DB::table('student_consequences')->whereIn('user_id', $ids)->delete();
-        }
-        if (Schema::hasTable('evaluation_responses')) {
-            DB::table('evaluation_responses')->whereIn('user_id', $ids)->delete();
-        }
-        if (Schema::hasTable('group_chat_members')) {
-            DB::table('group_chat_members')->whereIn('user_id', $ids)->delete();
-        }
-        if (Schema::hasTable('direct_messages')) {
-            DB::table('direct_messages')->whereIn('sender_id', $ids)->orWhereIn('receiver_id', $ids)->delete();
-        }
-        if (Schema::hasTable('messages')) {
-            DB::table('messages')->whereIn('user_id', $ids)->delete();
+        $tables = [
+            'push_tokens'          => 'user_id',
+            'attendances'          => 'user_id',
+            'student_fees'         => 'user_id',
+            'student_consequences' => 'user_id',
+            'evaluation_responses' => 'user_id',
+            'group_chat_members'   => 'user_id',
+            'messages'             => 'user_id',
+        ];
+
+        foreach ($tables as $table => $column) {
+            try {
+                if (Schema::hasTable($table) && Schema::hasColumn($table, $column)) {
+                    DB::table($table)->whereIn($column, $ids)->delete();
+                }
+            } catch (\Throwable $t) {
+                // Ignore missing or detached tables
+            }
         }
     }
 
@@ -337,13 +332,16 @@ class UserController extends Controller
         try {
             $user = User::findOrFail($id);
 
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
             $this->deleteUserDependencies([$user->id]);
             $user->delete();
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
             DB::commit();
             return response()->json(['message' => 'Account deleted successfully.']);
 
         } catch (\Exception $e) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
             DB::rollBack();
             Log::error('User delete error: ' . $e->getMessage());
             return response()->json(['message' => 'Error deleting account: ' . $e->getMessage()], 500);
@@ -434,12 +432,16 @@ class UserController extends Controller
         DB::beginTransaction();
         try {
             $ids = $request->user_ids;
+
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
             $this->deleteUserDependencies($ids);
             User::whereIn('id', $ids)->delete();
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
             DB::commit();
             return response()->json(['message' => count($ids) . ' account(s) deleted successfully.']);
         } catch (\Exception $e) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
             DB::rollBack();
             Log::error('User bulk delete error: ' . $e->getMessage());
             return response()->json(['message' => 'Error deleting accounts: ' . $e->getMessage()], 500);
