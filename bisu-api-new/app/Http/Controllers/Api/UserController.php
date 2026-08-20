@@ -362,8 +362,9 @@ class UserController extends Controller
             'students.*.middle_name'    => 'nullable|string|max:100',
             'students.*.last_name'      => 'required|string|max:100',
             'students.*.email'          => 'required|email|max:255',
-            'students.*.college_id'  => 'required|integer|exists:colleges,id',
-            'students.*.course_id'      => 'nullable|exists:courses,id',
+            'students.*.college_id'     => 'required|integer|exists:colleges,id',
+            'students.*.course_id'      => 'nullable',
+            'students.*.course'         => 'nullable|string|max:255',
             'students.*.year_level'     => 'required|string|max:20',
             'students.*.contact_number' => 'nullable|string|max:20',
             'students.*.street'         => 'nullable|string|max:255',
@@ -394,6 +395,7 @@ class UserController extends Controller
                 }
 
                 try {
+                    // Resolve address if provided
                     $addressId = null;
                     if (!empty($row['barangay']) || !empty($row['city']) || !empty($row['street']) || !empty($row['province'])) {
                         $address = \App\Models\Address::create([
@@ -406,13 +408,36 @@ class UserController extends Controller
                         $addressId = $address->id;
                     }
 
+                    // Resolve course / program (by ID, code, or name)
+                    $courseId = null;
+                    if (!empty($row['course_id']) && is_numeric($row['course_id'])) {
+                        $courseId = (int)$row['course_id'];
+                    } elseif (!empty($row['course'])) {
+                        $cVal = trim($row['course']);
+                        $foundCourse = \App\Models\Course::where('name', $cVal)
+                            ->orWhere('code', $cVal)
+                            ->orWhere('id', $cVal)
+                            ->first();
+                        if ($foundCourse) {
+                            $courseId = $foundCourse->id;
+                        } else {
+                            $codeClean = strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $cVal), 0, 10));
+                            $newCourse = \App\Models\Course::create([
+                                'college_id' => $row['college_id'],
+                                'name'       => $cVal,
+                                'code'       => $codeClean ?: 'COURSE',
+                            ]);
+                            $courseId = $newCourse->id;
+                        }
+                    }
+
                     User::create([
                         'student_number' => $row['student_number'],
                         'first_name'     => $row['first_name'],
                         'middle_name'    => $row['middle_name'] ?? null,
                         'last_name'      => $row['last_name'],
-                        'college_id'  => $row['college_id'],
-                        'course_id'      => $row['course_id'] ?? null,
+                        'college_id'     => $row['college_id'],
+                        'course_id'      => $courseId,
                         'year_level'     => $row['year_level'],
                         'contact_number' => $row['contact_number'] ?? null,
                         'email'          => $row['email'],
