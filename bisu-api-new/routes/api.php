@@ -258,11 +258,11 @@ Route::middleware('auth:sanctum')->group(function () {
         );
         // User Management
         Route::get('/users', [UserController::class , 'index']);
+        Route::post('/users/bulk-delete', [UserController::class , 'bulkDestroy']);
+        Route::post('/users/bulk-status', [UserController::class , 'bulkStatus']);
         Route::get('/users/{id}', [UserController::class , 'show']);
         Route::post('/users', [UserController::class , 'store']);
         Route::put('/users/{id}', [UserController::class , 'update']);
-        Route::delete('/users/{id}', [UserController::class , 'destroy']);
-
         Route::delete('/users/{id}', [UserController::class , 'destroy']);
         Route::post('/users/import', [UserController::class , 'importStudents']);
 

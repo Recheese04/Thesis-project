@@ -5,7 +5,8 @@ import {
   UserCircle, GraduationCap, Search, X,
   Pencil, Users, Shield, Star,
   RefreshCw, Building2, AlertTriangle,
-  ChevronRight, Activity, MoreHorizontal, BookOpen, Filter, Upload
+  ChevronRight, Activity, MoreHorizontal, BookOpen, Filter, Upload,
+  Check, Minus, Copy, UserCheck, UserX, ChevronDown, CheckSquare, Square
 } from "lucide-react";
 import AvatarImg from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
@@ -68,7 +69,7 @@ function StatCard({ icon: Icon, label, value, sub, grad }) {
   );
 }
 
-// ── Delete Dialog ──────────────────────────────────────────────────────────
+// ── Single Delete Dialog ──────────────────────────────────────────────────
 function DeleteDialog({ open, onClose, onConfirm, userName }) {
   return (
     <AlertDialog open={open} onOpenChange={v => !v && onClose()}>
@@ -97,6 +98,44 @@ function DeleteDialog({ open, onClose, onConfirm, userName }) {
   );
 }
 
+// ── Bulk Delete Dialog ─────────────────────────────────────────────────────
+function BulkDeleteDialog({ open, onClose, onConfirm, count, selectedUsers }) {
+  const sampleNames = selectedUsers.slice(0, 3).map(u => getFullName(u)).join(", ");
+  const extraCount = selectedUsers.length - 3;
+
+  return (
+    <AlertDialog open={open} onOpenChange={v => !v && onClose()}>
+      <AlertDialogContent className="rounded-2xl border-0 shadow-2xl max-w-sm">
+        <AlertDialogHeader>
+          <div className="flex justify-center mb-3">
+            <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center ring-8 ring-red-50/50">
+              <AlertTriangle className="w-7 h-7 text-red-500" />
+            </div>
+          </div>
+          <AlertDialogTitle className="text-center text-slate-900">
+            Delete {count} {count === 1 ? "account" : "accounts"}?
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-center text-slate-500 text-sm">
+            This will permanently remove{" "}
+            <strong className="text-slate-700">
+              {sampleNames}
+              {extraCount > 0 ? ` and ${extraCount} other${extraCount > 1 ? "s" : ""}` : ""}
+            </strong>{" "}
+            and revoke all system access. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex gap-2 mt-1">
+          <AlertDialogCancel className="flex-1 rounded-xl border-slate-200">Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}
+            className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 text-white">
+            <Trash2 className="mr-2 h-4 w-4" /> Delete All ({count})
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -116,6 +155,11 @@ export default function UserManagement() {
   const [importOpen, setImportOpen] = useState(false);
   const { selectedYearId, schoolYears } = useSchoolYear();
   const selectedYear = schoolYears.find(y => y.id === selectedYearId);
+
+  // Selection & Bulk Action States
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -158,10 +202,58 @@ export default function UserManagement() {
     try {
       await axios.delete(`/api/users/${deleteTarget.id}`, authH());
       toast.success("Account Deleted", { description: "The account has been removed successfully." });
+      setSelectedUserIds(prev => prev.filter(id => id !== deleteTarget.id));
       setDeleteTarget(null);
       fetchUsers();
     } catch {
       toast.error("Error", { description: "Failed to delete account. Please try again." });
+    }
+  };
+
+  // Bulk Handlers
+  const handleBulkStatus = async (isActive) => {
+    if (selectedUserIds.length === 0) return;
+    try {
+      setBulkActionLoading(true);
+      const res = await axios.post("/api/users/bulk-status", {
+        user_ids: selectedUserIds,
+        is_active: isActive,
+      }, authH());
+      toast.success("Status Updated", { description: res.data.message || `Updated ${selectedUserIds.length} accounts.` });
+      fetchUsers();
+    } catch (err) {
+      toast.error("Update Failed", { description: err.response?.data?.message || "Could not update user status." });
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleCopyEmails = () => {
+    const selected = users.filter(u => selectedUserIds.includes(u.id));
+    const emails = selected.map(u => u.email).filter(Boolean).join("; ");
+    if (!emails) {
+      toast.error("No Emails Found", { description: "Selected users have no email addresses." });
+      return;
+    }
+    navigator.clipboard.writeText(emails);
+    toast.success("Emails Copied!", { description: `Copied ${selected.length} email addresses to clipboard.` });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedUserIds.length === 0) return;
+    try {
+      setBulkActionLoading(true);
+      const res = await axios.post("/api/users/bulk-delete", {
+        user_ids: selectedUserIds,
+      }, authH());
+      toast.success("Accounts Deleted", { description: res.data.message || `Deleted ${selectedUserIds.length} accounts.` });
+      setSelectedUserIds([]);
+      setBulkDeleteOpen(false);
+      fetchUsers();
+    } catch (err) {
+      toast.error("Delete Failed", { description: err.response?.data?.message || "Could not delete selected accounts." });
+    } finally {
+      setBulkActionLoading(false);
     }
   };
 
@@ -193,9 +285,46 @@ export default function UserManagement() {
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  // Selection calculations
+  const paginatedIds = paginated.map(u => u.id);
+  const filteredIds = filtered.map(u => u.id);
+
+  const isAllPageSelected = paginatedIds.length > 0 && paginatedIds.every(id => selectedUserIds.includes(id));
+  const isSomePageSelected = paginatedIds.some(id => selectedUserIds.includes(id)) && !isAllPageSelected;
+  const isAllFilteredSelected = filteredIds.length > 0 && filteredIds.every(id => selectedUserIds.includes(id));
+
+  const toggleSelectUser = (id) => {
+    setSelectedUserIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectPage = () => {
+    if (isAllPageSelected) {
+      setSelectedUserIds(prev => prev.filter(id => !paginatedIds.includes(id)));
+    } else {
+      setSelectedUserIds(prev => [...new Set([...prev, ...paginatedIds])]);
+    }
+  };
+
+  const selectAllFiltered = () => {
+    setSelectedUserIds([...new Set(filteredIds)]);
+  };
+
+  const selectByRole = (roleId) => {
+    const roleUserIds = filtered.filter(u => String(u.user_type_id) === String(roleId)).map(u => u.id);
+    setSelectedUserIds(prev => [...new Set([...prev, ...roleUserIds])]);
+  };
+
+  const clearSelection = () => {
+    setSelectedUserIds([]);
+  };
+
+  const selectedUsersList = users.filter(u => selectedUserIds.includes(u.id));
+
   return (
     <TooltipProvider>
-      <div className="space-y-6">
+      <div className="space-y-6 pb-16">
 
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -240,7 +369,7 @@ export default function UserManagement() {
         </div>
 
         {/* Table card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden relative">
 
           {/* Toolbar */}
           <div className="px-5 py-3.5 border-b border-slate-100 space-y-3">
@@ -274,6 +403,49 @@ export default function UserManagement() {
                   <Filter className="w-3.5 h-3.5 mr-1.5" />
                   Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
                 </Button>
+                {/* Dedicated Select Users Dropdown right in the toolbar */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm"
+                      className={`h-8 border-slate-200 text-slate-600 hover:bg-slate-100 ${selectedUserIds.length > 0 ? "border-[#1e4db7] text-[#1e4db7] bg-blue-50 font-semibold" : ""}`}>
+                      <CheckSquare className="w-3.5 h-3.5 mr-1.5 text-[#1e4db7]" />
+                      {selectedUserIds.length > 0 ? `Selected (${selectedUserIds.length})` : "Select Users"}
+                      <ChevronDown className="w-3 h-3 ml-1.5 text-slate-400" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56 rounded-xl text-xs shadow-lg p-1.5">
+                    <DropdownMenuItem onClick={toggleSelectPage} className="cursor-pointer font-medium gap-2">
+                      <CheckSquare className="w-3.5 h-3.5 text-[#1e4db7]" />
+                      {isAllPageSelected ? "Deselect Page Users" : "Select Current Page"} ({paginated.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={selectAllFiltered} className="cursor-pointer font-medium gap-2">
+                      <CheckSquare className="w-3.5 h-3.5 text-[#1e4db7]" />
+                      Select All Filtered Users ({filtered.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => selectByRole("1")} className="cursor-pointer gap-2">
+                      <Shield className="w-3.5 h-3.5 text-[#0f2d5e]" />
+                      Select All Admins ({filtered.filter(u => String(u.user_type_id) === "1").length})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => selectByRole("2")} className="cursor-pointer gap-2">
+                      <Star className="w-3.5 h-3.5 text-[#1e4db7]" />
+                      Select All Officers ({filtered.filter(u => String(u.user_type_id) === "2").length})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => selectByRole("3")} className="cursor-pointer gap-2">
+                      <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
+                      Select All Students ({filtered.filter(u => String(u.user_type_id) === "3").length})
+                    </DropdownMenuItem>
+                    {selectedUserIds.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={clearSelection} className="cursor-pointer text-red-600 gap-2">
+                          <X className="w-3.5 h-3.5" />
+                          Clear Selection ({selectedUserIds.length})
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <Activity className="w-3.5 h-3.5" />
@@ -349,15 +521,78 @@ export default function UserManagement() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60">
+                  {/* Select All Checkbox & Presets Dropdown */}
+                  <th className="px-3 py-3 w-14 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={toggleSelectPage}
+                            className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                              isAllPageSelected
+                                ? "bg-[#1e4db7] border-[#1e4db7] text-white shadow-sm"
+                                : isSomePageSelected
+                                ? "bg-blue-100 border-[#1e4db7] text-[#1e4db7]"
+                                : "border-slate-300 bg-white hover:border-slate-400"
+                            }`}
+                          >
+                            {isAllPageSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            {isSomePageSelected && <Minus className="w-3 h-3 stroke-[3]" />}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{isAllPageSelected ? "Deselect Page" : "Select Current Page"}</TooltipContent>
+                      </Tooltip>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" title="More selection options" className="text-slate-400 hover:text-slate-700 p-0.5 rounded hover:bg-slate-200/60 transition-colors">
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-52 rounded-xl text-xs shadow-lg p-1.5">
+                          <DropdownMenuItem onClick={toggleSelectPage} className="cursor-pointer font-medium gap-2">
+                            <CheckSquare className="w-3.5 h-3.5 text-[#1e4db7]" />
+                            {isAllPageSelected ? "Deselect Page" : "Select Current Page"} ({paginated.length})
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={selectAllFiltered} className="cursor-pointer font-medium gap-2">
+                            <CheckSquare className="w-3.5 h-3.5 text-[#1e4db7]" />
+                            Select All Filtered ({filtered.length})
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => selectByRole("1")} className="cursor-pointer gap-2">
+                            <Shield className="w-3.5 h-3.5 text-[#0f2d5e]" />
+                            Select All Admins ({filtered.filter(u => String(u.user_type_id) === "1").length})
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => selectByRole("2")} className="cursor-pointer gap-2">
+                            <Star className="w-3.5 h-3.5 text-[#1e4db7]" />
+                            Select All Officers ({filtered.filter(u => String(u.user_type_id) === "2").length})
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => selectByRole("3")} className="cursor-pointer gap-2">
+                            <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
+                            Select All Students ({filtered.filter(u => String(u.user_type_id) === "3").length})
+                          </DropdownMenuItem>
+                          {selectedUserIds.length > 0 && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={clearSelection} className="cursor-pointer text-red-600 gap-2">
+                                <X className="w-3.5 h-3.5" />
+                                Clear Selection ({selectedUserIds.length})
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </th>
                   {["User", "Student No.", "College", "Course", "Role", "Year", "Status", ""].map(h => (
-                    <th key={h} className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {loading ? (
                   <tr>
-                    <td colSpan="8" className="py-24 text-center">
+                    <td colSpan="9" className="py-24 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl bg-[#0f2d5e]/5 flex items-center justify-center">
                           <Loader2 className="w-6 h-6 animate-spin text-[#1e4db7]" />
@@ -368,7 +603,7 @@ export default function UserManagement() {
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="py-24 text-center">
+                    <td colSpan="9" className="py-24 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
                           <UserCircle className="w-7 h-7 text-slate-300" />
@@ -391,10 +626,25 @@ export default function UserManagement() {
                   const Ico = meta?.icon ?? UserCircle;
                   const deptName = user.college?.name ?? colleges.find(d => d.id === user.college_id)?.name ?? null;
                   const allMemberships = user.all_memberships ?? [];
+                  const isSelected = selectedUserIds.includes(user.id);
 
                   return (
-                    <tr key={user.id} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="px-5 py-3.5">
+                    <tr key={user.id} className={`transition-colors group ${isSelected ? "bg-blue-50/70 border-l-4 border-l-[#1e4db7]" : "hover:bg-blue-50/30"}`}>
+                      {/* Row Checkbox */}
+                      <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => toggleSelectUser(user.id)}
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                            isSelected
+                              ? "bg-[#1e4db7] border-[#1e4db7] text-white shadow-sm"
+                              : "border-slate-300 bg-white hover:border-slate-400"
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="relative shrink-0">
                             <AvatarImg
@@ -423,38 +673,38 @@ export default function UserManagement() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3.5">
                         <span className="text-sm font-mono text-slate-500">
                           {user.student_number ?? <span className="text-slate-300 text-xs">—</span>}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 max-w-[120px]">
+                      <td className="px-4 py-3.5 max-w-[120px]">
                         {deptName
                           ? <div className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" /><span className="text-sm text-slate-600 truncate">{deptName}</span></div>
                           : <span className="text-slate-300 text-xs">—</span>}
                       </td>
-                      <td className="px-5 py-3.5 max-w-[160px]">
+                      <td className="px-4 py-3.5 max-w-[160px]">
                         {user.course?.name
                           ? <div className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" /><span className="text-sm text-slate-600 truncate" title={user.course.name}>{user.course.name}</span></div>
                           : <span className="text-slate-300 text-xs">—</span>}
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3.5">
                         <Badge className={`${meta?.badge ?? "bg-slate-100 text-slate-600 border-slate-200"} border flex items-center gap-1 w-fit text-xs font-semibold px-2.5 py-0.5 rounded-full`}>
                           <Ico className="w-3 h-3" />{user.user_type?.name ?? "Unassigned"}
                         </Badge>
                       </td>
-                      <td className="px-5 py-3.5 text-sm text-slate-500 whitespace-nowrap">
+                      <td className="px-4 py-3.5 text-sm text-slate-500 whitespace-nowrap">
                         {user.year_level
                           ? <div className="flex items-center gap-1.5"><GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />{user.year_level}</div>
                           : <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3.5">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${user.is_active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${user.is_active ? "bg-emerald-500" : "bg-slate-400"}`} />
                           {user.is_active ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-right">
+                      <td className="px-4 py-3.5 text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon"
@@ -529,6 +779,43 @@ export default function UserManagement() {
         </div>
       </div>
 
+      {/* Floating Action Bar when users are selected */}
+      {selectedUserIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#0f2d5e] text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200 max-w-[95vw] overflow-x-auto">
+          <div className="flex items-center gap-2 pr-3 border-r border-white/20 shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-blue-500/30 text-blue-200 font-bold text-xs flex items-center justify-center">
+              {selectedUserIds.length}
+            </div>
+            <span className="text-xs font-semibold whitespace-nowrap">
+              {selectedUserIds.length === 1 ? "1 account selected" : `${selectedUserIds.length} accounts selected`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" onClick={() => handleBulkStatus(true)} disabled={bulkActionLoading}
+              className="h-8 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs gap-1.5 font-medium shadow-sm">
+              <UserCheck className="w-3.5 h-3.5" /> Activate
+            </Button>
+            <Button size="sm" onClick={() => handleBulkStatus(false)} disabled={bulkActionLoading}
+              className="h-8 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs gap-1.5 font-medium shadow-sm">
+              <UserX className="w-3.5 h-3.5" /> Deactivate
+            </Button>
+            <Button size="sm" onClick={handleCopyEmails} variant="outline"
+              className="h-8 border-white/20 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs gap-1.5 font-medium">
+              <Copy className="w-3.5 h-3.5" /> Copy Emails
+            </Button>
+            <Button size="sm" onClick={() => setBulkDeleteOpen(true)} disabled={bulkActionLoading}
+              className="h-8 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs gap-1.5 font-medium shadow-sm">
+              <Trash2 className="w-3.5 h-3.5" /> Delete ({selectedUserIds.length})
+            </Button>
+            <button type="button" onClick={clearSelection} title="Clear selection"
+              className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors ml-1">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
       <UserFormModal
         open={formOpen}
         onClose={() => { setFormOpen(false); setEditUser(null); }}
@@ -548,6 +835,13 @@ export default function UserManagement() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         userName={getFullName(deleteTarget)}
+      />
+      <BulkDeleteDialog
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        count={selectedUserIds.length}
+        selectedUsers={selectedUsersList}
       />
     </TooltipProvider>
   );

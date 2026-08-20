@@ -392,4 +392,47 @@ class UserController extends Controller
             return response()->json(['message' => 'Import failed', 'error' => $e->getMessage()], 500);
         }
     }
+
+    public function bulkDestroy(Request $request)
+    {
+        $request->validate([
+            'user_ids'   => 'required|array|min:1',
+            'user_ids.*' => 'required|exists:users,id',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $ids = $request->user_ids;
+            Designation::whereIn('user_id', $ids)->delete();
+            DB::table('personal_access_tokens')->whereIn('tokenable_id', $ids)->delete();
+            User::whereIn('id', $ids)->delete();
+
+            DB::commit();
+            return response()->json(['message' => count($ids) . ' account(s) deleted successfully.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('User bulk delete error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error deleting accounts', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function bulkStatus(Request $request)
+    {
+        $request->validate([
+            'user_ids'   => 'required|array|min:1',
+            'user_ids.*' => 'required|exists:users,id',
+            'is_active'  => 'required|boolean',
+        ]);
+
+        try {
+            $ids = $request->user_ids;
+            User::whereIn('id', $ids)->update(['is_active' => $request->is_active]);
+
+            $statusStr = $request->is_active ? 'activated' : 'deactivated';
+            return response()->json(['message' => count($ids) . " account(s) {$statusStr} successfully."]);
+        } catch (\Exception $e) {
+            Log::error('User bulk status error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error updating status', 'error' => $e->getMessage()], 500);
+        }
+    }
 }
