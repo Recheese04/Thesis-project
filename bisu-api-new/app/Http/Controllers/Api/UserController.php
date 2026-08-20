@@ -408,25 +408,31 @@ class UserController extends Controller
                         $addressId = $address->id;
                     }
 
-                    // Resolve course / program (by ID, code, or name)
+                    // Resolve course / program (by ID or name)
                     $courseId = null;
                     if (!empty($row['course_id']) && is_numeric($row['course_id'])) {
                         $courseId = (int)$row['course_id'];
                     } elseif (!empty($row['course'])) {
                         $cVal = trim($row['course']);
-                        $foundCourse = \App\Models\Course::where('name', $cVal)
-                            ->orWhere('code', $cVal)
-                            ->orWhere('id', $cVal)
-                            ->first();
+                        $hasCodeCol = Schema::hasColumn('courses', 'code');
+                        $query = \App\Models\Course::where('name', $cVal)->orWhere('id', $cVal);
+                        if ($hasCodeCol) {
+                            $query->orWhere('code', $cVal);
+                        }
+                        $foundCourse = $query->first();
+
                         if ($foundCourse) {
                             $courseId = $foundCourse->id;
                         } else {
-                            $codeClean = strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $cVal), 0, 10));
-                            $newCourse = \App\Models\Course::create([
+                            $courseData = [
                                 'college_id' => $row['college_id'],
                                 'name'       => $cVal,
-                                'code'       => $codeClean ?: 'COURSE',
-                            ]);
+                            ];
+                            if ($hasCodeCol) {
+                                $codeClean = strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $cVal), 0, 10));
+                                $courseData['code'] = $codeClean ?: 'COURSE';
+                            }
+                            $newCourse = \App\Models\Course::create($courseData);
                             $courseId = $newCourse->id;
                         }
                     }
