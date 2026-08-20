@@ -33,6 +33,11 @@ const COLUMN_LABELS = {
     course: "Course",
     year_level: "Year Level",
     contact_number: "Contact No.",
+    street: "Street / Purok",
+    barangay: "Barangay",
+    city: "City / Municipality",
+    province: "Province",
+    zip_code: "Zip Code",
 };
 
 function parseCSV(text) {
@@ -89,6 +94,11 @@ export default function ImportStudentsModal({ open, onClose, onImported, college
             course: ["course", "program", "course_program", "degree"],
             year_level: ["year_level", "yearlevel", "year", "level"],
             contact_number: ["contact_number", "contact_no", "contact_no_", "contactno", "contact", "contact_num", "phone", "mobile", "phone_number", "phone_no", "mobile_no", "cellphone", "tel", "telephone", "mobile_number"],
+            street: ["street", "street_address", "purok", "address_street"],
+            barangay: ["barangay", "brgy", "bgy"],
+            city: ["city", "municipality", "town"],
+            province: ["province", "prov"],
+            zip_code: ["zip_code", "zipcode", "zip", "postal_code"],
         };
         for (const [field, alts] of Object.entries(aliases)) {
             const match = headers.find((h) => alts.includes(h));

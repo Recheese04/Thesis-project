@@ -366,6 +366,11 @@ class UserController extends Controller
             'students.*.course_id'      => 'nullable|exists:courses,id',
             'students.*.year_level'     => 'required|string|max:20',
             'students.*.contact_number' => 'nullable|string|max:20',
+            'students.*.street'         => 'nullable|string|max:255',
+            'students.*.barangay'       => 'nullable|string|max:100',
+            'students.*.city'           => 'nullable|string|max:100',
+            'students.*.province'       => 'nullable|string|max:100',
+            'students.*.zip_code'       => 'nullable|string|max:10',
         ]);
 
         $rows    = $request->students;
@@ -389,6 +394,18 @@ class UserController extends Controller
                 }
 
                 try {
+                    $addressId = null;
+                    if (!empty($row['barangay']) || !empty($row['city']) || !empty($row['street']) || !empty($row['province'])) {
+                        $address = \App\Models\Address::create([
+                            'street'   => $row['street'] ?? null,
+                            'barangay' => $row['barangay'] ?? null,
+                            'city'     => $row['city'] ?? null,
+                            'province' => $row['province'] ?? null,
+                            'zip_code' => $row['zip_code'] ?? null,
+                        ]);
+                        $addressId = $address->id;
+                    }
+
                     User::create([
                         'student_number' => $row['student_number'],
                         'first_name'     => $row['first_name'],
@@ -399,6 +416,7 @@ class UserController extends Controller
                         'year_level'     => $row['year_level'],
                         'contact_number' => $row['contact_number'] ?? null,
                         'email'          => $row['email'],
+                        'address_id'     => $addressId,
                         'password_hash'  => Hash::make('password'),
                         'user_type_id'   => 3,
                         'is_active'      => true,
