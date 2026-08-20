@@ -215,7 +215,7 @@ export default function UserManagement() {
     if (selectedUserIds.length === 0) return;
     try {
       setBulkActionLoading(true);
-      const res = await axios.post("/api/users/bulk-status", {
+      const res = await axios.put("/api/users/bulk-status", {
         user_ids: selectedUserIds,
         is_active: isActive,
       }, authH());
@@ -243,9 +243,10 @@ export default function UserManagement() {
     if (selectedUserIds.length === 0) return;
     try {
       setBulkActionLoading(true);
-      const res = await axios.post("/api/users/bulk-delete", {
-        user_ids: selectedUserIds,
-      }, authH());
+      const res = await axios.delete("/api/users/bulk-delete", {
+        ...authH(),
+        data: { user_ids: selectedUserIds },
+      });
       toast.success("Accounts Deleted", { description: res.data.message || `Deleted ${selectedUserIds.length} accounts.` });
       setSelectedUserIds([]);
       setBulkDeleteOpen(false);

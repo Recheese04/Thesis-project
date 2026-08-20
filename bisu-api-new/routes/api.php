@@ -258,8 +258,8 @@ Route::middleware('auth:sanctum')->group(function () {
         );
         // User Management
         Route::get('/users', [UserController::class , 'index']);
-        Route::match(['post', 'delete'], '/users/bulk-delete', [UserController::class , 'bulkDestroy']);
-        Route::match(['post', 'put'], '/users/bulk-status', [UserController::class , 'bulkStatus']);
+        Route::delete('/users/bulk-delete', [UserController::class , 'bulkDestroy']);
+        Route::put('/users/bulk-status', [UserController::class , 'bulkStatus']);
         Route::post('/users/import', [UserController::class , 'importStudents']);
         Route::get('/users/{id}', [UserController::class , 'show'])->where('id', '[0-9]+');
         Route::post('/users', [UserController::class , 'store']);
