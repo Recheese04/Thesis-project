@@ -258,13 +258,13 @@ Route::middleware('auth:sanctum')->group(function () {
         );
         // User Management
         Route::get('/users', [UserController::class , 'index']);
-        Route::post('/users/bulk-delete', [UserController::class , 'bulkDestroy']);
-        Route::post('/users/bulk-status', [UserController::class , 'bulkStatus']);
-        Route::get('/users/{id}', [UserController::class , 'show']);
-        Route::post('/users', [UserController::class , 'store']);
-        Route::put('/users/{id}', [UserController::class , 'update']);
-        Route::delete('/users/{id}', [UserController::class , 'destroy']);
+        Route::match(['post', 'delete'], '/users/bulk-delete', [UserController::class , 'bulkDestroy']);
+        Route::match(['post', 'put'], '/users/bulk-status', [UserController::class , 'bulkStatus']);
         Route::post('/users/import', [UserController::class , 'importStudents']);
+        Route::get('/users/{id}', [UserController::class , 'show'])->where('id', '[0-9]+');
+        Route::post('/users', [UserController::class , 'store']);
+        Route::put('/users/{id}', [UserController::class , 'update'])->where('id', '[0-9]+');
+        Route::delete('/users/{id}', [UserController::class , 'destroy'])->where('id', '[0-9]+');
 
         // School Years
         Route::get('/school-years', [SchoolYearController::class, 'index']);
