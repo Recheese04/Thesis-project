@@ -88,7 +88,7 @@ export default function ImportStudentsModal({ open, onClose, onImported, college
             college_id: ["college_id", "dept_id", "department_id", "department", "dept", "college"],
             course: ["course", "program", "course_program", "degree"],
             year_level: ["year_level", "yearlevel", "year", "level"],
-            contact_number: ["contact_number", "contact", "phone", "mobile", "phone_number", "cellphone"],
+            contact_number: ["contact_number", "contact_no", "contact_no_", "contactno", "contact", "contact_num", "phone", "mobile", "phone_number", "phone_no", "mobile_no", "cellphone", "tel", "telephone", "mobile_number"],
         };
         for (const [field, alts] of Object.entries(aliases)) {
             const match = headers.find((h) => alts.includes(h));
@@ -377,7 +377,7 @@ export default function ImportStudentsModal({ open, onClose, onImported, college
                             <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
                                 <Users className="w-4 h-4 text-emerald-600 shrink-0" />
                                 <p className="text-xs text-slate-700">
-                                    Default password for each student: <code className="bg-white px-1.5 py-0.5 rounded text-emerald-700 font-mono text-[11px]">bisu_[student_number]</code>
+                                    Default password for each student: <code className="bg-white px-1.5 py-0.5 rounded text-emerald-700 font-mono text-[11px]">password</code>
                                 </p>
                             </div>
                         </div>
