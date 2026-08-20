@@ -1,12 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
+import {
+  View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert,
+  ScrollView, Image, Modal, Animated, Easing
+} from 'react-native';
 import api from '../../services/api';
-import { CreditCard, CheckCircle, XCircle } from 'lucide-react-native';
+import {
+  CreditCard, CheckCircle, XCircle, Cpu, RefreshCw, Zap,
+  Users, UserCheck, UserX, Clock, ChevronRight, ShieldAlert, Sparkles, HelpCircle
+} from 'lucide-react-native';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useAuth } from '../../context/AuthContext';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
+
+interface ScanRecord {
+  id: string;
+  time: string;
+  uid: string;
+  success: boolean;
+  message: string;
+  userName?: string;
+  studentNumber?: string;
+  course?: string;
+  action?: 'checkin' | 'checkout' | 'already_checkout' | 'unknown';
+}
+
+// Sample test cards for simulator when physical hardware isn't attached
+const DEMO_TEST_CARDS = [
+  { label: 'Sample Student 1', uid: 'E2806894', description: 'Registered Test Card A' },
+  { label: 'Sample Student 2', uid: 'A34F92B1', description: 'Registered Test Card B' },
+  { label: 'Sample Student 3', uid: 'C910FA88', description: 'Registered Test Card C' },
+  { label: 'Unregistered Card', uid: '99XX00FF', description: 'Simulate Unregistered Tap' },
+];
 
 export default function OfficerRFIDScanner() {
   const [events, setEvents] = useState<any[]>([]);
@@ -14,203 +40,613 @@ export default function OfficerRFIDScanner() {
   const [rfidInput, setRfidInput] = useState('');
   const [scanning, setScanning] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
-  const [lastScan, setLastScan] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'scanner' | 'simulator'>('scanner');
+
+  // Event Attendance Stats
+  const [stats, setStats] = useState({ total: 0, checkedIn: 0, checkedOut: 0 });
+  const [loadingStats, setLoadingStats] = useState(false);
+
+  // Scan History
+  const [scanHistory, setScanHistory] = useState<ScanRecord[]>([]);
+  const [lastScan, setLastScan] = useState<ScanRecord | null>(null);
+
+  // Simulator state
+  const [simulatorPulse] = useState(new Animated.Value(1));
+  const [simulatingTap, setSimulatingTap] = useState(false);
+
   const { membership } = useAuth();
-  const { isDark, colors } = useTheme();
-  
+  const { isDark } = useTheme();
+
   const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
   const textSecondary = isDark ? '#94a3b8' : '#64748b';
+  const bgCard = isDark ? '#1e293b' : '#ffffff';
   const border = isDark ? '#334155' : '#e2e8f0';
-  
+
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     fetchEvents();
   }, []);
 
+  useEffect(() => {
+    if (selectedEventId) {
+      fetchEventStats(selectedEventId);
+    }
+  }, [selectedEventId]);
+
   const fetchEvents = async () => {
     try {
       const res = await api.get('/officer/events');
-      setEvents(res.data.events || []);
-      if (res.data.events?.length > 0) {
-        setSelectedEventId(res.data.events[0].id);
+      const eventList = res.data.events || [];
+      setEvents(eventList);
+      if (eventList.length > 0) {
+        setSelectedEventId(eventList[0].id);
       }
-    } catch (_) {}
+    } catch (_) { }
     setLoadingEvents(false);
   };
 
-  const handleScanSubmit = async () => {
-    if (!rfidInput.trim()) return;
+  const fetchEventStats = async (eventId: number) => {
+    setLoadingStats(true);
+    try {
+      const res = await api.get(`/attendance/event/${eventId}`);
+      if (res.data) {
+        const records = res.data.attendance || res.data.records || [];
+        const checkedIn = records.filter((r: any) => r.status === 'checked_in' || (r.time_in && !r.time_out)).length;
+        const checkedOut = records.filter((r: any) => r.status === 'checked_out' || r.time_out).length;
+        setStats({
+          total: records.length,
+          checkedIn,
+          checkedOut,
+        });
+      }
+    } catch (_) {
+      // Fallback: estimate from local scan history if endpoint varies
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  const executeScan = async (uidToScan: string) => {
+    const cleanUid = uidToScan.trim();
+    if (!cleanUid) return;
     if (!selectedEventId) {
-      Alert.alert('Error', 'Please select an event first.');
+      Alert.alert('Select Event', 'Please select an active event first before scanning.');
       return;
     }
 
     setScanning(true);
-    setLastScan(null);
+
+    // Trigger Card Animation Pulse in Simulator
+    Animated.sequence([
+      Animated.timing(simulatorPulse, { toValue: 1.15, duration: 150, useNativeDriver: true }),
+      Animated.timing(simulatorPulse, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start();
+
     try {
       const res = await api.post('/attendance/rfid-scan', {
         event_id: selectedEventId,
-        rfid_uid: rfidInput.trim()
+        rfid_uid: cleanUid,
       });
-      setLastScan({ success: true, data: res.data });
+
+      const data = res.data;
+      const newRecord: ScanRecord = {
+        id: Date.now().toString(),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        uid: cleanUid,
+        success: true,
+        message: data.message || 'Scan registered successfully!',
+        userName: data.user_name,
+        studentNumber: data.student_number,
+        course: data.course,
+        action: data.action || 'checkin',
+      };
+
+      setLastScan(newRecord);
+      setScanHistory(prev => [newRecord, ...prev]);
       setRfidInput('');
-      
-      // Keep focus on input for continuous scanning
-      setTimeout(() => inputRef.current?.focus(), 100);
+
+      // Refresh event statistics
+      fetchEventStats(selectedEventId);
+
+      // Keep focus on input for continuous hardware scanning
+      setTimeout(() => inputRef.current?.focus(), 150);
     } catch (err: any) {
-      setLastScan({ success: false, data: err.response?.data || { message: 'Scan failed' } });
+      const errData = err.response?.data || {};
+      const failRecord: ScanRecord = {
+        id: Date.now().toString(),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        uid: cleanUid,
+        success: false,
+        message: errData.message || 'Card scan failed or unrecognized.',
+        userName: errData.user_name,
+        action: errData.action || 'unknown',
+      };
+
+      setLastScan(failRecord);
+      setScanHistory(prev => [failRecord, ...prev]);
       setRfidInput('');
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setTimeout(() => inputRef.current?.focus(), 150);
+    } finally {
+      setScanning(false);
+      setSimulatingTap(false);
     }
-    setScanning(false);
+  };
+
+  const handleManualSubmit = () => {
+    executeScan(rfidInput);
+  };
+
+  const handleSimulatedTap = (uid: string) => {
+    setSimulatingTap(true);
+    setRfidInput(uid);
+    setTimeout(() => {
+      executeScan(uid);
+    }, 400);
   };
 
   if (loadingEvents) return (
     <OfficerPageWrapper activeRoute="rfid">
-      <View className="flex-1 justify-center items-center"><ActivityIndicator size="large" color="#2563eb" /></View>
+      <View className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={{ marginTop: 12, color: textSecondary, fontWeight: '600', fontSize: 13 }}>Loading RFID System...</Text>
+      </View>
     </OfficerPageWrapper>
   );
 
+  const selectedEvent = events.find(e => e.id === selectedEventId);
+
   return (
     <OfficerPageWrapper activeRoute="rfid">
-      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
-         {/* Header Area with Tarsi */}
-         <View style={{ position: 'relative', overflow: 'hidden' }}>
-          
-          {/* Decorative Background Circles */}
+      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {/* Header Area with Tarsi */}
+        <View style={{ position: 'relative', overflow: 'hidden' }}>
+
+          {/* Background Blobs */}
           <View style={{
-            position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#4ade80', opacity: 0.1, zIndex: 0
+            position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#3b82f6', opacity: 0.12, zIndex: 0
           }} />
           <View style={{
-            position: 'absolute', top: 60, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: '#22c55e', opacity: 0.08, zIndex: 0
+            position: 'absolute', top: 60, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: '#8b5cf6', opacity: 0.1, zIndex: 0
           }} />
 
-          {/* Title & Quick Actions */}
-          <View style={{ paddingHorizontal: 20, paddingTop: 20, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            
+          {/* Title & Badge */}
+          <View style={{ paddingHorizontal: 20, paddingTop: 16, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
-                Hardware Simulation
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <Cpu size={12} color="#3b82f6" />
+                <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginLeft: 5 }}>
+                  Hardware & Virtual Attendance
+                </Text>
+              </View>
               <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
                 RFID Scanner
               </Text>
             </View>
 
-            {/* Quick Actions moved to the right */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-               <View style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
-                  <CreditCard size={16} color={isDark ? '#94a3b8' : '#10b981'} />
-               </View>
+            <View style={{ width: 44, height: 44, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 14, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 }}>
+              <CreditCard size={20} color={isDark ? '#94a3b8' : '#2563eb'} />
             </View>
           </View>
 
-          {/* Mascot & Chat Area */}
-          <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
-            
-            {/* Flat Green Bar Background (Gradient) */}
+          {/* Mascot & Tarsi Bubble */}
+          <View style={{ position: 'relative', minHeight: 110, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
             <LinearGradient
-              colors={['#4ade80', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, zIndex: 0 }}
+              colors={['#3b82f6', '#1d4ed8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 44, zIndex: 0 }}
             />
 
-            {/* Mascot Image Wrapper */}
-            <View style={{ 
-              position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10 
+            <View style={{
+              position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10
             }}>
-              <Image 
-                source={require('../../tarsier-mascot/tar-id-nobg.png')} 
-                style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }} 
+              <Image
+                source={require('../../tarsier-mascot/tar-id-nobg.png')}
+                style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }}
                 resizeMode="contain"
               />
             </View>
 
-            {/* Chat Bubble */}
-            <TarsiChatBubble 
-              message="Ready to scan! Make sure the selected event matches the one you're checking in for." 
+            <TarsiChatBubble
+              message={
+                activeTab === 'simulator'
+                  ? "Don't have NodeMCU or RC522 hardware today? Use the Virtual Simulator to test card taps live!"
+                  : "Connect your hardware RFID scanner via USB OTG/Bluetooth, or select an event to get started."
+              }
             />
           </View>
-         </View>
+        </View>
 
-      <View className="px-5 pt-6 pb-4">
-        {events.length === 0 ? (
-          <View className="bg-amber-50 p-4 rounded-xl border border-amber-100">
-            <Text className="text-amber-700 font-bold">No active events</Text>
-            <Text className="text-amber-600 text-xs mt-1">Create an event to start scanning.</Text>
-          </View>
-        ) : (
-          <>
-            <Text className="text-sm font-bold text-slate-700 mb-2">Select Active Event</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
-              {events.map((ev) => (
-                <TouchableOpacity
-                  key={ev.id}
-                  onPress={() => setSelectedEventId(ev.id)}
-                  className={`mr-3 px-4 py-2.5 rounded-xl border ${selectedEventId === ev.id ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-200'}`}
-                >
-                  <Text className={`font-bold ${selectedEventId === ev.id ? 'text-white' : 'text-slate-700'}`}>{ev.title}</Text>
-                  <Text className={`text-[10px] mt-0.5 ${selectedEventId === ev.id ? 'text-blue-100' : 'text-slate-400'}`}>{ev.event_date}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+        <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 30 }}>
 
-            <View className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-              <Text className="text-[15px] font-extrabold text-slate-900 text-center mb-1">Scan ID Card</Text>
-              <Text className="text-xs text-slate-400 text-center mb-5">Ensure hardware scanner is active or type UID below</Text>
-              
-              <TextInput
-                ref={inputRef}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center text-lg font-bold text-slate-800 tracking-wider mb-4"
-                placeholder="Awaiting scan..."
-                value={rfidInput}
-                onChangeText={setRfidInput}
-                onSubmitEditing={handleScanSubmit}
-                autoFocus
-                returnKeyType="done"
-                editable={!scanning}
-              />
-              
-              <TouchableOpacity 
-                className={`bg-blue-600 py-3.5 rounded-xl items-center ${scanning ? 'opacity-70' : ''}`}
-                onPress={handleScanSubmit}
-                disabled={scanning}
-              >
-                {scanning ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-bold text-[15px]">Submit Scan</Text>}
-              </TouchableOpacity>
+          {/* Active Event Selector */}
+          {events.length === 0 ? (
+            <View style={{ backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fffbeb', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : '#fef3c7', marginBottom: 20 }}>
+              <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 14 }}>No Active Events Found</Text>
+              <Text style={{ color: textSecondary, fontSize: 12, marginTop: 2 }}>Please create or activate an event in the Event Management tab first.</Text>
             </View>
+          ) : (
+            <>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                  1. Select Event
+                </Text>
+                <TouchableOpacity onPress={() => selectedEventId && fetchEventStats(selectedEventId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <RefreshCw size={12} color="#3b82f6" />
+                  <Text style={{ fontSize: 11, color: '#3b82f6', fontWeight: '700', marginLeft: 4 }}>Sync Stats</Text>
+                </TouchableOpacity>
+              </View>
 
-            {/* Scan Results */}
-            {lastScan && (
-              <View className={`mt-5 p-5 rounded-2xl border ${lastScan.success ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-                <View className="flex-row items-center mb-3">
-                  {lastScan.success ? <CheckCircle size={20} color="#10b981" /> : <XCircle size={20} color="#ef4444" />}
-                  <Text className={`font-extrabold ml-2 text-base ${lastScan.success ? 'text-emerald-700' : 'text-red-700'}`}>
-                    {lastScan.data.message}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                {events.map((ev) => {
+                  const isSelected = selectedEventId === ev.id;
+                  return (
+                    <TouchableOpacity
+                      key={ev.id}
+                      onPress={() => setSelectedEventId(ev.id)}
+                      style={{
+                        marginRight: 10,
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 14,
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? '#2563eb' : border,
+                        backgroundColor: isSelected ? (isDark ? '#1e3a8a' : '#eff6ff') : bgCard,
+                      }}
+                    >
+                      <Text style={{ fontWeight: '800', fontSize: 13, color: isSelected ? (isDark ? '#93c5fd' : '#1e40af') : textPrimary }}>
+                        {ev.title}
+                      </Text>
+                      <Text style={{ fontSize: 10, marginTop: 2, color: isSelected ? (isDark ? '#bfdbfe' : '#3b82f6') : textSecondary }}>
+                        {ev.event_date || 'Today'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Event Attendance Stats Summary */}
+              {selectedEvent && (
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+                  <View style={{ flex: 1, backgroundColor: bgCard, borderWidth: 1, borderColor: border, borderRadius: 14, padding: 12, alignItems: 'center' }}>
+                    <Users size={16} color="#3b82f6" />
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: textPrimary, marginTop: 4 }}>
+                      {loadingStats ? '...' : stats.total}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: textSecondary, fontWeight: '700', textTransform: 'uppercase' }}>Total Scans</Text>
+                  </View>
+
+                  <View style={{ flex: 1, backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5', borderWidth: 1, borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#a7f3d0', borderRadius: 14, padding: 12, alignItems: 'center' }}>
+                    <UserCheck size={16} color="#10b981" />
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: '#10b981', marginTop: 4 }}>
+                      {loadingStats ? '...' : stats.checkedIn}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: '#047857', fontWeight: '700' }}>Checked In</Text>
+                  </View>
+
+                  <View style={{ flex: 1, backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fffbeb', borderWidth: 1, borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : '#fde68a', borderRadius: 14, padding: 12, alignItems: 'center' }}>
+                    <UserX size={16} color="#f59e0b" />
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: '#f59e0b', marginTop: 4 }}>
+                      {loadingStats ? '...' : stats.checkedOut}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: '#b45309', fontWeight: '700' }}>Checked Out</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Mode Toggle Switch: Hardware Reader vs Virtual Hardware Simulator */}
+              <View style={{ backgroundColor: bgCard, padding: 4, borderRadius: 14, borderWidth: 1, borderColor: border, flexDirection: 'row', marginBottom: 20 }}>
+                <TouchableOpacity
+                  onPress={() => setActiveTab('scanner')}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: activeTab === 'scanner' ? '#2563eb' : 'transparent',
+                    alignItems: 'center',
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CreditCard size={15} color={activeTab === 'scanner' ? '#ffffff' : textSecondary} />
+                  <Text style={{ marginLeft: 6, fontWeight: '800', fontSize: 12, color: activeTab === 'scanner' ? '#ffffff' : textSecondary }}>
+                    Hardware Scanner
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setActiveTab('simulator')}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: activeTab === 'simulator' ? '#8b5cf6' : 'transparent',
+                    alignItems: 'center',
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Cpu size={15} color={activeTab === 'simulator' ? '#ffffff' : textSecondary} />
+                  <Text style={{ marginLeft: 6, fontWeight: '800', fontSize: 12, color: activeTab === 'simulator' ? '#ffffff' : textSecondary }}>
+                    Virtual Simulator
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* TAB 1: HARDWARE SCANNER INPUT */}
+              {activeTab === 'scanner' && (
+                <View style={{ backgroundColor: bgCard, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
+                  <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                    <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: isDark ? '#1e3a8a' : '#dbeafe', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                      <CreditCard size={24} color="#2563eb" />
+                    </View>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: textPrimary }}>Awaiting Card Scan</Text>
+                    <Text style={{ fontSize: 12, color: textSecondary, textAlign: 'center', marginTop: 4 }}>
+                      Connect USB OTG / Bluetooth RFID Reader, or manually enter card UID
+                    </Text>
+                  </View>
+
+                  <TextInput
+                    ref={inputRef}
+                    style={{
+                      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                      borderWidth: 1.5,
+                      borderColor: scanning ? '#2563eb' : border,
+                      borderRadius: 14,
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      fontSize: 18,
+                      fontWeight: '800',
+                      color: textPrimary,
+                      textAlign: 'center',
+                      letterSpacing: 2,
+                      marginBottom: 14,
+                    }}
+                    placeholder="Place RFID card on reader..."
+                    placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
+                    value={rfidInput}
+                    onChangeText={setRfidInput}
+                    onSubmitEditing={handleManualSubmit}
+                    autoFocus
+                    returnKeyType="done"
+                    editable={!scanning}
+                  />
+
+                  <TouchableOpacity
+                    onPress={handleManualSubmit}
+                    disabled={scanning || !rfidInput.trim()}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      paddingVertical: 14,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      opacity: (scanning || !rfidInput.trim()) ? 0.6 : 1,
+                    }}
+                  >
+                    {scanning ? (
+                      <ActivityIndicator color="#ffffff" />
+                    ) : (
+                      <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>Submit Manual Scan</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* TAB 2: VIRTUAL HARDWARE SIMULATOR (NodeMCU + RC522 Emulation) */}
+              {activeTab === 'simulator' && (
+                <View style={{ backgroundColor: bgCard, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 20, marginBottom: 20 }}>
+
+                  {/* Simulator Banner */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#f3e8ff', padding: 12, borderRadius: 14, marginBottom: 16 }}>
+                    <Cpu size={20} color="#8b5cf6" />
+                    <View style={{ marginLeft: 10, flex: 1 }}>
+                      <Text style={{ fontWeight: '800', fontSize: 13, color: '#7c3aed' }}>NodeMCU & RC522 Emulation Active</Text>
+                      <Text style={{ fontSize: 11, color: textSecondary }}>Tap any simulated card below to trigger live check-in / check-out API requests.</Text>
+                    </View>
+                  </View>
+
+                  {/* Interactive Virtual Card Graphic */}
+                  <Animated.View style={{ transform: [{ scale: simulatorPulse }], alignItems: 'center', marginVertical: 10 }}>
+                    <LinearGradient
+                      colors={['#8b5cf6', '#6d28d9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={{ width: '100%', height: 140, borderRadius: 18, padding: 18, justifyContent: 'space-between', shadowColor: '#8b5cf6', shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, letterSpacing: 1 }}>BISU SMART RFID CARD</Text>
+                        <Zap size={18} color="#fef08a" />
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ width: 32, height: 24, backgroundColor: '#fef08a', borderRadius: 4, marginRight: 10, opacity: 0.9 }} />
+                        <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '800', letterSpacing: 3 }}>
+                          {rfidInput || '•••• ••••'}
+                        </Text>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700' }}>TAP CARD TO SCANNER</Text>
+                        <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800' }}>{selectedEvent?.title ? selectedEvent.title.substring(0, 18) + '...' : 'Event Ready'}</Text>
+                      </View>
+                    </LinearGradient>
+                  </Animated.View>
+
+                  {/* Quick Tap Demo Cards */}
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: textPrimary, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 14, marginBottom: 10 }}>
+                    Quick Tap Preset Cards:
+                  </Text>
+
+                  <View style={{ gap: 8 }}>
+                    {DEMO_TEST_CARDS.map((card, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        onPress={() => handleSimulatedTap(card.uid)}
+                        disabled={scanning}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                          paddingHorizontal: 14,
+                          paddingVertical: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: border,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: isDark ? '#312e81' : '#ede9fe', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                            <CreditCard size={16} color="#7c3aed" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontWeight: '800', fontSize: 13, color: textPrimary }}>{card.label}</Text>
+                            <Text style={{ fontSize: 10, color: textSecondary }}>UID: {card.uid} • {card.description}</Text>
+                          </View>
+                        </View>
+
+                        <View style={{ backgroundColor: '#8b5cf6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}>
+                          <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800' }}>Simulate Tap</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* LATEST SCAN RESULT CARD */}
+              {lastScan && (
+                <View style={{
+                  backgroundColor: lastScan.success
+                    ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5')
+                    : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2'),
+                  borderWidth: 1.5,
+                  borderColor: lastScan.success ? (isDark ? 'rgba(16, 185, 129, 0.4)' : '#a7f3d0') : (isDark ? 'rgba(239, 68, 68, 0.4)' : '#fecaca'),
+                  borderRadius: 18,
+                  padding: 16,
+                  marginBottom: 20,
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    {lastScan.success ? (
+                      <CheckCircle size={22} color="#10b981" />
+                    ) : (
+                      <XCircle size={22} color="#ef4444" />
+                    )}
+                    <Text style={{
+                      fontWeight: '900', fontSize: 15, marginLeft: 8,
+                      color: lastScan.success ? '#047857' : '#b91c1c'
+                    }}>
+                      {lastScan.message}
+                    </Text>
+                  </View>
+
+                  {lastScan.userName ? (
+                    <View style={{ backgroundColor: bgCard, padding: 12, borderRadius: 12, marginTop: 4, borderWidth: 1, borderColor: border }}>
+                      <Text style={{ fontSize: 15, fontWeight: '900', color: textPrimary }}>{lastScan.userName}</Text>
+                      {lastScan.studentNumber && (
+                        <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
+                          ID: {lastScan.studentNumber} {lastScan.course ? `• ${lastScan.course}` : ''}
+                        </Text>
+                      )}
+
+                      {lastScan.action && (
+                        <View style={{ marginTop: 8, alignSelf: 'flex-start' }}>
+                          <View style={{
+                            paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+                            backgroundColor: lastScan.action === 'checkin' ? '#d1fae5' : '#fef3c7'
+                          }}>
+                            <Text style={{
+                              fontSize: 10, fontWeight: '900', textTransform: 'uppercase',
+                              color: lastScan.action === 'checkin' ? '#047857' : '#b45309'
+                            }}>
+                              ACTION: {lastScan.action.replace('_', ' ')}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
+                      Scanned UID: <Text style={{ fontFamily: 'monospace', fontWeight: '800' }}>{lastScan.uid}</Text>
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {/* RECENT SCAN SESSION LOG */}
+              <View style={{ backgroundColor: bgCard, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 18 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Clock size={16} color="#3b82f6" />
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary, marginLeft: 6 }}>
+                      Session Scan History
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: textSecondary, fontWeight: '700' }}>
+                    {scanHistory.length} Scans
                   </Text>
                 </View>
-                
-                {lastScan.data.user_name && (
-                  <View className="bg-white p-3 rounded-lg shadow-sm border border-slate-100/50">
-                    <Text className="font-bold text-slate-800">{lastScan.data.user_name}</Text>
-                    <Text className="text-xs text-slate-500 mt-0.5">{lastScan.data.course} | {lastScan.data.student_number}</Text>
-                    {lastScan.data.action && (
-                      <View className="mt-2 flex-row">
-                        <View className={`px-2 py-1 rounded text-xs ${lastScan.data.action === 'checkin' ? 'bg-emerald-100' : 'bg-amber-100'}`}>
-                          <Text className={`font-bold text-[10px] uppercase ${lastScan.data.action === 'checkin' ? 'text-emerald-700' : 'text-amber-700'}`}>
-                            {lastScan.data.action}
-                          </Text>
+
+                {scanHistory.length === 0 ? (
+                  <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                    <CreditCard size={28} color={textSecondary} style={{ opacity: 0.4, marginBottom: 8 }} />
+                    <Text style={{ color: textSecondary, fontSize: 12, fontWeight: '600' }}>No scans in this session yet.</Text>
+                    <Text style={{ color: textSecondary, fontSize: 10, marginTop: 2 }}>Scanned cards will appear here in real-time.</Text>
+                  </View>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    {scanHistory.map((item) => (
+                      <View
+                        key={item.id}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingVertical: 10,
+                          paddingHorizontal: 12,
+                          borderRadius: 12,
+                          backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                          borderWidth: 1,
+                          borderColor: border,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          {item.success ? (
+                            <CheckCircle size={16} color="#10b981" style={{ marginRight: 8 }} />
+                          ) : (
+                            <XCircle size={16} color="#ef4444" style={{ marginRight: 8 }} />
+                          )}
+
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>
+                              {item.userName || `UID: ${item.uid}`}
+                            </Text>
+                            <Text style={{ fontSize: 10, color: textSecondary }}>
+                              {item.time} • {item.message}
+                            </Text>
+                          </View>
                         </View>
+
+                        {item.action && (
+                          <View style={{
+                            paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6,
+                            backgroundColor: item.action === 'checkin' ? '#d1fae5' : '#fee2e2'
+                          }}>
+                            <Text style={{
+                              fontSize: 9, fontWeight: '900', textTransform: 'uppercase',
+                              color: item.action === 'checkin' ? '#047857' : '#991b1b'
+                            }}>
+                              {item.action}
+                            </Text>
+                          </View>
+                        )}
                       </View>
-                    )}
+                    ))}
                   </View>
                 )}
               </View>
-            )}
-          </>
-        )}
-      </View>
+            </>
+          )}
+        </View>
       </ScrollView>
     </OfficerPageWrapper>
   );
 }
+

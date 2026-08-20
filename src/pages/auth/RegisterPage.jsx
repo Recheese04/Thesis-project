@@ -44,7 +44,7 @@ export default function Register() {
     try {
       // Get CSRF token
       await axios.get('http://localhost:8000/sanctum/csrf-cookie');
-      
+
       // Register request
       const response = await axios.post('http://localhost:8000/api/register', formData, {
         withCredentials: true
@@ -53,7 +53,7 @@ export default function Register() {
       // Store user data
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
-      
+
       navigate('/dashboard');
     } catch (err) {
       if (err.response?.data?.errors) {
@@ -90,8 +90,8 @@ export default function Register() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 mb-4 shadow-2xl shadow-indigo-500/50">
               <Sparkles className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-200 via-violet-200 to-indigo-200 bg-clip-text text-transparent mb-2" 
-                style={{ fontFamily: '"Syne", sans-serif' }}>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-200 via-violet-200 to-indigo-200 bg-clip-text text-transparent mb-2"
+              style={{ fontFamily: '"Syne", sans-serif' }}>
               Create Account
             </h1>
             <p className="text-slate-400">Join us and start your journey</p>

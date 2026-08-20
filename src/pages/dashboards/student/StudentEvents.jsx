@@ -11,16 +11,16 @@ const API_URL = '/api';
 
 export default function StudentEvents() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [events, setEvents]           = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState(null);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => { fetchEvents(); }, []);
 
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const token    = localStorage.getItem('token');
+      const token = localStorage.getItem('token');
       const response = await axios.get(`${API_URL}/events`, { headers: { Authorization: `Bearer ${token}` } });
       setEvents(response.data);
       setError(null);
@@ -54,8 +54,8 @@ export default function StudentEvents() {
 
   const getStatusBadge = (status) => {
     const map = {
-      upcoming:  { label: 'Upcoming',  cls: 'bg-blue-100 text-blue-700' },
-      ongoing:   { label: 'Ongoing',   cls: 'bg-green-100 text-green-700' },
+      upcoming: { label: 'Upcoming', cls: 'bg-blue-100 text-blue-700' },
+      ongoing: { label: 'Ongoing', cls: 'bg-green-100 text-green-700' },
       completed: { label: 'Completed', cls: 'bg-slate-100 text-slate-600' },
       cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-700' },
     };
@@ -75,9 +75,8 @@ export default function StudentEvents() {
       <CardContent className="p-4 sm:p-6">
         <div className="flex gap-3 sm:gap-4">
           {/* Date badge */}
-          <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex flex-col items-center justify-center shadow-sm flex-shrink-0 ${
-            muted ? 'bg-slate-100 text-slate-600' : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
-          }`}>
+          <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex flex-col items-center justify-center shadow-sm flex-shrink-0 ${muted ? 'bg-slate-100 text-slate-600' : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
+            }`}>
             <span className="text-[10px] font-semibold uppercase leading-none">
               {new Date(event.event_date).toLocaleDateString('en-US', { month: 'short' })}
             </span>
@@ -138,7 +137,7 @@ export default function StudentEvents() {
   }
 
   const filteredUpcoming = filterEvents(upcomingEvents);
-  const filteredPast     = filterEvents(pastEvents);
+  const filteredPast = filterEvents(pastEvents);
 
   return (
     <div className="space-y-5 sm:space-y-6">

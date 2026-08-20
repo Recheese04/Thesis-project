@@ -73,7 +73,7 @@ class UserController extends Controller
 
         $rules = [
             'email'        => 'required|email|unique:users,email',
-            'password'     => 'required|string|min:8',
+            'password'     => 'nullable|string|min:8',
             'user_type_id' => 'required|exists:user_types,id',
             'is_active'    => 'nullable|in:0,1',
         ];
@@ -114,9 +114,10 @@ class UserController extends Controller
 
         DB::beginTransaction();
         try {
+            $password = !empty($data['password']) ? $data['password'] : 'password';
             $userPayload = [
                 'email'         => $data['email'],
-                'password_hash' => Hash::make($data['password']),
+                'password_hash' => Hash::make($password),
                 'user_type_id'  => $data['user_type_id'],
                 'is_active'     => ($data['is_active'] ?? '1') == '1',
             ];
@@ -365,7 +366,7 @@ class UserController extends Controller
                         'year_level'     => $row['year_level'],
                         'contact_number' => $row['contact_number'] ?? null,
                         'email'          => $row['email'],
-                        'password_hash'  => Hash::make('bisu_' . $row['student_number']),
+                        'password_hash'  => Hash::make('password'),
                         'user_type_id'   => 3,
                         'is_active'      => true,
                     ]);

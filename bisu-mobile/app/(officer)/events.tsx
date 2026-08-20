@@ -10,10 +10,25 @@ import { useTheme } from '../../context/ThemeContext';
 import { MapPin, Clock, Building2, Plus, X, Calendar as CalendarIcon, CheckCircle2, RefreshCw, Search, MoreHorizontal, Activity, Edit3, QrCode, Users, ClipboardList, Trash2 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '../../constants/Config';
+
+const to12Hour = (timeStr?: string): string => {
+  if (!timeStr) return '';
+  try {
+    const parts = String(timeStr).split(':');
+    if (parts.length < 2) return timeStr;
+    let h = parseInt(parts[0], 10);
+    const m = parts[1].padStart(2, '0');
+    if (isNaN(h)) return timeStr;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${m} ${ampm}`;
+  } catch { return timeStr; }
+};
 
 export default function OfficerEvents() {
   const { isDark, colors } = useTheme();
-  const { membership } = useAuth();
+  const { user, membership } = useAuth();
   const orgId = membership?.organization_id;
   // Dark mode colors
   const bg = isDark ? '#0f172a' : '#f8fafc';
@@ -43,9 +58,9 @@ export default function OfficerEvents() {
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState(''); 
-  const [time, setTime] = useState(''); 
-  const [endTime, setEndTime] = useState(''); 
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [location, setLocation] = useState('');
   const [status, setStatus] = useState('upcoming');
   const [submitting, setSubmitting] = useState(false);
@@ -60,7 +75,7 @@ export default function OfficerEvents() {
       const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
       setEvents(data);
       setFiltered(data);
-    } catch (_) {}
+    } catch (_) { }
     setLoading(false);
     setRefreshing(false);
   };
@@ -82,15 +97,15 @@ export default function OfficerEvents() {
     setSubmitting(true);
     try {
       if (editingId) {
-         await api.put(`/events/${editingId}`, {
-           title, description, event_date: date, event_time: time || undefined, end_time: endTime || undefined, location, status
-         });
-         Alert.alert('Success', 'Event updated successfully.');
+        await api.put(`/events/${editingId}`, {
+          title, description, event_date: date, event_time: time || undefined, end_time: endTime || undefined, location, status
+        });
+        Alert.alert('Success', 'Event updated successfully.');
       } else {
-         await api.post('/events', {
-           title, description, event_date: date, event_time: time || undefined, end_time: endTime || undefined, location, status
-         });
-         Alert.alert('Success', 'Event created successfully.');
+        await api.post('/events', {
+          title, description, event_date: date, event_time: time || undefined, end_time: endTime || undefined, location, status
+        });
+        Alert.alert('Success', 'Event created successfully.');
       }
       setModalVisible(false);
       setEditingId(null);
@@ -119,12 +134,14 @@ export default function OfficerEvents() {
     setActionEvent(null);
     Alert.alert('Delete Event', `Are you sure you want to delete "${ev.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-         try {
-           await api.delete(`/events/${ev.id}`);
-           setEvents(prev => prev.filter(e => e.id !== ev.id));
-         } catch (e: any) { Alert.alert('Error', e.message); }
-      }}
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await api.delete(`/events/${ev.id}`);
+            setEvents(prev => prev.filter(e => e.id !== ev.id));
+          } catch (e: any) { Alert.alert('Error', e.message); }
+        }
+      }
     ]);
   };
 
@@ -132,31 +149,33 @@ export default function OfficerEvents() {
     setActionEvent(null);
     Alert.alert('Close Event', `Are you sure you want to close "${ev.title}"? This will auto-assign consequences to absent members.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Close Event', style: 'default', onPress: async () => {
-         try {
-           await api.post(`/events/${ev.id}/close`);
-           Alert.alert('Success', 'Event closed and consequences assigned.');
-           fetchEvents();
-         } catch (e: any) { Alert.alert('Error', e.response?.data?.message || e.message); }
-      }}
+      {
+        text: 'Close Event', style: 'default', onPress: async () => {
+          try {
+            await api.post(`/events/${ev.id}/close`);
+            Alert.alert('Success', 'Event closed and consequences assigned.');
+            fetchEvents();
+          } catch (e: any) { Alert.alert('Error', e.response?.data?.message || e.message); }
+        }
+      }
     ]);
   };
 
   const getStatusIcon = (st: string) => {
     switch (st) {
-       case 'ongoing': return <Activity size={10} color="#15803d" />;
-       case 'completed': return <CheckCircle2 size={10} color="#475569" />;
-       case 'cancelled': return <X size={10} color="#b91c1c" />;
-       default: return <Clock size={10} color="#1d4ed8" />; // upcoming
+      case 'ongoing': return <Activity size={10} color="#15803d" />;
+      case 'completed': return <CheckCircle2 size={10} color="#475569" />;
+      case 'cancelled': return <X size={10} color="#b91c1c" />;
+      default: return <Clock size={10} color="#1d4ed8" />; // upcoming
     }
   };
 
   const getStatusStyle = (st: string) => {
     switch (st) {
-       case 'ongoing': return { backgroundColor: isDark ? 'rgba(16,185,129,0.1)' : '#f0fdf4', borderColor: isDark ? 'rgba(16,185,129,0.3)' : '#bbf7d0', color: isDark ? '#6ee7b7' : '#15803d' };
-       case 'completed': return { backgroundColor: isDark ? '#334155' : '#f1f5f9', borderColor: isDark ? '#475569' : '#e2e8f0', color: isDark ? '#94a3b8' : '#475569' };
-       case 'cancelled': return { backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#fef2f2', borderColor: isDark ? 'rgba(239,68,68,0.3)' : '#fecaca', color: isDark ? '#fca5a5' : '#b91c1c' };
-       default: return { backgroundColor: isDark ? 'rgba(37,99,235,0.1)' : '#eff6ff', borderColor: isDark ? 'rgba(37,99,235,0.3)' : '#bfdbfe', color: isDark ? '#93c5fd' : '#1d4ed8' };
+      case 'ongoing': return { backgroundColor: isDark ? 'rgba(16,185,129,0.1)' : '#f0fdf4', borderColor: isDark ? 'rgba(16,185,129,0.3)' : '#bbf7d0', color: isDark ? '#6ee7b7' : '#15803d' };
+      case 'completed': return { backgroundColor: isDark ? '#334155' : '#f1f5f9', borderColor: isDark ? '#475569' : '#e2e8f0', color: isDark ? '#94a3b8' : '#475569' };
+      case 'cancelled': return { backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#fef2f2', borderColor: isDark ? 'rgba(239,68,68,0.3)' : '#fecaca', color: isDark ? '#fca5a5' : '#b91c1c' };
+      default: return { backgroundColor: isDark ? 'rgba(37,99,235,0.1)' : '#eff6ff', borderColor: isDark ? 'rgba(37,99,235,0.3)' : '#bfdbfe', color: isDark ? '#93c5fd' : '#1d4ed8' };
     }
   };
 
@@ -217,7 +236,7 @@ export default function OfficerEvents() {
       {/* Visual background flair circles mimicking the web gradients */}
       <View style={{ position: 'absolute', right: -20, top: -20, width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(255,255,255,0.1)' }} />
       <View style={{ position: 'absolute', right: -8, bottom: -32, width: 128, height: 128, borderRadius: 64, backgroundColor: 'rgba(255,255,255,0.05)' }} />
-      
+
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
         <View>
           <Text style={{ fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>{label}</Text>
@@ -234,11 +253,11 @@ export default function OfficerEvents() {
   return (
     <OfficerPageWrapper activeRoute="events">
       <View style={{ flex: 1, backgroundColor: bg }}>
-        
+
         {/* Header Section Matches Web Web Exactly */}
         {/* Header Area with Tarsi */}
         <View style={{ position: 'relative', overflow: 'hidden' }}>
-          
+
           {/* Decorative Background Circles */}
           <View style={{
             position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#4ade80', opacity: 0.1, zIndex: 0
@@ -249,7 +268,7 @@ export default function OfficerEvents() {
 
           {/* Title & Quick Actions */}
           <View style={{ paddingHorizontal: 20, paddingTop: 20, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            
+
             <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
                 Event Management
@@ -261,49 +280,49 @@ export default function OfficerEvents() {
 
             {/* Quick Actions moved to the right */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-               <TouchableOpacity 
-                  onPress={() => { setRefreshing(true); fetchEvents(); }}
-                  style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
-               >
-                  <RefreshCw size={16} color={isDark ? '#94a3b8' : '#0f2d5e'} />
-               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => { setRefreshing(true); fetchEvents(); }}
+                style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <RefreshCw size={16} color={isDark ? '#94a3b8' : '#0f2d5e'} />
+              </TouchableOpacity>
 
-               <TouchableOpacity 
-                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f2d5e', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, height: 40 }}
-                  onPress={() => {
-                    setEditingId(null);
-                    setTitle(''); setDescription(''); setDate(''); setTime(''); setEndTime(''); setLocation(''); setStatus('upcoming');
-                    setModalVisible(true);
-                  }}
-               >
-                  <Plus size={16} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, marginLeft: 6 }}>Add</Text>
-               </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f2d5e', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, height: 40 }}
+                onPress={() => {
+                  setEditingId(null);
+                  setTitle(''); setDescription(''); setDate(''); setTime(''); setEndTime(''); setLocation(''); setStatus('upcoming');
+                  setModalVisible(true);
+                }}
+              >
+                <Plus size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, marginLeft: 6 }}>Add</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
           {/* Mascot & Chat Area */}
           <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
-            
+
             {/* Flat Green Bar Background (Gradient) */}
             <LinearGradient
               colors={['#4ade80', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, zIndex: 0 }}
             />
 
-            <View style={{ 
-              position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10 
+            <View style={{
+              position: 'absolute', left: -20, bottom: 0, width: 210, height: 180, overflow: 'hidden', zIndex: 10
             }}>
-              <Image 
-                source={require('../../tarsier-mascot/tar-events-nobg.png')} 
-                style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }} 
+              <Image
+                source={require('../../tarsier-mascot/tar-events-nobg.png')}
+                style={{ position: 'absolute', left: -60, bottom: -130, width: 360, height: 360 }}
                 resizeMode="contain"
               />
             </View>
 
             {/* Chat Bubble */}
-            <TarsiChatBubble 
-              message={`You have ${stats.total} total events, with ${stats.upcoming} upcoming and ${stats.ongoing} currently active!`} 
+            <TarsiChatBubble
+              message={`You have ${stats.total} total events, with ${stats.upcoming} upcoming and ${stats.ongoing} currently active!`}
             />
           </View>
         </View>
@@ -326,90 +345,119 @@ export default function OfficerEvents() {
 
           {/* Table Container Mimic */}
           <View style={{ backgroundColor: cardBg, borderRadius: 20, borderWidth: 1, borderColor: border, overflow: 'hidden', marginBottom: 24 }}>
-             
-             {/* Toolbar */}
-             <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderLight, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: cardBg, zIndex: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8 }}>
-                   <Search size={14} color="#94a3b8" />
-                   <TextInput
-                      style={{ flex: 1, marginLeft: 8, fontSize: 12, color: textPrimary }}
-                      placeholder="Search events..."
-                      placeholderTextColor="#94a3b8"
-                      value={search}
-                      onChangeText={setSearch}
-                   />
+
+            {/* Toolbar */}
+            <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderLight, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: cardBg, zIndex: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8 }}>
+                <Search size={14} color="#94a3b8" />
+                <TextInput
+                  style={{ flex: 1, marginLeft: 8, fontSize: 12, color: textPrimary }}
+                  placeholder="Search events..."
+                  placeholderTextColor="#94a3b8"
+                  value={search}
+                  onChangeText={setSearch}
+                />
+              </View>
+
+              <View style={{ backgroundColor: isDark ? '#334155' : '#f8fafc', borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 34, width: 80 }}>
+                <Text style={{ fontSize: 11, color: textPrimary, fontWeight: '500' }}>All</Text>
+                <Text style={{ fontSize: 10, color: textMuted }}>▼</Text>
+              </View>
+            </View>
+
+            <View style={{ paddingHorizontal: 16, paddingVertical: 6, backgroundColor: cardBg, borderBottomWidth: 1, borderBottomColor: borderLight, flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <Text style={{ fontSize: 10, color: textMuted }}><Text style={{ fontWeight: '800', color: textSecondary }}>{filtered.length}</Text> results</Text>
+            </View>
+
+            {/* Entries */}
+            <View style={{ backgroundColor: cardBg }}>
+              {filtered.length === 0 ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
+                  <CalendarIcon size={32} color="#cbd5e1" />
+                  <Text style={{ color: textMuted, fontSize: 12, fontWeight: '700', marginTop: 8 }}>No events found</Text>
                 </View>
-                
-                <View style={{ backgroundColor: isDark ? '#334155' : '#f8fafc', borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 34, width: 80 }}>
-                   <Text style={{ fontSize: 11, color: textPrimary, fontWeight: '500' }}>All</Text>
-                   <Text style={{ fontSize: 10, color: textMuted }}>▼</Text>
-                </View>
-             </View>
+              ) : filtered.map((ev, index) => {
+                const isLast = index === filtered.length - 1;
+                return (
+                  <View key={ev.id} style={{ padding: 16, ...(!isLast ? { borderBottomWidth: 1, borderBottomColor: borderLight } : {}) }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1 }}>
+                        <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: '#0f2d5e', alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 2 }}>
+                          <CalendarIcon size={16} color="#fff" />
+                        </View>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary, marginBottom: 4 }}>{ev.title}</Text>
 
-             <View style={{ paddingHorizontal: 16, paddingVertical: 6, backgroundColor: cardBg, borderBottomWidth: 1, borderBottomColor: borderLight, flexDirection: 'row', justifyContent: 'flex-end' }}>
-                <Text style={{ fontSize: 10, color: textMuted }}><Text style={{ fontWeight: '800', color: textSecondary }}>{filtered.length}</Text> results</Text>
-             </View>
+                          <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 8, ...getStatusStyle(ev.status) }}>
+                            {getStatusIcon(ev.status)}
+                            <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'capitalize', marginLeft: 4 }}>{ev.status}</Text>
+                          </View>
 
-             {/* Entries */}
-             <View style={{ backgroundColor: cardBg }}>
-                {filtered.length === 0 ? (
-                   <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
-                      <CalendarIcon size={32} color="#cbd5e1" />
-                      <Text style={{ color: textMuted, fontSize: 12, fontWeight: '700', marginTop: 8 }}>No events found</Text>
-                   </View>
-                ) : filtered.map((ev, index) => {
-                   const isLast = index === filtered.length - 1;
-                   return (
-                      <View key={ev.id} style={{ padding: 16, ...(!isLast ? { borderBottomWidth: 1, borderBottomColor: borderLight } : {}) }}>
-                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1 }}>
-                               <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: '#0f2d5e', alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 2 }}>
-                                  <CalendarIcon size={16} color="#fff" />
-                               </View>
-                               <View style={{ flex: 1, paddingRight: 8 }}>
-                                  <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary, marginBottom: 4 }}>{ev.title}</Text>
-                                  
-                                  <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 8, ...getStatusStyle(ev.status) }}>
-                                     {getStatusIcon(ev.status)}
-                                     <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'capitalize', marginLeft: 4 }}>{ev.status}</Text>
-                                  </View>
-
-                                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
-                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-                                        <Clock size={11} color="#94a3b8" />
-                                        <Text style={{ fontSize: 11, color: textSecondary, marginLeft: 4 }}>
-                                           {new Date(ev.start_time || ev.event_date).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                           {(ev.event_time) ? ` · ${ev.event_time}` : ''}
-                                           {(ev.end_time) ? ` - ${ev.end_time}` : ''}
-                                        </Text>
-                                     </View>
-                                     
-                                     {!!ev.location && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                           <MapPin size={11} color="#94a3b8" />
-                                           <Text style={{ fontSize: 11, color: textSecondary, marginLeft: 4 }}>{ev.location}</Text>
-                                        </View>
-                                     )}
-                                  </View>
-                               </View>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
+                              <Clock size={11} color="#94a3b8" />
+                              <Text style={{ fontSize: 11, color: textSecondary, marginLeft: 4 }}>
+                                {new Date(ev.start_time || ev.event_date).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                {ev.event_time ? ` · ${to12Hour(ev.event_time)}` : ''}
+                                {ev.end_time ? ` - ${to12Hour(ev.end_time)}` : ''}
+                              </Text>
                             </View>
-                            <TouchableOpacity style={{ padding: 8, marginRight: -8 }} onPress={() => setActionEvent(ev)}>
-                               <MoreHorizontal size={20} color="#94a3b8" />
-                            </TouchableOpacity>
-                         </View>
-                      </View>
-                   );
-                })}
-             </View>
 
-             {/* Table Footer */}
-             <View style={{ backgroundColor: footerBg, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: borderLight }}>
-                <Text style={{ fontSize: 10, color: textMuted }}>
-                   Showing <Text style={{ fontWeight: '800', color: textSecondary }}>{filtered.length}</Text> of <Text style={{ fontWeight: '800', color: textSecondary }}>{events.length}</Text> events
-                </Text>
-             </View>
+                            {!!ev.location && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <MapPin size={11} color="#94a3b8" />
+                                <Text style={{ fontSize: 11, color: textSecondary, marginLeft: 4 }}>{ev.location}</Text>
+                              </View>
+                            )}
+                          </View>
+
+                          {/* Posted By Officer Row */}
+                          {(() => {
+                             const posterUser = ev?.creator || ev?.user || ev?.created_by_user || ev?.officer;
+                             const fallbackName = (user?.first_name || user?.last_name) ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Campus Officer';
+                             const posterName = posterUser ? `${posterUser.first_name || ''} ${posterUser.last_name || ''}`.trim() : (ev?.creator_name || ev?.officer_name || fallbackName);
+                             const posterPfp = posterUser?.profile_picture_url || posterUser?.profile_picture || user?.profile_picture_url || user?.profile_picture || null;
+                             const initialChar = posterName ? posterName[0].toUpperCase() : 'O';
+
+                             return (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9' }}>
+                                   <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#2563eb', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginRight: 6, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1' }}>
+                                      {posterPfp ? (
+                                         <Image source={{ uri: posterPfp.startsWith('http') ? posterPfp : `${API_BASE_URL.replace('/api', '/storage')}/${posterPfp}` }} style={{ width: 22, height: 22 }} />
+                                      ) : (
+                                         <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>
+                                            {initialChar}
+                                         </Text>
+                                      )}
+                                   </View>
+                                   <Text style={{ fontSize: 11, color: textSecondary, flex: 1 }} numberOfLines={1}>
+                                      Posted by{' '}
+                                      <Text style={{ color: textPrimary, fontWeight: '700' }}>
+                                         {posterName}
+                                      </Text>
+                                   </Text>
+                                </View>
+                             );
+                          })()}
+                        </View>
+                      </View>
+                      <TouchableOpacity style={{ padding: 8, marginRight: -8 }} onPress={() => setActionEvent(ev)}>
+                        <MoreHorizontal size={20} color="#94a3b8" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Table Footer */}
+            <View style={{ backgroundColor: footerBg, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: borderLight }}>
+              <Text style={{ fontSize: 10, color: textMuted }}>
+                Showing <Text style={{ fontWeight: '800', color: textSecondary }}>{filtered.length}</Text> of <Text style={{ fontWeight: '800', color: textSecondary }}>{events.length}</Text> events
+              </Text>
+            </View>
           </View>
-          
+
           <View style={{ height: 24 }} />
         </ScrollView>
 
@@ -417,7 +465,7 @@ export default function OfficerEvents() {
         <Modal visible={modalVisible} transparent animationType="slide">
           <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
             <View style={{ backgroundColor: modalBg, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', maxHeight: '90%' }}>
-              
+
               <View style={{ backgroundColor: '#0f2d5e', paddingHorizontal: 20, paddingVertical: 20, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                   <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
@@ -443,37 +491,37 @@ export default function OfficerEvents() {
                     value={title} onChangeText={setTitle}
                   />
                 </View>
-                
+
                 <View style={{ marginBottom: 16 }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: textPrimary, marginBottom: 6, marginLeft: 4 }}>Date <Text style={{ color: '#ef4444' }}>*</Text></Text>
-                  <TouchableOpacity 
-                     style={{ backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-                     onPress={() => openPicker('date')}
+                  <TouchableOpacity
+                    style={{ backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                    onPress={() => openPicker('date')}
                   >
-                     <Text style={{ fontSize: 15, color: date ? textPrimary : textMuted }}>{date || 'Select Date (YYYY-MM-DD)'}</Text>
-                     <CalendarIcon size={16} color="#94a3b8" />
+                    <Text style={{ fontSize: 15, color: date ? textPrimary : textMuted }}>{date || 'Select Date (YYYY-MM-DD)'}</Text>
+                    <CalendarIcon size={16} color="#94a3b8" />
                   </TouchableOpacity>
                 </View>
 
                 <View style={{ flexDirection: 'row', marginBottom: 16 }}>
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: textPrimary, marginBottom: 6, marginLeft: 4 }}>Start Time</Text>
-                    <TouchableOpacity 
-                       style={{ backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-                       onPress={() => openPicker('start')}
+                    <TouchableOpacity
+                      style={{ backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                      onPress={() => openPicker('start')}
                     >
-                       <Text style={{ fontSize: 15, color: time ? textPrimary : textMuted }}>{time || 'HH:MM'}</Text>
-                       <Clock size={16} color="#94a3b8" />
+                      <Text style={{ fontSize: 15, color: time ? textPrimary : textMuted }}>{time || 'HH:MM'}</Text>
+                      <Clock size={16} color="#94a3b8" />
                     </TouchableOpacity>
                   </View>
                   <View style={{ flex: 1, marginLeft: 8 }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: textPrimary, marginBottom: 6, marginLeft: 4 }}>End Time</Text>
-                    <TouchableOpacity 
-                       style={{ backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-                       onPress={() => openPicker('end')}
+                    <TouchableOpacity
+                      style={{ backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                      onPress={() => openPicker('end')}
                     >
-                       <Text style={{ fontSize: 15, color: endTime ? textPrimary : textMuted }}>{endTime || 'HH:MM'}</Text>
-                       <Clock size={16} color="#94a3b8" />
+                      <Text style={{ fontSize: 15, color: endTime ? textPrimary : textMuted }}>{endTime || 'HH:MM'}</Text>
+                      <Clock size={16} color="#94a3b8" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -481,15 +529,15 @@ export default function OfficerEvents() {
                 <View style={{ marginBottom: 16 }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: textPrimary, marginBottom: 6, marginLeft: 4 }}>Status</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                     {['upcoming', 'ongoing', 'completed', 'cancelled'].map(s => (
-                        <TouchableOpacity 
-                           key={s} 
-                           onPress={() => setStatus(s)}
-                           style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, borderWidth: 1, marginRight: 8, backgroundColor: status === s ? (isDark ? 'rgba(37,99,235,0.1)' : '#eff6ff') : inputBg, borderColor: status === s ? '#2563eb' : inputBorder }}
-                        >
-                           <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'capitalize', color: status === s ? '#2563eb' : textSecondary }}>{s}</Text>
-                        </TouchableOpacity>
-                     ))}
+                    {['upcoming', 'ongoing', 'completed', 'cancelled'].map(s => (
+                      <TouchableOpacity
+                        key={s}
+                        onPress={() => setStatus(s)}
+                        style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, borderWidth: 1, marginRight: 8, backgroundColor: status === s ? (isDark ? 'rgba(37,99,235,0.1)' : '#eff6ff') : inputBg, borderColor: status === s ? '#2563eb' : inputBorder }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'capitalize', color: status === s ? '#2563eb' : textSecondary }}>{s}</Text>
+                      </TouchableOpacity>
+                    ))}
                   </ScrollView>
                 </View>
 
@@ -516,46 +564,46 @@ export default function OfficerEvents() {
 
                 <View style={{ height: 24 }} />
               </ScrollView>
-              
+
               <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: borderLight, backgroundColor: footerBg, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 }}>
-                 <TouchableOpacity 
-                   style={{ flex: 1, borderWidth: 1, borderColor: border, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginRight: 8, backgroundColor: cardBg }}
-                   onPress={() => setModalVisible(false)}
-                 >
-                   <Text style={{ color: textSecondary, fontWeight: '700' }}>Cancel</Text>
-                 </TouchableOpacity>
-                 <TouchableOpacity 
-                   style={{ flex: 2, backgroundColor: '#0f2d5e', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', opacity: submitting ? 0.7 : 1 }}
-                   onPress={handleSubmit}
-                   disabled={submitting}
-                 >
-                   {submitting ? <ActivityIndicator color="#fff" size="small" /> : (
-                      <>
-                         <CheckCircle2 size={16} color="#fff" />
-                         <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 }}>Create Event</Text>
-                      </>
-                   )}
-                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, borderWidth: 1, borderColor: border, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginRight: 8, backgroundColor: cardBg }}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={{ color: textSecondary, fontWeight: '700' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 2, backgroundColor: '#0f2d5e', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', opacity: submitting ? 0.7 : 1 }}
+                  onPress={handleSubmit}
+                  disabled={submitting}
+                >
+                  {submitting ? <ActivityIndicator color="#fff" size="small" /> : (
+                    <>
+                      <CheckCircle2 size={16} color="#fff" />
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 }}>Create Event</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
           </View>
 
           {renderPicker()}
           {Platform.OS === 'ios' && showPicker && (
-             <View style={{ position: 'absolute', bottom: 0, width: '100%', backgroundColor: modalBg, paddingHorizontal: 16, paddingBottom: 32, paddingTop: 16, borderTopWidth: 1, borderTopColor: border, zIndex: 50 }}>
-               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 }}>
-                 <TouchableOpacity onPress={() => setShowPicker(null)} style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: isDark ? 'rgba(37,99,235,0.1)' : '#eff6ff', borderRadius: 8 }}>
-                   <Text style={{ color: '#2563eb', fontWeight: '700' }}>Done</Text>
-                 </TouchableOpacity>
-               </View>
-               <DateTimePicker
-                 value={tempDate}
-                 mode={showPicker === 'date' ? 'date' : 'time'}
-                 display="spinner"
-                 onChange={handlePickerChange}
-                 style={{ height: 200 }}
-               />
-             </View>
+            <View style={{ position: 'absolute', bottom: 0, width: '100%', backgroundColor: modalBg, paddingHorizontal: 16, paddingBottom: 32, paddingTop: 16, borderTopWidth: 1, borderTopColor: border, zIndex: 50 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <TouchableOpacity onPress={() => setShowPicker(null)} style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: isDark ? 'rgba(37,99,235,0.1)' : '#eff6ff', borderRadius: 8 }}>
+                  <Text style={{ color: '#2563eb', fontWeight: '700' }}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempDate}
+                mode={showPicker === 'date' ? 'date' : 'time'}
+                display="spinner"
+                onChange={handlePickerChange}
+                style={{ height: 200 }}
+              />
+            </View>
           )}
         </Modal>
 
@@ -567,7 +615,7 @@ export default function OfficerEvents() {
                 <View style={{ width: 48, height: 6, backgroundColor: isDark ? '#475569' : '#e2e8f0', borderRadius: 3 }} />
               </View>
               <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary, marginBottom: 16, paddingHorizontal: 8 }}>{actionEvent?.title}</Text>
-              
+
               <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 4, backgroundColor: isDark ? '#0f172a' : '#f8fafc', borderRadius: 12 }} onPress={() => handleEdit(actionEvent)}>
                 <Edit3 size={18} color="#0f2d5e" />
                 <Text style={{ marginLeft: 12, fontWeight: '600', color: textPrimary }}>Edit Event</Text>
@@ -587,19 +635,19 @@ export default function OfficerEvents() {
                 <ClipboardList size={18} color="#0f2d5e" />
                 <Text style={{ marginLeft: 12, fontWeight: '600', color: textPrimary }}>Evaluations</Text>
               </TouchableOpacity>
-              
+
               {actionEvent?.status !== 'completed' && (
-                 <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 12, marginTop: 4, backgroundColor: isDark ? 'rgba(16,185,129,0.1)' : '#ecfdf5', borderRadius: 12 }} onPress={() => handleCloseEvent(actionEvent)}>
-                   <CheckCircle2 size={18} color="#10b981" />
-                   <Text style={{ marginLeft: 12, fontWeight: '600', color: '#10b981' }}>Close Event (Run Consequences)</Text>
-                 </TouchableOpacity>
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 12, marginTop: 4, backgroundColor: isDark ? 'rgba(16,185,129,0.1)' : '#ecfdf5', borderRadius: 12 }} onPress={() => handleCloseEvent(actionEvent)}>
+                  <CheckCircle2 size={18} color="#10b981" />
+                  <Text style={{ marginLeft: 12, fontWeight: '600', color: '#10b981' }}>Close Event (Run Consequences)</Text>
+                </TouchableOpacity>
               )}
-              
+
               <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 12, marginTop: 8, backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#fef2f2', borderRadius: 12 }} onPress={() => handleDelete(actionEvent)}>
                 <Trash2 size={18} color="#dc2626" />
                 <Text style={{ marginLeft: 12, fontWeight: '600', color: '#dc2626' }}>Delete Event</Text>
               </TouchableOpacity>
-              
+
               <View style={{ height: 16 }} />
             </View>
           </Pressable>
@@ -610,24 +658,24 @@ export default function OfficerEvents() {
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
             <View style={{ backgroundColor: modalBg, width: '85%', borderRadius: 24, overflow: 'hidden', paddingBottom: 4 }} onStartShouldSetResponder={() => true}>
               <View style={{ backgroundColor: '#0f2d5e', padding: 20, alignItems: 'center' }}>
-                 <QrCode size={28} color="#fff" />
-                 <Text style={{ color: '#fff', fontWeight: '800', fontSize: 18, marginTop: 8, letterSpacing: 0.5 }}>Event QR Code</Text>
-                 <Text style={{ color: 'rgba(219,234,254,0.8)', fontSize: 12, marginTop: 4, textAlign: 'center' }}>Students can scan this from their app to automatically Check-In / Check-Out</Text>
+                <QrCode size={28} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 18, marginTop: 8, letterSpacing: 0.5 }}>Event QR Code</Text>
+                <Text style={{ color: 'rgba(219,234,254,0.8)', fontSize: 12, marginTop: 4, textAlign: 'center' }}>Students can scan this from their app to automatically Check-In / Check-Out</Text>
               </View>
               <View style={{ padding: 24, alignItems: 'center' }}>
-                 <Text style={{ color: textPrimary, fontWeight: '800', fontSize: 16, textAlign: 'center', marginBottom: 16 }}>{qrEvent?.title}</Text>
-                 <View style={{ padding: 12, backgroundColor: isDark ? '#0f172a' : '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: border }}>
-                    {qrEvent && (
-                       <Image 
-                          source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrEvent.qr_code)}` }} 
-                          style={{ width: 200, height: 200 }} 
-                       />
-                    )}
-                 </View>
-                 <Text style={{ fontSize: 10, fontFamily: 'monospace', color: textMuted, marginTop: 16, letterSpacing: 1 }}>{qrEvent?.qr_code}</Text>
+                <Text style={{ color: textPrimary, fontWeight: '800', fontSize: 16, textAlign: 'center', marginBottom: 16 }}>{qrEvent?.title}</Text>
+                <View style={{ padding: 12, backgroundColor: isDark ? '#0f172a' : '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: border }}>
+                  {qrEvent && (
+                    <Image
+                      source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrEvent.qr_code)}` }}
+                      style={{ width: 200, height: 200 }}
+                    />
+                  )}
+                </View>
+                <Text style={{ fontSize: 10, fontFamily: 'monospace', color: textMuted, marginTop: 16, letterSpacing: 1 }}>{qrEvent?.qr_code}</Text>
               </View>
               <TouchableOpacity style={{ borderTopWidth: 1, borderTopColor: borderLight, paddingVertical: 16, alignItems: 'center', backgroundColor: footerBg }} onPress={() => setQrEvent(null)}>
-                 <Text style={{ color: isDark ? '#93c5fd' : '#0f2d5e', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>Close Window</Text>
+                <Text style={{ color: isDark ? '#93c5fd' : '#0f2d5e', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>Close Window</Text>
               </TouchableOpacity>
             </View>
           </View>

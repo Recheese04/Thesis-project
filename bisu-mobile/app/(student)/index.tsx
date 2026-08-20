@@ -35,15 +35,15 @@ export default function StudentDashboard() {
         api.get('/student/attendance').catch(() => ({ data: [] })),
       ]);
       setEvents(Array.isArray(eventsRes.data) ? eventsRes.data : []);
-      
+
       const oblData = oblRes.data || {};
       const consequences = Array.isArray(oblData.consequences) ? oblData.consequences : [];
       setObligations(consequences);
-      
+
       setAnnouncements(Array.isArray(annRes.data) ? annRes.data : []);
       const attData = Array.isArray(attRes.data) ? attRes.data : [];
       setAttendanceRecords(attData);
-    } catch (_) {}
+    } catch (_) { }
     setLoading(false);
     setRefreshing(false);
   };
@@ -84,7 +84,7 @@ export default function StudentDashboard() {
       >
         {/* Header Area */}
         <View style={{ paddingTop: 20, paddingBottom: 10, backgroundColor: isDark ? colors.card : '#ffffff', position: 'relative', overflow: 'hidden' }}>
-          
+
           {/* Decorative Background Circles */}
           <View style={{
             position: 'absolute',
@@ -121,7 +121,7 @@ export default function StudentDashboard() {
 
           {/* Mascot & Chat Area */}
           <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
-            
+
             {/* Flat Green Bar Background (Gradient) */}
             <LinearGradient
               colors={['#4ade80', '#16a34a']}
@@ -138,31 +138,31 @@ export default function StudentDashboard() {
             />
 
             {/* Mascot Image Wrapper (for clipping to half-body) */}
-            <View style={{ 
-              position: 'absolute', 
-              left: -20, 
-              bottom: 0, 
-              width: 210, 
-              height: 180, 
+            <View style={{
+              position: 'absolute',
+              left: -20,
+              bottom: 0,
+              width: 210,
+              height: 180,
               overflow: 'hidden',
-              zIndex: 10 
+              zIndex: 10
             }}>
-              <Image 
-                source={require('../../tarsier-mascot/tar-wave-nobg.png')} 
-                style={{ 
-                  position: 'absolute', 
-                  left: -60, 
+              <Image
+                source={require('../../tarsier-mascot/tar-wave-nobg.png')}
+                style={{
+                  position: 'absolute',
+                  left: -60,
                   bottom: -130, // Push his legs completely out of view
-                  width: 360, 
-                  height: 360, 
-                }} 
+                  width: 360,
+                  height: 360,
+                }}
                 resizeMode="contain"
               />
             </View>
 
             {/* Chat Bubble */}
-            <TarsiChatBubble 
-              message={`You have ${upcomingCount} upcoming events. Don't forget to check in! Your current attendance rate is ${attendancePct}%.`} 
+            <TarsiChatBubble
+              message={`You have ${upcomingCount} upcoming events. Don't forget to check in! Your current attendance rate is ${attendancePct}%.`}
             />
           </View>
         </View>
@@ -170,37 +170,37 @@ export default function StudentDashboard() {
         {/* Dynamic Stats Grid */}
         <View style={{ paddingHorizontal: 20, gap: 12 }}>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <StatCard 
-              label="Total Events" 
-              value={totalEvents} 
-              desc="Events registered" 
-              icon={<Calendar size={20} color="#fff" />} 
+            <StatCard
+              label="Total Events"
+              value={totalEvents}
+              desc="Events registered"
+              icon={<Calendar size={20} color="#fff" />}
               gradient={['#6366f1', '#4f46e5']}
               isDark={isDark}
             />
-            <StatCard 
-              label="Attended" 
-              value={attended} 
-              desc="Successfully completed" 
-              icon={<CheckCircle2 size={20} color="#fff" />} 
+            <StatCard
+              label="Attended"
+              value={attended}
+              desc="Successfully completed"
+              icon={<CheckCircle2 size={20} color="#fff" />}
               gradient={['#10b981', '#059669']}
               isDark={isDark}
             />
           </View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <StatCard 
-              label="Upcoming" 
-              value={upcomingCount} 
-              desc="Events scheduled" 
-              icon={<Clock size={20} color="#fff" />} 
+            <StatCard
+              label="Upcoming"
+              value={upcomingCount}
+              desc="Events scheduled"
+              icon={<Clock size={20} color="#fff" />}
               gradient={['#f59e0b', '#d97706']}
               isDark={isDark}
             />
-            <StatCard 
-              label="Attendance" 
-              value={`${attendancePct}%`} 
-              desc="Overall completion" 
-              icon={<Award size={20} color="#fff" />} 
+            <StatCard
+              label="Attendance"
+              value={`${attendancePct}%`}
+              desc="Overall completion"
+              icon={<Award size={20} color="#fff" />}
               gradient={['#8b5cf6', '#7c3aed']}
               isDark={isDark}
             />
@@ -212,26 +212,26 @@ export default function StudentDashboard() {
           <Text style={{ fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: 12, letterSpacing: -0.3 }}>Quick Actions</Text>
           <View style={{ backgroundColor: cardBg, borderRadius: 24, padding: 16, borderWidth: 1, borderColor: cardBorder, shadowColor: colors.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 }}>
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-              <QuickAction 
-                title="Check In" subtitle="Scan QR" 
-                icon={<QrCode size={20} color={isDark ? '#a5b4fc' : '#4f46e5'} />} 
+              <QuickAction
+                title="Check In" subtitle="Scan QR"
+                icon={<QrCode size={20} color={isDark ? '#a5b4fc' : '#4f46e5'} />}
                 onPress={() => router.push('/(student)/attendance')} isDark={isDark}
               />
-              <QuickAction 
-                title="Events" subtitle="Browse" 
-                icon={<CalendarDays size={20} color={isDark ? '#6ee7b7' : '#059669'} />} 
+              <QuickAction
+                title="Events" subtitle="Browse"
+                icon={<CalendarDays size={20} color={isDark ? '#6ee7b7' : '#059669'} />}
                 onPress={() => router.push('/(student)/events')} isDark={isDark}
               />
             </View>
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <QuickAction 
-                title="History" subtitle="Attendance" 
-                icon={<Activity size={20} color={isDark ? '#fcd34d' : '#d97706'} />} 
+              <QuickAction
+                title="History" subtitle="Attendance"
+                icon={<Activity size={20} color={isDark ? '#fcd34d' : '#d97706'} />}
                 onPress={() => router.push('/(student)/attendance')} isDark={isDark}
               />
-              <QuickAction 
-                title="Alerts" subtitle="Updates" 
-                icon={<Bell size={20} color={isDark ? '#fca5a5' : '#dc2626'} />} 
+              <QuickAction
+                title="Alerts" subtitle="Updates"
+                icon={<Bell size={20} color={isDark ? '#fca5a5' : '#dc2626'} />}
                 onPress={() => router.push('/(student)/announcements')} isDark={isDark}
               />
             </View>
@@ -240,7 +240,7 @@ export default function StudentDashboard() {
 
         {/* Bottom Lists */}
         <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginTop: 24, paddingBottom: 40, alignItems: 'flex-start' }}>
-          
+
           <View style={{ flex: 1, backgroundColor: cardBg, borderRadius: 24, padding: 16, borderWidth: 1, borderColor: cardBorder, shadowColor: colors.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <Text style={{ fontWeight: '800', color: colors.textPrimary, fontSize: 14 }}>Upcoming</Text>
@@ -284,7 +284,7 @@ export default function StudentDashboard() {
                 <Text style={{ color: emptyTextColor, fontSize: 11, textAlign: 'center', marginTop: 8 }}>No records found</Text>
               </View>
             ) : attendanceRecords.slice(0, 3).map((rec: any, idx: number) => (
-               <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                 <View style={{ width: 36, height: 36, backgroundColor: rec.status === 'present' ? (isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5') : (isDark ? 'rgba(239,68,68,0.15)' : '#fef2f2'), borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
                   {rec.status === 'present' ? <CheckCircle2 size={16} color="#10b981" /> : <Activity size={16} color="#ef4444" />}
                 </View>
@@ -337,7 +337,7 @@ function QuickAction({ title, subtitle, icon, onPress, isDark }: any) {
   const borderColor = isDark ? '#475569' : '#f1f5f9';
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       onPress={onPress} activeOpacity={0.7}
       style={{ flex: 1, backgroundColor: bg, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor }}
     >

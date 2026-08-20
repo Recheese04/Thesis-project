@@ -143,7 +143,7 @@ class EventController extends Controller
             $this->syncEventStatuses();
 
             $user  = auth()->user();
-            $query = Event::with(['organization.college'])
+            $query = Event::with(['organization.college', 'creator'])
                 ->orderBy('event_date', 'desc')
                 ->orderBy('event_time', 'desc');
 
@@ -181,7 +181,21 @@ class EventController extends Controller
                 }
             }
 
-            return response()->json($query->get());
+            $events = $query->get();
+            $events->transform(function ($e) {
+                if (!$e->creator && $e->organization_id) {
+                    $desig = \App\Models\Designation::with('user')
+                        ->where('organization_id', $e->organization_id)
+                        ->where('status', 'active')
+                        ->first();
+                    if ($desig && $desig->user) {
+                        $e->setRelation('creator', $desig->user);
+                    }
+                }
+                return $e;
+            });
+
+            return response()->json($events);
         } catch (\Exception $e) {
             Log::error('Event index error: ' . $e->getMessage());
             return response()->json(['message' => 'Error fetching events', 'error' => $e->getMessage()], 500);
@@ -191,7 +205,16 @@ class EventController extends Controller
     public function show($id)
     {
         try {
-            $event = Event::with(['organization.college'])->findOrFail($id);
+            $event = Event::with(['organization.college', 'creator'])->findOrFail($id);
+            if (!$event->creator && $event->organization_id) {
+                $desig = \App\Models\Designation::with('user')
+                    ->where('organization_id', $event->organization_id)
+                    ->where('status', 'active')
+                    ->first();
+                if ($desig && $desig->user) {
+                    $event->setRelation('creator', $desig->user);
+                }
+            }
             return response()->json($event);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Event not found'], 404);
@@ -236,7 +259,7 @@ class EventController extends Controller
             $data['created_by']      = $user->id;
 
             $event = Event::create($data);
-            $event->load(['organization.college']);
+            $event->load(['organization.college', 'creator']);
 
             // Notify all org members about the new event
             \App\Services\ExpoPushService::sendToOrganization(
@@ -333,7 +356,7 @@ class EventController extends Controller
             $this->syncEventStatuses();
 
             $user  = auth()->user();
-            $query = Event::with(['organization.college'])
+            $query = Event::with(['organization.college', 'creator'])
                 ->where('status', 'ongoing')
                 ->orderBy('event_date', 'asc')
                 ->orderBy('event_time', 'asc');
@@ -347,7 +370,6 @@ class EventController extends Controller
                 if (!empty($orgIds)) {
                     $query->whereIn('organization_id', $orgIds);
                 } else {
-                    // Force zero results if not a member of any org
                     $query->where('organization_id', 0);
                 }
             }
@@ -361,7 +383,21 @@ class EventController extends Controller
                 }
             }
 
-            return response()->json($query->get());
+            $events = $query->get();
+            $events->transform(function ($e) {
+                if (!$e->creator && $e->organization_id) {
+                    $desig = \App\Models\Designation::with('user')
+                        ->where('organization_id', $e->organization_id)
+                        ->where('status', 'active')
+                        ->first();
+                    if ($desig && $desig->user) {
+                        $e->setRelation('creator', $desig->user);
+                    }
+                }
+                return $e;
+            });
+
+            return response()->json($events);
         } catch (\Exception $e) {
             Log::error('Upcoming events error: ' . $e->getMessage());
             return response()->json(['message' => 'Error fetching upcoming events'], 500);
