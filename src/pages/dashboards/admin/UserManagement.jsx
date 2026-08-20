@@ -205,8 +205,8 @@ export default function UserManagement() {
       setSelectedUserIds(prev => prev.filter(id => id !== deleteTarget.id));
       setDeleteTarget(null);
       fetchUsers();
-    } catch {
-      toast.error("Error", { description: "Failed to delete account. Please try again." });
+    } catch (err) {
+      toast.error("Error", { description: err.response?.data?.message || err.response?.data?.error || "Failed to delete account. Please try again." });
     }
   };
 
@@ -222,7 +222,7 @@ export default function UserManagement() {
       toast.success("Status Updated", { description: res.data.message || `Updated ${selectedUserIds.length} accounts.` });
       fetchUsers();
     } catch (err) {
-      toast.error("Update Failed", { description: err.response?.data?.message || "Could not update user status." });
+      toast.error("Update Failed", { description: err.response?.data?.message || err.response?.data?.error || "Could not update user status." });
     } finally {
       setBulkActionLoading(false);
     }
@@ -252,7 +252,7 @@ export default function UserManagement() {
       setBulkDeleteOpen(false);
       fetchUsers();
     } catch (err) {
-      toast.error("Delete Failed", { description: err.response?.data?.message || "Could not delete selected accounts." });
+      toast.error("Delete Failed", { description: err.response?.data?.message || err.response?.data?.error || err.message || "Could not delete selected accounts." });
     } finally {
       setBulkActionLoading(false);
     }

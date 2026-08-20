@@ -333,17 +333,21 @@ class UserController extends Controller
             $user = User::findOrFail($id);
 
             DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            $addressId = $user->address_id;
             $this->deleteUserDependencies([$user->id]);
             $user->delete();
+            if ($addressId) {
+                try { Address::where('id', $addressId)->delete(); } catch (\Throwable $t) {}
+            }
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
             DB::commit();
             return response()->json(['message' => 'Account deleted successfully.']);
 
-        } catch (\Exception $e) {
-            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        } catch (\Throwable $e) {
+            try { DB::statement('SET FOREIGN_KEY_CHECKS=1;'); } catch (\Throwable $t) {}
             DB::rollBack();
-            Log::error('User delete error: ' . $e->getMessage());
+            Log::error('User delete error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
             return response()->json(['message' => 'Error deleting account: ' . $e->getMessage()], 500);
         }
     }
@@ -432,18 +436,23 @@ class UserController extends Controller
         DB::beginTransaction();
         try {
             $ids = $request->user_ids;
+            $users = User::whereIn('id', $ids)->get();
+            $addressIds = $users->pluck('address_id')->filter()->toArray();
 
             DB::statement('SET FOREIGN_KEY_CHECKS=0;');
             $this->deleteUserDependencies($ids);
             User::whereIn('id', $ids)->delete();
+            if (!empty($addressIds)) {
+                try { Address::whereIn('id', $addressIds)->delete(); } catch (\Throwable $t) {}
+            }
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
             DB::commit();
             return response()->json(['message' => count($ids) . ' account(s) deleted successfully.']);
-        } catch (\Exception $e) {
-            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        } catch (\Throwable $e) {
+            try { DB::statement('SET FOREIGN_KEY_CHECKS=1;'); } catch (\Throwable $t) {}
             DB::rollBack();
-            Log::error('User bulk delete error: ' . $e->getMessage());
+            Log::error('User bulk delete error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
             return response()->json(['message' => 'Error deleting accounts: ' . $e->getMessage()], 500);
         }
     }
