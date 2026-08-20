@@ -349,7 +349,7 @@ export default function ImportStudentsModal({ open, onClose, onImported, college
                                             <thead>
                                                 <tr className="bg-slate-50 border-b border-slate-100">
                                                     <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-400 uppercase">#</th>
-                                                    {csvHeaders.slice(0, 8).map((h) => (
+                                                    {csvHeaders.map((h) => (
                                                         <th key={h} className="px-3 py-2 text-left text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">{h}</th>
                                                     ))}
                                                 </tr>
@@ -358,7 +358,7 @@ export default function ImportStudentsModal({ open, onClose, onImported, college
                                                 {csvRows.slice(0, 5).map((row, i) => (
                                                     <tr key={i} className="hover:bg-blue-50/30">
                                                         <td className="px-3 py-2 text-slate-400">{i + 1}</td>
-                                                        {csvHeaders.slice(0, 8).map((h) => (
+                                                        {csvHeaders.map((h) => (
                                                             <td key={h} className="px-3 py-2 text-slate-600 whitespace-nowrap max-w-[150px] truncate">{row[h] || "—"}</td>
                                                         ))}
                                                     </tr>
