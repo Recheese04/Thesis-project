@@ -502,7 +502,7 @@ Route::middleware('auth:sanctum')->group(function () {
             $attendance->delete();
             return response()->json(['message' => 'Record deleted.']);
         }
-        );
+        )->where('id', '[0-9]+');
 
         // Evaluations
         Route::get('/evaluations', [EvaluationController::class , 'index']);
