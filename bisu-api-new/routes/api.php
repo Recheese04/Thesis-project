@@ -481,19 +481,19 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('/events/{id}/qr', [EventController::class , 'getQRCode']);
 
                 // Attendance
-                Route::post('attendance/checkin', [AttendanceController::class , 'checkIn']);
-                Route::post('attendance/checkout', [AttendanceController::class , 'checkOut']);
-                Route::get('attendance/my', [AttendanceController::class , 'getMyAttendance']);
-                Route::get('attendance/status/{eventId}', [AttendanceController::class , 'getCurrentStatus']);
-                Route::get('attendance/event/{eventId}', [AttendanceController::class , 'getEventAttendance']);
-                Route::post('attendance/manual-checkin', [AttendanceController::class , 'manualCheckIn']);
-                Route::post('attendance/manual-checkout', [AttendanceController::class , 'manualCheckOut']);
-                Route::post('attendance/rfid-checkin', [AttendanceController::class , 'rfidCheckIn']);
-                Route::post('attendance/rfid-checkout', [AttendanceController::class , 'rfidCheckOut']);
-                Route::post('attendance/rfid-scan', [AttendanceController::class , 'rfidScan']); // smart auto-detect
-                Route::post('attendance/rfid-device', [AttendanceController::class , 'rfidDeviceScan']); // NodeMCU auto-detect event
+                Route::post('/attendance/rfid-device', [AttendanceController::class , 'rfidDeviceScan']); // NodeMCU auto-detect event
+                Route::post('/attendance/checkin', [AttendanceController::class , 'checkIn']);
+                Route::post('/attendance/checkout', [AttendanceController::class , 'checkOut']);
+                Route::get('/attendance/my', [AttendanceController::class , 'getMyAttendance']);
+                Route::get('/attendance/status/{eventId}', [AttendanceController::class , 'getCurrentStatus']);
+                Route::get('/attendance/event/{eventId}', [AttendanceController::class , 'getEventAttendance']);
+                Route::post('/attendance/manual-checkin', [AttendanceController::class , 'manualCheckIn']);
+                Route::post('/attendance/manual-checkout', [AttendanceController::class , 'manualCheckOut']);
+                Route::post('/attendance/rfid-checkin', [AttendanceController::class , 'rfidCheckIn']);
+                Route::post('/attendance/rfid-checkout', [AttendanceController::class , 'rfidCheckOut']);
+                Route::post('/attendance/rfid-scan', [AttendanceController::class , 'rfidScan']); // smart auto-detect
                 Route::put('/students/{id}/rfid', [UserController::class , 'updateRfidUid']);
-                Route::delete('attendance/{id}', function (\Illuminate\Http\Request $request, $id) {
+                Route::delete('/attendance/{id}', function (\Illuminate\Http\Request $request, $id) {
             $user = $request->user();
             $attendance = \App\Models\Attendance::with('event')->findOrFail($id);
             if (!$attendance->event || !$user->isOfficerOf($attendance->event->organization_id)) {
