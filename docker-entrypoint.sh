@@ -15,8 +15,8 @@ php artisan cache:clear || true
 php artisan view:clear
 
 # Generate optimized config/routes for production
-php artisan config:cache
-php artisan route:cache
+php artisan config:cache || true
+php artisan route:cache || true
 
 # Fix storage permissions
 chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true

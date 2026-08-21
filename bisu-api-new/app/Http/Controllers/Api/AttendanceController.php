@@ -661,4 +661,22 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Scan error: ' . $e->getMessage()], 500);
         }
     }
+
+    public function destroyRecord(Request $request, $id)
+    {
+        try {
+            $user = $request->user();
+            $attendance = Attendance::with('event')->findOrFail($id);
+            if (!$attendance->event || !$user->isOfficerOf($attendance->event->organization_id)) {
+                return response()->json(['message' => 'Unauthorized. You can only delete attendance records for your organization.'], 403);
+            }
+            $attendance->delete();
+            return response()->json(['message' => 'Record deleted.']);
+        }
+        catch (\Exception $e) {
+            Log::error('Delete attendance error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error deleting record', 'error' => $e->getMessage()], 500);
+        }
+    }
 }
+

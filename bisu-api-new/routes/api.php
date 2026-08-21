@@ -493,16 +493,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/attendance/rfid-checkout', [AttendanceController::class , 'rfidCheckOut']);
                 Route::post('/attendance/rfid-scan', [AttendanceController::class , 'rfidScan']); // smart auto-detect
                 Route::put('/students/{id}/rfid', [UserController::class , 'updateRfidUid']);
-                Route::delete('/attendance/{id}', function (\Illuminate\Http\Request $request, $id) {
-            $user = $request->user();
-            $attendance = \App\Models\Attendance::with('event')->findOrFail($id);
-            if (!$attendance->event || !$user->isOfficerOf($attendance->event->organization_id)) {
-                return response()->json(['message' => 'Unauthorized. You can only delete attendance records for your organization.'], 403);
-            }
-            $attendance->delete();
-            return response()->json(['message' => 'Record deleted.']);
-        }
-        )->where('id', '[0-9]+');
+                Route::delete('/attendance/{id}', [AttendanceController::class, 'destroyRecord'])->where('id', '[0-9]+');
 
         // Evaluations
         Route::get('/evaluations', [EvaluationController::class , 'index']);
