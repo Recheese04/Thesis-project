@@ -491,6 +491,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('attendance/rfid-checkin', [AttendanceController::class , 'rfidCheckIn']);
                 Route::post('attendance/rfid-checkout', [AttendanceController::class , 'rfidCheckOut']);
                 Route::post('attendance/rfid-scan', [AttendanceController::class , 'rfidScan']); // smart auto-detect
+                Route::post('attendance/rfid-device', [AttendanceController::class , 'rfidDeviceScan']); // NodeMCU auto-detect event
                 Route::put('/students/{id}/rfid', [UserController::class , 'updateRfidUid']);
                 Route::delete('attendance/{id}', function (\Illuminate\Http\Request $request, $id) {
             $user = $request->user();
