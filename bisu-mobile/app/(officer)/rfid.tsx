@@ -12,7 +12,7 @@ import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useAuth } from '../../context/AuthContext';
 import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
 import { useTheme } from '../../context/ThemeContext';
-import { LinearGradient } from 'expo-linear-gradient';
+import SafeLinearGradient from '../../components/ui/SafeLinearGradient';
 
 interface ScanRecord {
   id: string;
@@ -26,21 +26,12 @@ interface ScanRecord {
   action?: 'checkin' | 'checkout' | 'already_checkout' | 'unknown';
 }
 
-// Sample test cards for simulator when physical hardware isn't attached
-const DEMO_TEST_CARDS = [
-  { label: 'Sample Student 1', uid: 'E2806894', description: 'Registered Test Card A' },
-  { label: 'Sample Student 2', uid: 'A34F92B1', description: 'Registered Test Card B' },
-  { label: 'Sample Student 3', uid: 'C910FA88', description: 'Registered Test Card C' },
-  { label: 'Unregistered Card', uid: '99XX00FF', description: 'Simulate Unregistered Tap' },
-];
-
 export default function OfficerRFIDScanner() {
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [rfidInput, setRfidInput] = useState('');
   const [scanning, setScanning] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
-  const [activeTab, setActiveTab] = useState<'scanner' | 'simulator'>('scanner');
 
   // Event Attendance Stats
   const [stats, setStats] = useState({ total: 0, checkedIn: 0, checkedOut: 0 });
@@ -49,10 +40,6 @@ export default function OfficerRFIDScanner() {
   // Scan History
   const [scanHistory, setScanHistory] = useState<ScanRecord[]>([]);
   const [lastScan, setLastScan] = useState<ScanRecord | null>(null);
-
-  // Simulator state
-  const [simulatorPulse] = useState(new Animated.Value(1));
-  const [simulatingTap, setSimulatingTap] = useState(false);
 
   const { membership } = useAuth();
   const { isDark } = useTheme();
@@ -71,6 +58,10 @@ export default function OfficerRFIDScanner() {
   useEffect(() => {
     if (selectedEventId) {
       fetchEventStats(selectedEventId);
+      const interval = setInterval(() => {
+        fetchEventStats(selectedEventId);
+      }, 3000);
+      return () => clearInterval(interval);
     }
   }, [selectedEventId]);
 
@@ -101,7 +92,6 @@ export default function OfficerRFIDScanner() {
         });
       }
     } catch (_) {
-      // Fallback: estimate from local scan history if endpoint varies
     } finally {
       setLoadingStats(false);
     }
@@ -116,12 +106,6 @@ export default function OfficerRFIDScanner() {
     }
 
     setScanning(true);
-
-    // Trigger Card Animation Pulse in Simulator
-    Animated.sequence([
-      Animated.timing(simulatorPulse, { toValue: 1.15, duration: 150, useNativeDriver: true }),
-      Animated.timing(simulatorPulse, { toValue: 1, duration: 150, useNativeDriver: true }),
-    ]).start();
 
     try {
       const res = await api.post('/attendance/rfid-scan', {
@@ -169,20 +153,11 @@ export default function OfficerRFIDScanner() {
       setTimeout(() => inputRef.current?.focus(), 150);
     } finally {
       setScanning(false);
-      setSimulatingTap(false);
     }
   };
 
   const handleManualSubmit = () => {
     executeScan(rfidInput);
-  };
-
-  const handleSimulatedTap = (uid: string) => {
-    setSimulatingTap(true);
-    setRfidInput(uid);
-    setTimeout(() => {
-      executeScan(uid);
-    }, 400);
   };
 
   if (loadingEvents) return (
@@ -216,7 +191,7 @@ export default function OfficerRFIDScanner() {
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                 <Cpu size={12} color="#3b82f6" />
                 <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginLeft: 5 }}>
-                  Hardware & Virtual Attendance
+                  Hardware RFID Attendance
                 </Text>
               </View>
               <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
@@ -231,7 +206,7 @@ export default function OfficerRFIDScanner() {
 
           {/* Mascot & Tarsi Bubble */}
           <View style={{ position: 'relative', minHeight: 110, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
-            <LinearGradient
+            <SafeLinearGradient
               colors={['#3b82f6', '#1d4ed8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 44, zIndex: 0 }}
             />
@@ -247,11 +222,7 @@ export default function OfficerRFIDScanner() {
             </View>
 
             <TarsiChatBubble
-              message={
-                activeTab === 'simulator'
-                  ? "Don't have NodeMCU or RC522 hardware today? Use the Virtual Simulator to test card taps live!"
-                  : "Connect your hardware RFID scanner via USB OTG/Bluetooth, or select an event to get started."
-              }
+              message="NodeMCU & RC522 Hardware active! Live card scans will record directly to attendance."
             />
           </View>
         </View>
@@ -268,7 +239,7 @@ export default function OfficerRFIDScanner() {
             <>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                  1. Select Event
+                  Active Event
                 </Text>
                 <TouchableOpacity onPress={() => selectedEventId && fetchEventStats(selectedEventId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <RefreshCw size={12} color="#3b82f6" />
@@ -333,183 +304,62 @@ export default function OfficerRFIDScanner() {
                 </View>
               )}
 
-              {/* Mode Toggle Switch: Hardware Reader vs Virtual Hardware Simulator */}
-              <View style={{ backgroundColor: bgCard, padding: 4, borderRadius: 14, borderWidth: 1, borderColor: border, flexDirection: 'row', marginBottom: 20 }}>
-                <TouchableOpacity
-                  onPress={() => setActiveTab('scanner')}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 10,
-                    borderRadius: 10,
-                    backgroundColor: activeTab === 'scanner' ? '#2563eb' : 'transparent',
-                    alignItems: 'center',
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <CreditCard size={15} color={activeTab === 'scanner' ? '#ffffff' : textSecondary} />
-                  <Text style={{ marginLeft: 6, fontWeight: '800', fontSize: 12, color: activeTab === 'scanner' ? '#ffffff' : textSecondary }}>
-                    Hardware Scanner
+              {/* HARDWARE SCANNER / MANUAL BACKUP INPUT */}
+              <View style={{ backgroundColor: bgCard, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
+                <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                  <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: isDark ? '#1e3a8a' : '#dbeafe', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                    <CreditCard size={24} color="#2563eb" />
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: textPrimary }}>Hardware Scanner Active</Text>
+                  <Text style={{ fontSize: 12, color: textSecondary, textAlign: 'center', marginTop: 4 }}>
+                    Tap card on NodeMCU reader, or enter Card UID manually below
                   </Text>
-                </TouchableOpacity>
+                </View>
+
+                <TextInput
+                  ref={inputRef}
+                  style={{
+                    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                    borderWidth: 1.5,
+                    borderColor: scanning ? '#2563eb' : border,
+                    borderRadius: 14,
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    fontSize: 18,
+                    fontWeight: '800',
+                    color: textPrimary,
+                    textAlign: 'center',
+                    letterSpacing: 2,
+                    marginBottom: 14,
+                  }}
+                  placeholder="Place RFID card on reader..."
+                  placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
+                  value={rfidInput}
+                  onChangeText={setRfidInput}
+                  onSubmitEditing={handleManualSubmit}
+                  autoFocus
+                  returnKeyType="done"
+                  editable={!scanning}
+                />
 
                 <TouchableOpacity
-                  onPress={() => setActiveTab('simulator')}
+                  onPress={handleManualSubmit}
+                  disabled={scanning || !rfidInput.trim()}
                   style={{
-                    flex: 1,
-                    paddingVertical: 10,
-                    borderRadius: 10,
-                    backgroundColor: activeTab === 'simulator' ? '#8b5cf6' : 'transparent',
+                    backgroundColor: '#2563eb',
+                    paddingVertical: 14,
+                    borderRadius: 14,
                     alignItems: 'center',
-                    flexDirection: 'row',
-                    justifyContent: 'center',
+                    opacity: (scanning || !rfidInput.trim()) ? 0.6 : 1,
                   }}
                 >
-                  <Cpu size={15} color={activeTab === 'simulator' ? '#ffffff' : textSecondary} />
-                  <Text style={{ marginLeft: 6, fontWeight: '800', fontSize: 12, color: activeTab === 'simulator' ? '#ffffff' : textSecondary }}>
-                    Virtual Simulator
-                  </Text>
+                  {scanning ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>Submit Manual UID</Text>
+                  )}
                 </TouchableOpacity>
               </View>
-
-              {/* TAB 1: HARDWARE SCANNER INPUT */}
-              {activeTab === 'scanner' && (
-                <View style={{ backgroundColor: bgCard, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
-                  <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                    <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: isDark ? '#1e3a8a' : '#dbeafe', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                      <CreditCard size={24} color="#2563eb" />
-                    </View>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: textPrimary }}>Awaiting Card Scan</Text>
-                    <Text style={{ fontSize: 12, color: textSecondary, textAlign: 'center', marginTop: 4 }}>
-                      Connect USB OTG / Bluetooth RFID Reader, or manually enter card UID
-                    </Text>
-                  </View>
-
-                  <TextInput
-                    ref={inputRef}
-                    style={{
-                      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-                      borderWidth: 1.5,
-                      borderColor: scanning ? '#2563eb' : border,
-                      borderRadius: 14,
-                      paddingHorizontal: 16,
-                      paddingVertical: 14,
-                      fontSize: 18,
-                      fontWeight: '800',
-                      color: textPrimary,
-                      textAlign: 'center',
-                      letterSpacing: 2,
-                      marginBottom: 14,
-                    }}
-                    placeholder="Place RFID card on reader..."
-                    placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
-                    value={rfidInput}
-                    onChangeText={setRfidInput}
-                    onSubmitEditing={handleManualSubmit}
-                    autoFocus
-                    returnKeyType="done"
-                    editable={!scanning}
-                  />
-
-                  <TouchableOpacity
-                    onPress={handleManualSubmit}
-                    disabled={scanning || !rfidInput.trim()}
-                    style={{
-                      backgroundColor: '#2563eb',
-                      paddingVertical: 14,
-                      borderRadius: 14,
-                      alignItems: 'center',
-                      opacity: (scanning || !rfidInput.trim()) ? 0.6 : 1,
-                    }}
-                  >
-                    {scanning ? (
-                      <ActivityIndicator color="#ffffff" />
-                    ) : (
-                      <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>Submit Manual Scan</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* TAB 2: VIRTUAL HARDWARE SIMULATOR (NodeMCU + RC522 Emulation) */}
-              {activeTab === 'simulator' && (
-                <View style={{ backgroundColor: bgCard, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 20, marginBottom: 20 }}>
-
-                  {/* Simulator Banner */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#f3e8ff', padding: 12, borderRadius: 14, marginBottom: 16 }}>
-                    <Cpu size={20} color="#8b5cf6" />
-                    <View style={{ marginLeft: 10, flex: 1 }}>
-                      <Text style={{ fontWeight: '800', fontSize: 13, color: '#7c3aed' }}>NodeMCU & RC522 Emulation Active</Text>
-                      <Text style={{ fontSize: 11, color: textSecondary }}>Tap any simulated card below to trigger live check-in / check-out API requests.</Text>
-                    </View>
-                  </View>
-
-                  {/* Interactive Virtual Card Graphic */}
-                  <Animated.View style={{ transform: [{ scale: simulatorPulse }], alignItems: 'center', marginVertical: 10 }}>
-                    <LinearGradient
-                      colors={['#8b5cf6', '#6d28d9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={{ width: '100%', height: 140, borderRadius: 18, padding: 18, justifyContent: 'space-between', shadowColor: '#8b5cf6', shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 }}
-                    >
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, letterSpacing: 1 }}>BISU SMART RFID CARD</Text>
-                        <Zap size={18} color="#fef08a" />
-                      </View>
-
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={{ width: 32, height: 24, backgroundColor: '#fef08a', borderRadius: 4, marginRight: 10, opacity: 0.9 }} />
-                        <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '800', letterSpacing: 3 }}>
-                          {rfidInput || '•••• ••••'}
-                        </Text>
-                      </View>
-
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700' }}>TAP CARD TO SCANNER</Text>
-                        <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800' }}>{selectedEvent?.title ? selectedEvent.title.substring(0, 18) + '...' : 'Event Ready'}</Text>
-                      </View>
-                    </LinearGradient>
-                  </Animated.View>
-
-                  {/* Quick Tap Demo Cards */}
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: textPrimary, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 14, marginBottom: 10 }}>
-                    Quick Tap Preset Cards:
-                  </Text>
-
-                  <View style={{ gap: 8 }}>
-                    {DEMO_TEST_CARDS.map((card, idx) => (
-                      <TouchableOpacity
-                        key={idx}
-                        onPress={() => handleSimulatedTap(card.uid)}
-                        disabled={scanning}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-                          paddingHorizontal: 14,
-                          paddingVertical: 12,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: border,
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                          <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: isDark ? '#312e81' : '#ede9fe', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                            <CreditCard size={16} color="#7c3aed" />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontWeight: '800', fontSize: 13, color: textPrimary }}>{card.label}</Text>
-                            <Text style={{ fontSize: 10, color: textSecondary }}>UID: {card.uid} • {card.description}</Text>
-                          </View>
-                        </View>
-
-                        <View style={{ backgroundColor: '#8b5cf6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}>
-                          <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800' }}>Simulate Tap</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
 
               {/* LATEST SCAN RESULT CARD */}
               {lastScan && (
