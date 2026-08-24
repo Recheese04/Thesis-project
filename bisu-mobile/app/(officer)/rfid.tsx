@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert,
-  ScrollView, Image, Modal, Animated, Easing
+  ScrollView, Image, Modal, FlatList
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import api from '../../services/api';
 import {
-  CreditCard, CheckCircle, XCircle, Cpu, RefreshCw, Zap,
-  Users, UserCheck, UserX, Clock, ChevronRight, ShieldAlert, Sparkles, HelpCircle
+  CreditCard, CheckCircle, XCircle, Cpu, RefreshCw,
+  Users, UserCheck, UserX, Clock, Search, X, ListFilter, UserPlus, List
 } from 'lucide-react-native';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useAuth } from '../../context/AuthContext';
@@ -27,11 +28,15 @@ interface ScanRecord {
 }
 
 export default function OfficerRFIDScanner() {
+  const router = useRouter();
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [rfidInput, setRfidInput] = useState('');
   const [scanning, setScanning] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
+
+  // Scan Mode: 'checkin' (force check-in) or 'checkout' (force check-out)
+  const [scanMode, setScanMode] = useState<'checkin' | 'checkout'>('checkin');
 
   // Event Attendance Stats
   const [stats, setStats] = useState({ total: 0, checkedIn: 0, checkedOut: 0 });
@@ -40,6 +45,13 @@ export default function OfficerRFIDScanner() {
   // Scan History
   const [scanHistory, setScanHistory] = useState<ScanRecord[]>([]);
   const [lastScan, setLastScan] = useState<ScanRecord | null>(null);
+
+  // Member Search & Manual Attendance Modal
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [memberQuery, setMemberQuery] = useState('');
+  const [submittingMemberId, setSubmittingMemberId] = useState<number | null>(null);
 
   const { membership } = useAuth();
   const { isDark } = useTheme();
@@ -57,9 +69,9 @@ export default function OfficerRFIDScanner() {
 
   useEffect(() => {
     if (selectedEventId) {
-      fetchEventStats(selectedEventId);
+      fetchEventStats(selectedEventId, false);
       const interval = setInterval(() => {
-        fetchEventStats(selectedEventId);
+        fetchEventStats(selectedEventId, true);
       }, 3000);
       return () => clearInterval(interval);
     }
@@ -77,8 +89,8 @@ export default function OfficerRFIDScanner() {
     setLoadingEvents(false);
   };
 
-  const fetchEventStats = async (eventId: number) => {
-    setLoadingStats(true);
+  const fetchEventStats = async (eventId: number, isSilent = false) => {
+    if (!isSilent) setLoadingStats(true);
     try {
       const res = await api.get(`/attendance/event/${eventId}`);
       if (res.data) {
@@ -93,8 +105,32 @@ export default function OfficerRFIDScanner() {
       }
     } catch (_) {
     } finally {
-      setLoadingStats(false);
+      if (!isSilent) setLoadingStats(false);
     }
+  };
+
+  const fetchOrgMembers = async () => {
+    const orgId = membership?.organization_id;
+    if (!orgId) return;
+    setLoadingMembers(true);
+    try {
+      const res = await api.get(`/organizations/${orgId}/members`);
+      const list = Array.isArray(res.data) ? res.data : (res.data.members || []);
+      setMembers(list);
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to load organization members.');
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const openMemberModal = () => {
+    if (!selectedEventId) {
+      Alert.alert('Select Event', 'Please select an active event first.');
+      return;
+    }
+    setShowMemberModal(true);
+    fetchOrgMembers();
   };
 
   const executeScan = async (uidToScan: string) => {
@@ -108,7 +144,9 @@ export default function OfficerRFIDScanner() {
     setScanning(true);
 
     try {
-      const res = await api.post('/attendance/rfid-scan', {
+      const endpoint = scanMode === 'checkout' ? '/attendance/rfid-checkout' : '/attendance/rfid-checkin';
+
+      const res = await api.post(endpoint, {
         event_id: selectedEventId,
         rfid_uid: cleanUid,
       });
@@ -119,19 +157,19 @@ export default function OfficerRFIDScanner() {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         uid: cleanUid,
         success: true,
-        message: data.message || 'Scan registered successfully!',
+        message: data.message || `Scan (${scanMode === 'checkout' ? 'Check-Out' : 'Check-In'}) registered successfully!`,
         userName: data.user_name,
         studentNumber: data.student_number,
         course: data.course,
-        action: data.action || 'checkin',
+        action: scanMode,
       };
 
       setLastScan(newRecord);
       setScanHistory(prev => [newRecord, ...prev]);
       setRfidInput('');
 
-      // Refresh event statistics
-      fetchEventStats(selectedEventId);
+      // Refresh event statistics silently
+      fetchEventStats(selectedEventId, true);
 
       // Keep focus on input for continuous hardware scanning
       setTimeout(() => inputRef.current?.focus(), 150);
@@ -144,7 +182,7 @@ export default function OfficerRFIDScanner() {
         success: false,
         message: errData.message || 'Card scan failed or unrecognized.',
         userName: errData.user_name,
-        action: errData.action || 'unknown',
+        action: 'unknown',
       };
 
       setLastScan(failRecord);
@@ -156,9 +194,53 @@ export default function OfficerRFIDScanner() {
     }
   };
 
-  const handleManualSubmit = () => {
-    executeScan(rfidInput);
+  const handleManualMemberAction = async (memberUser: any, type: 'checkin' | 'checkout') => {
+    if (!selectedEventId) return;
+    const userId = memberUser.id || memberUser.user_id || memberUser.user?.id;
+    if (!userId) return;
+
+    const name = `${memberUser.user?.first_name || memberUser.first_name || 'Member'} ${memberUser.user?.last_name || memberUser.last_name || ''}`.trim();
+
+    setSubmittingMemberId(userId);
+    try {
+      const endpoint = type === 'checkin' ? '/attendance/manual-checkin' : '/attendance/manual-checkout';
+      const res = await api.post(endpoint, {
+        event_id: selectedEventId,
+        user_id: userId,
+      });
+
+      const newRecord: ScanRecord = {
+        id: Date.now().toString(),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        uid: 'MANUAL',
+        success: true,
+        message: res.data?.message || `Manual ${type === 'checkin' ? 'check-in' : 'check-out'} recorded`,
+        userName: name,
+        studentNumber: memberUser.user?.student_number || memberUser.student_number,
+        course: memberUser.user?.course?.name || memberUser.course,
+        action: type,
+      };
+
+      setLastScan(newRecord);
+      setScanHistory(prev => [newRecord, ...prev]);
+      fetchEventStats(selectedEventId);
+      Alert.alert('Success', `Recorded manual ${type === 'checkin' ? 'check-in' : 'check-out'} for ${name}.`);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.response?.data?.errors?.user_id?.[0] || `Failed to record manual ${type}.`;
+      Alert.alert('Manual Attendance Status', msg);
+    } finally {
+      setSubmittingMemberId(null);
+    }
   };
+
+  const filteredMembers = members.filter(m => {
+    const u = m.user || m;
+    const name = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase();
+    const stNo = String(u.student_number || '').toLowerCase();
+    const des = String(m.designation || '').toLowerCase();
+    const q = memberQuery.toLowerCase();
+    return name.includes(q) || stNo.includes(q) || des.includes(q);
+  });
 
   if (loadingEvents) return (
     <OfficerPageWrapper activeRoute="rfid">
@@ -222,7 +304,7 @@ export default function OfficerRFIDScanner() {
             </View>
 
             <TarsiChatBubble
-              message="NodeMCU & RC522 Hardware active! Live card scans will record directly to attendance."
+              message="NodeMCU & RC522 Hardware active! Choose Check-In or Check-Out mode below."
             />
           </View>
         </View>
@@ -304,61 +386,108 @@ export default function OfficerRFIDScanner() {
                 </View>
               )}
 
-              {/* HARDWARE SCANNER / MANUAL BACKUP INPUT */}
+              {/* HARDWARE SCANNER & SCAN MODE SELECTOR */}
               <View style={{ backgroundColor: bgCard, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
+                
+                {/* SCAN MODE TOGGLE TABS */}
+                <Text style={{ fontSize: 11, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
+                  Hardware Scan Mode
+                </Text>
+                <View style={{ flexDirection: 'row', backgroundColor: isDark ? '#0f172a' : '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 16 }}>
+                  <TouchableOpacity
+                    onPress={() => setScanMode('checkin')}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 9,
+                      alignItems: 'center',
+                      backgroundColor: scanMode === 'checkin' ? '#10b981' : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: scanMode === 'checkin' ? '#ffffff' : textSecondary }}>
+                      📥 Check-In Mode
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setScanMode('checkout')}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 9,
+                      alignItems: 'center',
+                      backgroundColor: scanMode === 'checkout' ? '#f59e0b' : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: scanMode === 'checkout' ? '#ffffff' : textSecondary }}>
+                      📤 Check-Out Mode
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
                 <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                  <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: isDark ? '#1e3a8a' : '#dbeafe', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                    <CreditCard size={24} color="#2563eb" />
+                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: scanMode === 'checkin' ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#dcfce7') : (isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7'), alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                    <CreditCard size={26} color={scanMode === 'checkin' ? '#10b981' : '#f59e0b'} />
                   </View>
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: textPrimary }}>Hardware Scanner Active</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: textPrimary }}>
+                    Hardware Scanner ({scanMode === 'checkin' ? 'Check-In' : 'Check-Out'})
+                  </Text>
                   <Text style={{ fontSize: 12, color: textSecondary, textAlign: 'center', marginTop: 4 }}>
-                    Tap card on NodeMCU reader, or enter Card UID manually below
+                    {scanMode === 'checkin' ? 'Tap RFID card on reader to record Check-In' : 'Tap RFID card on reader to record Check-Out'}
                   </Text>
                 </View>
 
+                {/* Invisible input listener for physical USB/Bluetooth card readers */}
                 <TextInput
                   ref={inputRef}
-                  style={{
-                    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-                    borderWidth: 1.5,
-                    borderColor: scanning ? '#2563eb' : border,
-                    borderRadius: 14,
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                    fontSize: 18,
-                    fontWeight: '800',
-                    color: textPrimary,
-                    textAlign: 'center',
-                    letterSpacing: 2,
-                    marginBottom: 14,
-                  }}
-                  placeholder="Place RFID card on reader..."
-                  placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
+                  style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
                   value={rfidInput}
                   onChangeText={setRfidInput}
-                  onSubmitEditing={handleManualSubmit}
+                  onSubmitEditing={() => executeScan(rfidInput)}
                   autoFocus
                   returnKeyType="done"
-                  editable={!scanning}
                 />
 
-                <TouchableOpacity
-                  onPress={handleManualSubmit}
-                  disabled={scanning || !rfidInput.trim()}
-                  style={{
-                    backgroundColor: '#2563eb',
-                    paddingVertical: 14,
-                    borderRadius: 14,
-                    alignItems: 'center',
-                    opacity: (scanning || !rfidInput.trim()) ? 0.6 : 1,
-                  }}
-                >
-                  {scanning ? (
-                    <ActivityIndicator color="#ffffff" />
-                  ) : (
-                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>Submit Manual UID</Text>
-                  )}
-                </TouchableOpacity>
+                {/* QUICK ACTIONS BUTTONS */}
+                <View style={{ gap: 10 }}>
+                  <TouchableOpacity
+                    onPress={openMemberModal}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      borderRadius: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <UserPlus size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>
+                      Manual Check-in / Check-out by Name
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => router.push('/(officer)/attendance')}
+                    style={{
+                      backgroundColor: isDark ? '#334155' : '#f1f5f9',
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      borderRadius: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: border,
+                    }}
+                  >
+                    <List size={18} color={textPrimary} style={{ marginRight: 8 }} />
+                    <Text style={{ color: textPrimary, fontWeight: '800', fontSize: 14 }}>
+                      View Full Attendance Records
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* LATEST SCAN RESULT CARD */}
@@ -495,6 +624,169 @@ export default function OfficerRFIDScanner() {
             </>
           )}
         </View>
+
+        {/* MODAL: MANUAL MEMBER CHECK-IN / CHECK-OUT */}
+        <Modal
+          visible={showMemberModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowMemberModal(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+            <View style={{
+              backgroundColor: bgCard,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 20,
+              maxHeight: '85%',
+              borderWidth: 1,
+              borderColor: border,
+            }}>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <View>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: textPrimary }}>Manual Member Attendance</Text>
+                  <Text style={{ fontSize: 12, color: textSecondary, marginTop: 2 }}>Select Check-In or Check-Out for a member</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowMemberModal(false)}
+                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isDark ? '#334155' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={20} color={textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Search Bar */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                borderRadius: 14,
+                paddingHorizontal: 12,
+                borderWidth: 1,
+                borderColor: border,
+                marginBottom: 14,
+              }}>
+                <Search size={18} color={textSecondary} />
+                <TextInput
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    paddingHorizontal: 10,
+                    fontSize: 14,
+                    color: textPrimary,
+                  }}
+                  placeholder="Search by member name, ID number..."
+                  placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+                  value={memberQuery}
+                  onChangeText={setMemberQuery}
+                />
+                {memberQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setMemberQuery('')}>
+                    <X size={16} color={textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Members List */}
+              {loadingMembers ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color="#2563eb" />
+                  <Text style={{ color: textSecondary, marginTop: 10, fontSize: 13, fontWeight: '600' }}>Loading organization members...</Text>
+                </View>
+              ) : filteredMembers.length === 0 ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <Users size={32} color={textSecondary} style={{ opacity: 0.4, marginBottom: 8 }} />
+                  <Text style={{ color: textSecondary, fontSize: 14, fontWeight: '700' }}>No members found</Text>
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  <View style={{ gap: 8, paddingBottom: 20 }}>
+                    {filteredMembers.map((m) => {
+                      const u = m.user || m;
+                      const uId = u.id || m.user_id || m.id;
+                      const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Unknown User';
+                      const stNo = u.student_number || 'No ID';
+                      const designation = m.designation || 'Member';
+                      const isSubmitting = submittingMemberId === uId;
+
+                      return (
+                        <View
+                          key={m.id || uId}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 12,
+                            borderRadius: 14,
+                            backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                            borderWidth: 1,
+                            borderColor: border,
+                          }}
+                        >
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary }}>{fullName}</Text>
+                            <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
+                              ID: {stNo} • <Text style={{ color: '#3b82f6', fontWeight: '700' }}>{designation}</Text>
+                            </Text>
+                          </View>
+
+                          <View style={{ flexDirection: 'row', gap: 6 }}>
+                            <TouchableOpacity
+                              onPress={() => handleManualMemberAction(m, 'checkin')}
+                              disabled={isSubmitting}
+                              style={{
+                                backgroundColor: '#10b981',
+                                paddingHorizontal: 10,
+                                paddingVertical: 8,
+                                borderRadius: 10,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                opacity: isSubmitting ? 0.6 : 1,
+                              }}
+                            >
+                              {isSubmitting ? (
+                                <ActivityIndicator size="small" color="#ffffff" />
+                              ) : (
+                                <>
+                                  <UserCheck size={13} color="#ffffff" style={{ marginRight: 3 }} />
+                                  <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 11 }}>In</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              onPress={() => handleManualMemberAction(m, 'checkout')}
+                              disabled={isSubmitting}
+                              style={{
+                                backgroundColor: '#f59e0b',
+                                paddingHorizontal: 10,
+                                paddingVertical: 8,
+                                borderRadius: 10,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                opacity: isSubmitting ? 0.6 : 1,
+                              }}
+                            >
+                              {isSubmitting ? (
+                                <ActivityIndicator size="small" color="#ffffff" />
+                              ) : (
+                                <>
+                                  <UserX size={13} color="#ffffff" style={{ marginRight: 3 }} />
+                                  <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 11 }}>Out</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </OfficerPageWrapper>
   );

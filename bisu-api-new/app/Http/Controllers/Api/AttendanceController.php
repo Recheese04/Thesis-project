@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\Attendance;
 use App\Models\User;
+use App\Models\Designation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -288,12 +289,29 @@ class AttendanceController extends Controller
     {
         try {
             $data = $request->validate([
-                'attendance_id' => 'required|exists:attendances,id',
-                'time_out' => 'nullable|date',
-                'remarks' => 'nullable|string',
+                'attendance_id' => 'nullable|exists:attendances,id',
+                'event_id'      => 'nullable|exists:events,id',
+                'user_id'       => 'nullable|exists:users,id',
+                'time_out'      => 'nullable|date',
+                'remarks'       => 'nullable|string',
             ]);
 
-            $attendance = Attendance::with('event')->findOrFail($data['attendance_id']);
+            if (!empty($data['attendance_id'])) {
+                $attendance = Attendance::with('event')->findOrFail($data['attendance_id']);
+            } else if (!empty($data['event_id']) && !empty($data['user_id'])) {
+                $attendance = Attendance::with('event')
+                    ->where('event_id', $data['event_id'])
+                    ->where('user_id', $data['user_id'])
+                    ->where('status', 'checked_in')
+                    ->first();
+            } else {
+                return response()->json(['message' => 'Must provide attendance_id or both event_id and user_id'], 422);
+            }
+
+            if (!$attendance) {
+                return response()->json(['message' => 'No active check-in record found for this student.'], 404);
+            }
+
             $authUser = auth()->user();
             $event = $attendance->event;
 
@@ -302,7 +320,7 @@ class AttendanceController extends Controller
             }
 
             if ($attendance->status === 'checked_out') {
-                return response()->json(['message' => 'Already checked out'], 400);
+                return response()->json(['message' => 'Already checked out.'], 400);
             }
 
             $attendance->time_out = $data['time_out'] ?? now();
@@ -490,6 +508,21 @@ class AttendanceController extends Controller
                 return response()->json(['message' => 'Unauthorized. You can only scan for your organization\'s events.'], 403);
             }
 
+            // Verify if student is an active member of this organization
+            $isMember = Designation::where('user_id', $user->id)
+                ->where('organization_id', $event->organization_id)
+                ->where('status', 'active')
+                ->exists();
+
+            if (!$isMember) {
+                return response()->json([
+                    'message' => 'Access Denied: This student is not a member of this organization.',
+                    'action' => 'unknown',
+                    'user_name' => trim($user->first_name . ' ' . $user->last_name),
+                    'student_number' => $user->student_number,
+                ], 403);
+            }
+
             $userPayload = [
                 'user_name' => trim($user->first_name . ' ' . $user->last_name),
                 'profile_picture_url' => $user->profile_picture_url,
@@ -596,6 +629,22 @@ class AttendanceController extends Controller
                     'rfid_uid' => $data['rfid_uid'],
                     'event_title' => $event->title,
                 ], 404);
+            }
+
+            // Verify if student is an active member of this organization
+            $isMember = Designation::where('user_id', $user->id)
+                ->where('organization_id', $event->organization_id)
+                ->where('status', 'active')
+                ->exists();
+
+            if (!$isMember) {
+                return response()->json([
+                    'message' => 'Access Denied: This student is not a member of this organization.',
+                    'action' => 'unknown',
+                    'user_name' => trim($user->first_name . ' ' . $user->last_name),
+                    'student_number' => $user->student_number,
+                    'event_title' => $event->title,
+                ], 403);
             }
 
             $userPayload = [
