@@ -622,7 +622,14 @@ class AttendanceController extends Controller
                 'device_id' => 'nullable|string',
             ]);
 
-            $authUser = auth()->user();
+            $authUser = null;
+            try {
+                if ($request->bearerToken()) {
+                    $authUser = auth('sanctum')->user();
+                }
+            } catch (\Throwable $e) {
+                $authUser = null;
+            }
             $event = null;
 
             // Auto-register / update last_seen_at for this hardware scanner
