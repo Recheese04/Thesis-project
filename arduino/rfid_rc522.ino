@@ -22,8 +22,8 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 //************************************************************************
 /* Wi-Fi & Backend Server Credentials */
-const char *ssid = "BISU_WIFI";
-const char *password = "B!SU@wifi2026";
+const char *ssid = "POSTANES WIFI";
+const char *password = "Rechie@James!4!";
 const char* device_token = "2c4f3c61aa79d533";
 
 String URL = "https://thesis-project-production-c531.up.railway.app/api/attendance/rfid-device"; 

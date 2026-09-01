@@ -627,10 +627,14 @@ class AttendanceController extends Controller
 
             // Auto-register / update last_seen_at for this hardware scanner
             if (!empty($data['device_id'])) {
-                ScannerDevice::updateOrCreate(
-                    ['device_id' => $data['device_id']],
-                    ['last_seen_at' => now()]
-                );
+                try {
+                    ScannerDevice::updateOrCreate(
+                        ['device_id' => $data['device_id']],
+                        ['last_seen_at' => now()]
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('ScannerDevice update skipped: ' . $e->getMessage());
+                }
             }
 
             // 1. If explicit event_id is provided by scanner device
@@ -640,18 +644,22 @@ class AttendanceController extends Controller
 
             // 2. Check if there is an ACTIVE Scanner Session started by an officer
             if (!$event) {
-                $activeSession = null;
-                // If device_id provided, look for session specifically bound to this device
-                if (!empty($data['device_id'])) {
-                    $activeSession = ScannerSession::where('device_id', $data['device_id'])->where('status', 'active')->latest()->first();
-                }
-                // Fallback to general scanner session (not locked to specific MAC)
-                if (!$activeSession) {
-                    $activeSession = ScannerSession::where('status', 'active')->latest()->first();
-                }
+                try {
+                    $activeSession = null;
+                    // If device_id provided, look for session specifically bound to this device
+                    if (!empty($data['device_id'])) {
+                        $activeSession = ScannerSession::where('device_id', $data['device_id'])->where('status', 'active')->latest()->first();
+                    }
+                    // Fallback to general scanner session (not locked to specific MAC)
+                    if (!$activeSession) {
+                        $activeSession = ScannerSession::where('status', 'active')->latest()->first();
+                    }
 
-                if ($activeSession) {
-                    $event = Event::where('id', $activeSession->event_id)->where('status', 'ongoing')->first();
+                    if ($activeSession) {
+                        $event = Event::where('id', $activeSession->event_id)->where('status', 'ongoing')->first();
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('ScannerSession check skipped: ' . $e->getMessage());
                 }
             }
 

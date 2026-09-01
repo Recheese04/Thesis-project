@@ -3,8 +3,8 @@
  * FINAL WORKING ARDUINO SKETCH FOR BISU THESIS RFID ATTENDANCE SYSTEM
  * Hardware: NodeMCU (ESP8266) + RC522 RFID Reader
  * 
- * Wi-Fi SSID  : BISU_WIFI
- * Wi-Fi Pass  : B!SU@wifi2026
+ * Wi-Fi SSID  : POSTANES WIFI
+ * Wi-Fi Pass  : Rechie@James!4!
  * Server API  : https://thesis-project-production-c531.up.railway.app/api/attendance/rfid-device
  * 
  * WIRING DIAGRAM:
@@ -33,8 +33,8 @@
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 // Wi-Fi Credentials & Server Configuration
-const char *ssid = "BISU_WIFI";
-const char *password = "B!SU@wifi2026";
+const char *ssid = "POSTANES WIFI";
+const char *password = "Rechie@James!4!";
 const char* URL = "https://thesis-project-production-c531.up.railway.app/api/attendance/rfid-device";
 
 // Card Scan Anti-Duplicate Cooldown (2 seconds for same card)
@@ -166,6 +166,7 @@ void sendScanToServer(String cardUID) {
 
     if (http.begin(client, URL)) {
       http.addHeader("Content-Type", "application/json");
+      http.addHeader("Accept", "application/json");
 
       // Construct JSON Payload with unique device MAC address
       String deviceID = WiFi.macAddress();
