@@ -615,12 +615,20 @@ class AttendanceController extends Controller
 
     public function rfidDeviceScan(Request $request)
     {
-        try {
-            $data = $request->validate([
+            $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
                 'rfid_uid' => 'required|string',
-                'event_id' => 'nullable|exists:events,id',
+                'event_id' => 'nullable|integer',
                 'device_id' => 'nullable|string',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation error.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $data = $validator->validated();
 
             $authUser = null;
             try {
