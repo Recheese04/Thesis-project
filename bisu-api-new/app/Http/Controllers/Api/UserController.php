@@ -67,6 +67,44 @@ class UserController extends Controller
         }
     }
 
+    public function getByRfid(Request $request, $uid)
+    {
+        try {
+            $user = User::with(['college', 'course', 'userType'])->where('rfid_uid', $uid)->first();
+            if (!$user) {
+                return response()->json(['message' => 'No user found with this RFID card.'], 404);
+            }
+
+            if ($request->has('event_id')) {
+                $event = \App\Models\Event::find($request->event_id);
+                if ($event) {
+                    $isMember = \App\Models\Designation::where('user_id', $user->id)
+                        ->where('organization_id', $event->organization_id)
+                        ->where('status', 'active')
+                        ->exists();
+
+                    if (!$isMember) {
+                        return response()->json(['message' => 'User is not a member of this organization.'], 403);
+                    }
+                }
+            }
+
+            return response()->json([
+                'id' => $user->id,
+                'user_name' => trim($user->first_name . ' ' . $user->last_name),
+                'student_number' => $user->student_number,
+                'profile_picture_url' => $user->profile_picture_url,
+                'year_level' => $user->year_level,
+                'course' => $user->course ? $user->course->name : null,
+                'college' => $user->college ? $user->college->name : null,
+                'rfid_uid' => $user->rfid_uid
+            ]);
+        } catch (\Exception $e) {
+            Log::error('User getByRfid error: ' . $e->getMessage());
+            return response()->json(['message' => 'Server Error', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function store(Request $request)
     {
         $needsStudent = in_array($request->user_type_id, ['2', 2, '3', 3]);
@@ -78,6 +116,7 @@ class UserController extends Controller
             'password'     => 'nullable|string|min:8',
             'user_type_id' => 'required|exists:user_types,id',
             'is_active'    => 'nullable|in:0,1',
+            'rfid_uid'     => 'nullable|string|max:50|unique:users,rfid_uid',
         ];
 
         if ($needsStudent) {
@@ -122,6 +161,7 @@ class UserController extends Controller
                 'password_hash' => Hash::make($password),
                 'user_type_id'  => $data['user_type_id'],
                 'is_active'     => ($data['is_active'] ?? '1') == '1',
+                'rfid_uid'      => $data['rfid_uid'] ?? null,
             ];
 
             if ($needsStudent) {
@@ -185,6 +225,7 @@ class UserController extends Controller
             'password'     => 'nullable|string|min:8',
             'user_type_id' => 'required|exists:user_types,id',
             'is_active'    => 'nullable|in:0,1',
+            'rfid_uid'     => "nullable|string|max:50|unique:users,rfid_uid,{$user->id}",
         ];
 
         if ($needsStudent) {
@@ -230,6 +271,10 @@ class UserController extends Controller
                 'user_type_id' => $data['user_type_id'],
                 'is_active'    => isset($data['is_active']) ? $data['is_active'] == '1' : $user->is_active,
             ];
+
+            if (array_key_exists('rfid_uid', $data)) {
+                $userUpdate['rfid_uid'] = $data['rfid_uid'];
+            }
 
             if ($needsStudent) {
                 $userUpdate['student_number'] = $data['student_number'];

@@ -22,7 +22,7 @@ const EMPTY_FORM = {
   email: "", password: "", user_type_id: "", is_active: "1",
   student_number: "", first_name: "", middle_name: "",
   last_name: "", college_id: "", year_level: "", contact_number: "",
-  course_id: "",
+  course_id: "", rfid_uid: "",
   org_memberships: [],
   street: "",
   barangay: "",
@@ -212,6 +212,7 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, colleg
         year_level:      editUser.year_level     ?? "",
         contact_number:  editUser.contact_number ?? "",
         course_id:       String(editUser.course_id ?? ""),
+        rfid_uid:        editUser.rfid_uid       ?? "",
         org_memberships: (editUser.all_memberships ?? []).map(m => ({
           organization_id: String(m.organization_id),
           designation:     m.designation ?? "Member",
@@ -409,6 +410,12 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, colleg
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-slate-700 font-semibold text-xs">RFID UID <span className="text-slate-400 font-normal">(optional)</span></Label>
+                  <Input value={form.rfid_uid} onChange={set("rfid_uid")} placeholder="Scan RFID card..."
+                    className="border-slate-200 focus:border-[#1e4db7] bg-white h-9 text-sm" />
                 </div>
 
                 {isOfficer && (

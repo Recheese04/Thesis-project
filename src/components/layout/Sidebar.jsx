@@ -53,7 +53,6 @@ const adminMenuSections = [
     items: [
       { icon: ClipboardList, label: 'Attendance', path: '/admin/attendance', badge: null },
       { icon: FileText, label: 'Documents', path: '/admin/documents', badge: null },
-      { icon: MessageSquare, label: 'Messages', path: '/admin/messages', badge: null },
     ],
   },
 ];

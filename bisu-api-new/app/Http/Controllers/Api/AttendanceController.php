@@ -7,6 +7,8 @@ use App\Models\Event;
 use App\Models\Attendance;
 use App\Models\User;
 use App\Models\Designation;
+use App\Models\ScannerSession;
+use App\Models\ScannerDevice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -129,7 +131,7 @@ class AttendanceController extends Controller
         try {
             $event = Event::findOrFail($eventId);
             $authUser = auth()->user();
-            if (!$authUser->isOfficerOf($event->organization_id)) {
+            if (!$authUser->isAdmin() && !$authUser->isOfficerOf($event->organization_id)) {
                 return response()->json(['message' => 'Unauthorized. You can only view attendance for your own events.'], 403);
             }
 
@@ -369,6 +371,17 @@ class AttendanceController extends Controller
                 return response()->json(['message' => 'Unauthorized. You can only scan for your organization\'s events.'], 403);
             }
 
+            $isMember = \App\Models\Designation::where('user_id', $user->id)
+                ->where('organization_id', $event->organization_id)
+                ->where('status', 'active')
+                ->exists();
+
+            if (!$isMember) {
+                return response()->json([
+                    'message' => 'User is not a member of this organization.',
+                ], 403);
+            }
+
             $existing = Attendance::where('event_id', $data['event_id'])
                 ->where('user_id', $user->id)
                 ->first();
@@ -445,6 +458,17 @@ class AttendanceController extends Controller
             $authUser = auth()->user();
             if (!$authUser->isOfficerOf($event->organization_id)) {
                 return response()->json(['message' => 'Unauthorized.'], 403);
+            }
+
+            $isMember = \App\Models\Designation::where('user_id', $user->id)
+                ->where('organization_id', $event->organization_id)
+                ->where('status', 'active')
+                ->exists();
+
+            if (!$isMember) {
+                return response()->json([
+                    'message' => 'User is not a member of this organization.',
+                ], 403);
             }
 
             $attendance = Attendance::where('event_id', $data['event_id'])
@@ -594,28 +618,64 @@ class AttendanceController extends Controller
         try {
             $data = $request->validate([
                 'rfid_uid' => 'required|string',
+                'event_id' => 'nullable|exists:events,id',
+                'device_id' => 'nullable|string',
             ]);
 
             $authUser = auth()->user();
+            $event = null;
 
-            // Find the officer's organization
-            $orgId = $authUser->getOfficerOrganizationId();
-            if (!$orgId) {
-                return response()->json([
-                    'message' => 'You are not an officer of any organization.',
-                    'action' => 'error',
-                ], 403);
+            // Auto-register / update last_seen_at for this hardware scanner
+            if (!empty($data['device_id'])) {
+                ScannerDevice::updateOrCreate(
+                    ['device_id' => $data['device_id']],
+                    ['last_seen_at' => now()]
+                );
             }
 
-            // Auto-find the current ongoing event for this org
-            $event = Event::where('organization_id', $orgId)
-                ->where('status', 'ongoing')
-                ->orderBy('updated_at', 'desc')
-                ->first();
+            // 1. If explicit event_id is provided by scanner device
+            if (!empty($data['event_id'])) {
+                $event = Event::where('id', $data['event_id'])->where('status', 'ongoing')->first();
+            }
+
+            // 2. Check if there is an ACTIVE Scanner Session started by an officer
+            if (!$event) {
+                $activeSession = null;
+                // If device_id provided, look for session specifically bound to this device
+                if (!empty($data['device_id'])) {
+                    $activeSession = ScannerSession::where('device_id', $data['device_id'])->where('status', 'active')->latest()->first();
+                }
+                // Fallback to general scanner session (not locked to specific MAC)
+                if (!$activeSession) {
+                    $activeSession = ScannerSession::where('status', 'active')->latest()->first();
+                }
+
+                if ($activeSession) {
+                    $event = Event::where('id', $activeSession->event_id)->where('status', 'ongoing')->first();
+                }
+            }
+
+            // 3. If logged in officer, find ongoing event for officer's organization
+            if (!$event && $authUser) {
+                $orgId = $authUser->getOfficerOrganizationId();
+                if ($orgId) {
+                    $event = Event::where('organization_id', $orgId)
+                        ->where('status', 'ongoing')
+                        ->orderBy('updated_at', 'desc')
+                        ->first();
+                }
+            }
+
+            // 4. Fallback for hardware scans (NodeMCU): find latest active ongoing event
+            if (!$event) {
+                $event = Event::where('status', 'ongoing')
+                    ->orderBy('updated_at', 'desc')
+                    ->first();
+            }
 
             if (!$event) {
                 return response()->json([
-                    'message' => 'No ongoing event found for your organization. Please start an event first.',
+                    'message' => 'No ongoing event found. Please start an event in the mobile app first.',
                     'action' => 'no_event',
                 ], 404);
             }

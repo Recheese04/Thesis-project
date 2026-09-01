@@ -1,12 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Users, CheckCircle, XCircle, Clock, Calendar, Download, RefreshCw, Search, ListFilter, LayoutGrid } from 'lucide-react';
+import {
+  Users, CheckCircle, XCircle, Clock, Calendar, Download, RefreshCw,
+  Search, ListFilter, LayoutGrid, UserPlus, LogOut, Loader2, Trash2,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
@@ -19,7 +34,24 @@ export default function OfficerAttendance() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState('grouped'); // 'grouped' or 'flat'
+  const [viewMode, setViewMode] = useState('grouped');
+
+  // Manual Check-In state
+  const [manualOpen, setManualOpen] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [manualRemarks, setManualRemarks] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Check-Out state
+  const [checkoutTarget, setCheckoutTarget] = useState(null);
+
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const orgId = localStorage.getItem('organization_id');
 
   useEffect(() => { fetchEvents(); }, []);
   useEffect(() => { if (selectedEvent) fetchAttendance(selectedEvent.id); }, [selectedEvent]);
@@ -41,6 +73,84 @@ export default function OfficerAttendance() {
       setStats(res.data.stats ?? null);
     } catch { toast.error('Failed to load attendance'); }
     finally { setLoadingAttendance(false); }
+  };
+
+  // ── Fetch org members for manual check-in ─────────────────────────────
+  const fetchMembers = async () => {
+    if (!orgId) return;
+    setLoadingMembers(true);
+    try {
+      const res = await axios.get(`/api/organizations/${orgId}/members`, authH());
+      // Filter to only active members
+      const active = (res.data || []).filter(m => m.status === 'active');
+      setMembers(active);
+    } catch {
+      toast.error('Failed to load members');
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const openManualDialog = () => {
+    setSelectedUserId('');
+    setManualRemarks('');
+    setMemberSearch('');
+    setManualOpen(true);
+    fetchMembers();
+  };
+
+  // ── Manual Check-In ───────────────────────────────────────────────────
+  const handleManualCheckIn = async () => {
+    if (!selectedUserId || !selectedEvent) {
+      toast.error('Please select a member.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await axios.post('/api/attendance/manual-checkin', {
+        event_id: selectedEvent.id,
+        user_id: selectedUserId,
+        remarks: manualRemarks || null,
+      }, authH());
+      toast.success('Manual check-in recorded!');
+      setManualOpen(false);
+      fetchAttendance(selectedEvent.id);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.errors?.user_id?.[0] || 'Check-in failed.';
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Manual Check-Out ──────────────────────────────────────────────────
+  const handleManualCheckOut = async () => {
+    if (!checkoutTarget) return;
+    try {
+      await axios.post('/api/attendance/manual-checkout', {
+        attendance_id: checkoutTarget.id,
+      }, authH());
+      toast.success('Checked out successfully!');
+      setCheckoutTarget(null);
+      fetchAttendance(selectedEvent.id);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Check-out failed.');
+      setCheckoutTarget(null);
+    }
+  };
+
+  // ── Delete Attendance ─────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await axios.delete(`/api/attendance/${deleteTarget.id}`, authH());
+      toast.success('Record deleted.');
+      setDeleteTarget(null);
+      fetchAttendance(selectedEvent.id);
+    } catch {
+      toast.error('Failed to delete record.');
+      setDeleteTarget(null);
+    }
   };
 
   const formatTime = (dt) => {
@@ -84,6 +194,17 @@ export default function OfficerAttendance() {
     );
   }, [attendance, searchQuery]);
 
+  // Filtered member list for the manual check-in dialog
+  const filteredMembers = useMemo(() => {
+    if (!memberSearch.trim()) return members;
+    const q = memberSearch.toLowerCase();
+    return members.filter(m => {
+      const name = `${m.user?.first_name || ''} ${m.user?.last_name || ''}`.toLowerCase();
+      const sid = (m.user?.student_number || '').toLowerCase();
+      return name.includes(q) || sid.includes(q);
+    });
+  }, [members, memberSearch]);
+
   const AttendanceRow = ({ record }) => (
     <TableRow>
       <TableCell>
@@ -102,6 +223,20 @@ export default function OfficerAttendance() {
       <TableCell>{formatTime(record.time_out)}</TableCell>
       <TableCell>{record.formatted_duration ?? '—'}</TableCell>
       <TableCell><StatusBadge status={record.status} /></TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          {record.status === 'checked_in' && (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+              onClick={() => setCheckoutTarget(record)} title="Check Out">
+              <LogOut className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"
+            onClick={() => setDeleteTarget(record)} title="Delete">
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </TableCell>
     </TableRow>
   );
 
@@ -119,7 +254,19 @@ export default function OfficerAttendance() {
             <p className="text-xs text-slate-500 font-mono">{record.user?.student_number ?? '—'}</p>
           </div>
         </div>
-        <StatusBadge status={record.status} />
+        <div className="flex items-center gap-1 shrink-0">
+          <StatusBadge status={record.status} />
+          {record.status === 'checked_in' && (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500 hover:text-blue-700"
+              onClick={() => setCheckoutTarget(record)}>
+              <LogOut className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-600"
+            onClick={() => setDeleteTarget(record)}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
       <div className="grid grid-cols-3 gap-1 text-xs">
         <div>
@@ -150,10 +297,16 @@ export default function OfficerAttendance() {
         </div>
         <div className="flex gap-2 flex-wrap">
           {selectedEvent && (
-            <Button variant="outline" size="sm" onClick={() => fetchAttendance(selectedEvent.id)} disabled={loadingAttendance}>
-              <RefreshCw className={`w-4 h-4 mr-1.5 ${loadingAttendance ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
+            <>
+              <Button size="sm" onClick={openManualDialog}
+                className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5">
+                <UserPlus className="w-4 h-4" /> Manual Check-In
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => fetchAttendance(selectedEvent.id)} disabled={loadingAttendance}>
+                <RefreshCw className={`w-4 h-4 mr-1.5 ${loadingAttendance ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+            </>
           )}
           <Button variant="outline" size="sm" onClick={handleExport} disabled={!attendance.length}>
             <Download className="w-4 h-4 mr-1.5" />
@@ -310,6 +463,7 @@ export default function OfficerAttendance() {
                               <TableHead>Check Out</TableHead>
                               <TableHead>Duration</TableHead>
                               <TableHead>Status</TableHead>
+                              <TableHead className="w-20">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -340,6 +494,7 @@ export default function OfficerAttendance() {
                           <TableHead>Check Out</TableHead>
                           <TableHead>Duration</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead className="w-20">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -353,6 +508,134 @@ export default function OfficerAttendance() {
           </Card>
         </>
       )}
+
+      {/* ── Manual Check-In Dialog ───────────────────────────────────────── */}
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-violet-600" /> Manual Check-In
+            </DialogTitle>
+            <DialogDescription>
+              Select a member to manually record their attendance for <strong>{selectedEvent?.title}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Member search + select */}
+            <div className="space-y-2">
+              <Label>Member</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Search by name or student ID…"
+                  className="pl-9"
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                />
+              </div>
+
+              {loadingMembers ? (
+                <div className="py-6 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading members…
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+                  {filteredMembers.length === 0 ? (
+                    <div className="py-6 text-center text-sm text-slate-400">No members found</div>
+                  ) : (
+                    filteredMembers.map(m => {
+                      const name = `${m.user?.first_name || ''} ${m.user?.last_name || ''}`.trim();
+                      const userId = String(m.user_id);
+                      const isSelected = selectedUserId === userId;
+                      return (
+                        <button key={m.id} type="button"
+                          onClick={() => setSelectedUserId(userId)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all ${
+                            isSelected
+                              ? 'bg-violet-50 border-l-3 border-violet-500'
+                              : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <Avatar className="w-8 h-8 shrink-0">
+                            <AvatarFallback className={`text-xs font-bold ${isSelected ? 'bg-violet-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                              {getInitials(name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${isSelected ? 'text-violet-700' : 'text-slate-800'}`}>{name || 'Unknown'}</p>
+                            <p className="text-xs text-slate-400 font-mono">{m.user?.student_number || '—'}</p>
+                          </div>
+                          {isSelected && (
+                            <CheckCircle className="w-4 h-4 text-violet-600 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Remarks */}
+            <div className="space-y-2">
+              <Label>Remarks <span className="text-xs text-slate-400">(optional)</span></Label>
+              <Textarea
+                placeholder="e.g. Late arrival, excused…"
+                value={manualRemarks}
+                onChange={(e) => setManualRemarks(e.target.value)}
+                className="resize-none h-20"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button variant="ghost" onClick={() => setManualOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button onClick={handleManualCheckIn} disabled={submitting || !selectedUserId}
+              className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5">
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+              {submitting ? 'Checking In…' : 'Check In'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Check-Out Confirmation ────────────────────────────────────────── */}
+      <AlertDialog open={!!checkoutTarget} onOpenChange={(v) => !v && setCheckoutTarget(null)}>
+        <AlertDialogContent className="rounded-2xl max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Check out this student?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Mark <strong>{checkoutTarget?.user?.name ?? 'this student'}</strong> as checked out from{' '}
+              <strong>{selectedEvent?.title}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleManualCheckOut} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <LogOut className="mr-2 h-4 w-4" /> Check Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Delete Confirmation ───────────────────────────────────────────── */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <AlertDialogContent className="rounded-2xl max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently remove the attendance record for <strong>{deleteTarget?.user?.name ?? 'this student'}</strong>. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

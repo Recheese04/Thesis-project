@@ -25,6 +25,7 @@ import OrganizationManagement from './pages/dashboards/admin/OrganizationManagem
 import EventManagement from './pages/dashboards/admin/EventManagement';
 import Settings from './pages/dashboards/admin/Settings';
 import AttendanceManagement from './pages/dashboards/admin/AttendanceManagement';
+import AdminDocuments from './pages/dashboards/admin/AdminDocuments';
 
 // Student
 import StudentLayout from './components/layout/StudentLayout';
@@ -100,6 +101,7 @@ function App() {
           <Route path="organizations" element={<OrganizationManagement />} />
           <Route path="events" element={<EventManagement />} />
           <Route path="attendance" element={<AttendanceManagement />} />
+          <Route path="documents" element={<AdminDocuments />} />
           <Route path="settings" element={<Settings />} />
         </Route>
 

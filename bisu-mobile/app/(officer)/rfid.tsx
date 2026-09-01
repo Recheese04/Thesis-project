@@ -63,9 +63,89 @@ export default function OfficerRFIDScanner() {
 
   const inputRef = useRef<TextInput>(null);
 
+  // Scanner Session & Devices (Officer Hardware Assignment)
+  const [activeSession, setActiveSession] = useState<any>(null);
+  const [loadingSession, setLoadingSession] = useState(false);
+  const [devices, setDevices] = useState<any[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchEvents();
+    fetchActiveSession();
+    fetchDevices();
   }, []);
+
+  const fetchDevices = async () => {
+    try {
+      const res = await api.get('/scanner-devices');
+      setDevices(res.data.devices || []);
+    } catch (_) { }
+  };
+
+  const fetchActiveSession = async () => {
+    try {
+      const res = await api.get('/scanner-sessions/active');
+      setActiveSession(res.data.session || null);
+    } catch (_) { }
+  };
+
+  const handleStartSession = async () => {
+    if (!selectedEventId) {
+      Alert.alert('Select Event', 'Please select an event first.');
+      return;
+    }
+    setLoadingSession(true);
+    try {
+      const res = await api.post('/scanner-sessions/start', {
+        event_id: selectedEventId,
+        device_id: selectedDeviceId,
+      });
+      setActiveSession(res.data.session);
+      Alert.alert('Scanner Session Started', `NodeMCU hardware is now bound to "${res.data.session.event_title}". Scans will be logged under your officer name.`);
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.message || 'Failed to start scanner session.');
+    } finally {
+      setLoadingSession(false);
+    }
+  };
+
+  const handleStopSession = async () => {
+    setLoadingSession(true);
+    try {
+      await api.post('/scanner-sessions/stop');
+      setActiveSession(null);
+      Alert.alert('Session Stopped', 'The hardware scanner session has been ended.');
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.message || 'Failed to stop scanner session.');
+    } finally {
+      setLoadingSession(false);
+    }
+  };
+
+  const handleRenameDevice = (device: any) => {
+    Alert.prompt(
+      'Rename Scanner Board',
+      `Enter friendly name for device (${device.device_id}):`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save',
+          onPress: async (newName?: string) => {
+            if (!newName || !newName.trim()) return;
+            try {
+              await api.put(`/scanner-devices/${device.id}/rename`, { name: newName.trim() });
+              fetchDevices();
+              Alert.alert('Success', 'Scanner renamed successfully!');
+            } catch (err: any) {
+              Alert.alert('Error', 'Failed to rename scanner.');
+            }
+          },
+        },
+      ],
+      'plain-text',
+      device.name !== 'Unnamed Scanner' ? device.name : ''
+    );
+  };
 
   useEffect(() => {
     if (selectedEventId) {
@@ -102,6 +182,36 @@ export default function OfficerRFIDScanner() {
           checkedIn,
           checkedOut,
         });
+
+        // Sync live attendance records from database into scanHistory & lastScan UI
+        if (Array.isArray(records) && records.length > 0) {
+          const syncedRecords: ScanRecord[] = records.map((rec: any) => {
+            const u = rec.user || rec.student || {};
+            const timeRaw = rec.time_out || rec.time_in || rec.created_at;
+            const formattedTime = timeRaw
+              ? new Date(timeRaw).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              : 'Just now';
+
+            const isCheckedOut = rec.status === 'checked_out' || !!rec.time_out;
+            return {
+              id: String(rec.id),
+              time: formattedTime,
+              uid: u.rfid_uid || 'RFID',
+              success: true,
+              message: isCheckedOut ? 'Check-Out recorded' : 'Check-In recorded',
+              userName: u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Student',
+              studentNumber: u.student_number || u.student_id,
+              course: typeof u.course === 'string' ? u.course : u.course?.name,
+              action: isCheckedOut ? 'checkout' : 'checkin',
+            };
+          });
+
+          setScanHistory(syncedRecords);
+
+          if (syncedRecords.length > 0) {
+            setLastScan(syncedRecords[0]);
+          }
+        }
       }
     } catch (_) {
     } finally {
@@ -385,6 +495,134 @@ export default function OfficerRFIDScanner() {
                   </View>
                 </View>
               )}
+
+              {/* SCANNER SESSION CARD (OFFICER & EVENT BINDING) */}
+              <View style={{
+                backgroundColor: activeSession ? (isDark ? 'rgba(16, 185, 129, 0.12)' : '#ecfdf5') : bgCard,
+                borderRadius: 20,
+                borderWidth: 1.5,
+                borderColor: activeSession ? '#10b981' : border,
+                padding: 16,
+                marginBottom: 20,
+              }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: activeSession ? '#10b981' : '#94a3b8', marginRight: 6 }} />
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: activeSession ? '#10b981' : textSecondary, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                        {activeSession ? 'Hardware Bound & Active' : 'NodeMCU Hardware Binding'}
+                      </Text>
+                    </View>
+
+                    {activeSession ? (
+                      <>
+                        <Text style={{ fontSize: 16, fontWeight: '900', color: textPrimary }}>
+                          {activeSession.event_title}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: textSecondary, marginTop: 2 }}>
+                          👤 Officer: <Text style={{ fontWeight: '800', color: textPrimary }}>{activeSession.officer_name}</Text>
+                          {activeSession.device_id ? ` • 📟 ${activeSession.device_id}` : ' • 🌐 All Scanners'}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary }}>
+                          Bind Scanner to Selected Event
+                        </Text>
+                        <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
+                          Assign hardware scans to <Text style={{ fontWeight: '700', color: '#2563eb' }}>{selectedEvent?.title || 'Selected Event'}</Text>
+                        </Text>
+                      </>
+                    )}
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={activeSession ? handleStopSession : handleStartSession}
+                    disabled={loadingSession}
+                    style={{
+                      backgroundColor: activeSession ? '#ef4444' : '#2563eb',
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      justify: 'center',
+                    }}
+                  >
+                    {loadingSession ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>
+                        {activeSession ? 'Stop Session' : 'Start Session'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* DEVICE SELECTOR (ONLY WHEN NO ACTIVE SESSION) */}
+                {!activeSession && devices.length > 0 && (
+                  <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: border }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                        Target Hardware Scanner
+                      </Text>
+                      <TouchableOpacity onPress={fetchDevices} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <RefreshCw size={10} color="#3b82f6" />
+                        <Text style={{ fontSize: 10, color: '#3b82f6', fontWeight: '700', marginLeft: 3 }}>Refresh</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <TouchableOpacity
+                        onPress={() => setSelectedDeviceId(null)}
+                        style={{
+                          marginRight: 8,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: selectedDeviceId === null ? '#2563eb' : border,
+                          backgroundColor: selectedDeviceId === null ? (isDark ? '#1e3a8a' : '#eff6ff') : bgCard,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: selectedDeviceId === null ? '#2563eb' : textPrimary }}>
+                          🌐 Any Scanner (Default)
+                        </Text>
+                      </TouchableOpacity>
+
+                      {devices.map((dev) => {
+                        const isSelected = selectedDeviceId === dev.device_id;
+                        return (
+                          <View
+                            key={dev.id}
+                            style={{
+                              marginRight: 8,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              paddingHorizontal: 10,
+                              paddingVertical: 6,
+                              borderRadius: 10,
+                              borderWidth: 1,
+                              borderColor: isSelected ? '#2563eb' : border,
+                              backgroundColor: isSelected ? (isDark ? '#1e3a8a' : '#eff6ff') : bgCard,
+                            }}
+                          >
+                            <TouchableOpacity onPress={() => setSelectedDeviceId(dev.device_id)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dev.is_online ? '#10b981' : '#94a3b8', marginRight: 6 }} />
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: isSelected ? '#2563eb' : textPrimary }}>
+                                {dev.name !== 'Unnamed Scanner' ? dev.name : dev.device_id}
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => handleRenameDevice(dev)} style={{ marginLeft: 6, padding: 2 }}>
+                              <Text style={{ fontSize: 10, color: textSecondary }}>✏️</Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
 
               {/* HARDWARE SCANNER & SCAN MODE SELECTOR */}
               <View style={{ backgroundColor: bgCard, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>

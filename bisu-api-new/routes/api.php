@@ -25,10 +25,13 @@ use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ChatbotController;
 use App\Http\Controllers\Api\PushTokenController;
+use App\Http\Controllers\Api\ScannerSessionController;
+use App\Http\Controllers\Api\ScannerDeviceController;
 use App\Models\Designation;
 use App\Models\User;
 
 Route::post('/login', [AuthController::class , 'login']);
+Route::post('/attendance/rfid-device', [AttendanceController::class , 'rfidDeviceScan']); // Public endpoint for NodeMCU hardware
 
 // TEMPORARY DEBUG: Check user existence and password hash (REMOVE AFTER FIXING)
 Route::any('/debug-user', function() {
@@ -258,6 +261,7 @@ Route::middleware('auth:sanctum')->group(function () {
         );
         // User Management
         Route::get('/users', [UserController::class , 'index']);
+        Route::get('/users/rfid/{uid}', [UserController::class , 'getByRfid']);
         Route::delete('/users/bulk-delete', [UserController::class , 'bulkDestroy']);
         Route::put('/users/bulk-status', [UserController::class , 'bulkStatus']);
         Route::post('/users/bulk-assign-org', [UserController::class , 'bulkAssignOrg']);
@@ -494,6 +498,13 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/attendance/rfid-scan', [AttendanceController::class , 'rfidScan']); // smart auto-detect
                 Route::put('/students/{id}/rfid', [UserController::class , 'updateRfidUid']);
                 Route::delete('/attendance/{id}', [AttendanceController::class, 'destroyRecord'])->where('id', '[0-9]+');
+
+                // Scanner Sessions & Devices (Officer RFID Hardware Assignment)
+                Route::post('/scanner-sessions/start', [ScannerSessionController::class, 'start']);
+                Route::post('/scanner-sessions/stop', [ScannerSessionController::class, 'stop']);
+                Route::get('/scanner-sessions/active', [ScannerSessionController::class, 'active']);
+                Route::get('/scanner-devices', [ScannerDeviceController::class, 'index']);
+                Route::put('/scanner-devices/{id}/rename', [ScannerDeviceController::class, 'rename']);
 
         // Evaluations
         Route::get('/evaluations', [EvaluationController::class , 'index']);

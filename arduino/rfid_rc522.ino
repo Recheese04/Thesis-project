@@ -1,11 +1,9 @@
 //*******************************libraries********************************
-//RFID-----------------------------
+#include <ESP8266WiFi.h>
+#include <WiFiClientSecure.h>
+#include <ESP8266HTTPClient.h>
 #include <SPI.h>
 #include <MFRC522.h>
-#include <WiFiClientSecure.h>
-//NodeMCU--------------------------
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
 
 //************************************************************************
 // NODEMCU GPIO WIRING:
@@ -24,11 +22,11 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 //************************************************************************
 /* Wi-Fi & Backend Server Credentials */
-const char *ssid = "POSTANES WIFI";
-const char *password = "Rechie@James!4!";
+const char *ssid = "BISU_WIFI";
+const char *password = "B!SU@wifi2026";
 const char* device_token = "2c4f3c61aa79d533";
 
-String URL = "https://thesis-project-production-c531.up.railway.app/api/attendance/rfid-scan"; 
+String URL = "https://thesis-project-production-c531.up.railway.app/api/attendance/rfid-device"; 
 
 // Track last card scanned and time to prevent duplicate rapid scans of the same card
 String lastScannedUID = "";
@@ -152,14 +150,17 @@ void SendCardID(String Card_uid) {
     client.setInsecure(); // Required for HTTPS Railway domain
 
     HTTPClient http;
-    String getData = "?rfid_uid=" + String(Card_uid) + "&device_token=" + String(device_token);
-    String Link = URL + getData;
-
-    Serial.print(F("Requesting URL: "));
-    Serial.println(Link);
+    Serial.print(F("Connecting to: "));
+    Serial.println(URL);
     
-    if (http.begin(client, Link)) {
-      int httpCode = http.GET();
+    if (http.begin(client, URL)) {
+      http.addHeader("Content-Type", "application/json");
+
+      String jsonPayload = "{\"rfid_uid\":\"" + Card_uid + "\",\"device_token\":\"" + String(device_token) + "\"}";
+      Serial.print(F("Payload: "));
+      Serial.println(jsonPayload);
+
+      int httpCode = http.POST(jsonPayload);
       String payload = http.getString();
 
       Serial.print(F("HTTP Response Code: "));

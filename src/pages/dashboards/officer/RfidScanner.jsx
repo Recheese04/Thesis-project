@@ -153,30 +153,23 @@ export default function RfidScanner() {
         setScanLog(prev => [entry, ...prev].slice(0, MAX_LOG));
 
         try {
-            const res = await axios.post(endpoint, {
-                event_id: selectedEvent,
-                rfid_uid: uid,
-            }, authH());
-
-            // 200 with 'Already checked in' is a soft warning, not a hard error
-            const isWarning = res.status === 200 && currentMode === "checkin";
+            const res = await axios.get(`/api/users/rfid/${uid}?event_id=${selectedEvent}`, authH());
 
             const updated = {
                 ...entry,
-                status: isWarning ? "warning" : "success",
+                status: "verify",
                 action: currentMode,
-                studentName: res.data.student_name || "Unknown",
+                studentName: res.data.user_name || res.data.student_name || "Unknown",
                 profilePicture: res.data.profile_picture_url || null,
                 studentNumber: res.data.student_number || "",
                 course: res.data.course || "",
                 yearLevel: res.data.year_level || "",
-                message: res.data.message,
+                message: "Awaiting Officer Confirmation",
             };
             setScanLog(prev => prev.map(e => e.id === entry.id ? updated : e));
             setLastScan(updated);
             setShowOverlay(true);
-            if (soundOn) playBeep(!isWarning);
-            fetchStats();
+            if (soundOn) playBeep(true);
 
         } catch (err) {
             const msg = err.response?.data?.message ?? "Scan failed";
@@ -184,7 +177,7 @@ export default function RfidScanner() {
                 ...entry,
                 status: "error",
                 action: currentMode,
-                studentName: err.response?.data?.student_name || "—",
+                studentName: err.response?.data?.user_name || err.response?.data?.student_name || "—",
                 profilePicture: err.response?.data?.profile_picture_url || null,
                 studentNumber: err.response?.data?.student_number || "",
                 message: msg,
@@ -197,6 +190,59 @@ export default function RfidScanner() {
             setProcessing(false);
         }
     }, [selectedEvent, processing, soundOn, fetchStats]);
+
+    // ── Confirm / Cancel Scan ──────────────────────────────────────────────
+    const confirmScan = async () => {
+        if (!lastScan || lastScan.status !== "verify" || processing) return;
+        setProcessing(true);
+        const currentMode = lastScan.action;
+        const endpoint = currentMode === "checkin"
+            ? "/api/attendance/rfid-checkin"
+            : "/api/attendance/rfid-checkout";
+
+        try {
+            const res = await axios.post(endpoint, {
+                event_id: selectedEvent,
+                rfid_uid: lastScan.uid,
+            }, authH());
+
+            const isWarning = res.status === 200 && currentMode === "checkin";
+            
+            const updated = {
+                ...lastScan,
+                status: isWarning ? "warning" : "success",
+                message: res.data.message,
+            };
+            setScanLog(prev => prev.map(e => e.id === lastScan.id ? updated : e));
+            setLastScan(updated);
+            if (soundOn) playBeep(!isWarning);
+            fetchStats();
+        } catch (err) {
+            const msg = err.response?.data?.message ?? "Check-in failed";
+            const updated = {
+                ...lastScan,
+                status: "error",
+                message: msg,
+            };
+            setScanLog(prev => prev.map(e => e.id === lastScan.id ? updated : e));
+            setLastScan(updated);
+            if (soundOn) playBeep(false);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const cancelScan = () => {
+        if (!lastScan || lastScan.status !== "verify") return;
+        const updated = {
+            ...lastScan,
+            status: "error",
+            message: "Scan Cancelled by Officer"
+        };
+        setScanLog(prev => prev.map(e => e.id === lastScan.id ? updated : e));
+        setShowOverlay(false);
+        setLastScan(null);
+    };
 
     // ── Connect to serial device ───────────────────────────────────────────
     const connectSerial = async () => {
@@ -430,11 +476,13 @@ export default function RfidScanner() {
                     ? "bg-[#0b1220] border border-slate-700/50 min-h-[260px]"
                     : lastScan.status === "success"
                         ? "bg-[#071a10] border border-emerald-500/40 min-h-[300px]"
-                        : lastScan.status === "warning"
-                            ? "bg-[#1a1400] border border-amber-500/40 min-h-[300px]"
-                            : lastScan.status === "error"
-                                ? "bg-[#1a0708] border border-red-500/40 min-h-[300px]"
-                                : "bg-[#0b1220] border border-slate-600/40 min-h-[300px]"
+                        : lastScan.status === "verify"
+                            ? "bg-[#0b1b36] border border-blue-500/40 min-h-[300px]"
+                            : lastScan.status === "warning"
+                                ? "bg-[#1a1400] border border-amber-500/40 min-h-[300px]"
+                                : lastScan.status === "error"
+                                    ? "bg-[#1a0708] border border-red-500/40 min-h-[300px]"
+                                    : "bg-[#0b1220] border border-slate-600/40 min-h-[300px]"
                     }`}>
 
                     {/* Grid overlay */}
@@ -498,7 +546,7 @@ export default function RfidScanner() {
                                     {/* Glowing Backdrop Frame */}
                                     <div className="absolute inset-[-12px] rounded-[2.5rem] bg-gradient-to-b from-transparent to-transparent border border-white/10 opacity-60"
                                         style={{
-                                            boxShadow: lastScan.status === "success" ? "0 0 50px #10b98133, inset 0 0 30px #10b98122" : lastScan.status === "error" ? "0 0 50px #ef444433, inset 0 0 30px #ef444422" : "0 0 50px #f59e0b33, inset 0 0 30px #f59e0b22",
+                                            boxShadow: lastScan.status === "success" ? "0 0 50px #10b98133, inset 0 0 30px #10b98122" : lastScan.status === "error" ? "0 0 50px #ef444433, inset 0 0 30px #ef444422" : lastScan.status === "verify" ? "0 0 50px #3b82f633, inset 0 0 30px #3b82f622" : "0 0 50px #f59e0b33, inset 0 0 30px #f59e0b22",
                                             animation: "ringPulse 3s ease-in-out infinite"
                                         }} />
 
@@ -517,7 +565,7 @@ export default function RfidScanner() {
 
                                     {/* Floating Status Badge */}
                                     <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full flex items-center justify-center border-4 border-[#050910] shadow-[0_0_40px_rgba(0,0,0,0.9)] z-20"
-                                        style={{ background: lastScan.status === "success" ? "#10b981" : lastScan.status === "error" ? "#ef4444" : "#f59e0b" }}>
+                                        style={{ background: lastScan.status === "success" ? "#10b981" : lastScan.status === "error" ? "#ef4444" : lastScan.status === "verify" ? "#2563eb" : "#f59e0b" }}>
                                         {lastScan.status === "success" ? <CheckCircle2 className="w-12 h-12 text-white" /> :
                                             lastScan.status === "error" ? <XCircle className="w-12 h-12 text-white" /> :
                                                 <AlertTriangle className="w-12 h-12 text-white animate-pulse" />}
@@ -533,10 +581,11 @@ export default function RfidScanner() {
                                                 style={{ background: lastScan.status === "success" ? "#34d399" : lastScan.status === "error" ? "#f87171" : "#fbbf24" }} />
                                             <span className="font-mono text-sm tracking-[0.3em] uppercase font-bold"
                                                 style={{
-                                                    color: lastScan.status === "success" ? "#34d399" : lastScan.status === "error" ? "#f87171" : "#fbbf24",
+                                                    color: lastScan.status === "success" ? "#34d399" : lastScan.status === "error" ? "#f87171" : lastScan.status === "verify" ? "#60a5fa" : "#fbbf24",
                                                     animation: "flickerIn 0.3s ease-out",
                                                 }}>
-                                                {lastScan.status === "success" && lastScan.action === "checkin" ? "CHECKED IN · IDENTITY VERIFIED" :
+                                                {lastScan.status === "verify" ? "PENDING CONFIRMATION" :
+                                                    lastScan.status === "success" && lastScan.action === "checkin" ? "CHECKED IN · IDENTITY VERIFIED" :
                                                     lastScan.status === "success" && lastScan.action === "checkout" ? "CHECKED OUT · IDENTITY VERIFIED" :
                                                         lastScan.status === "warning" ? `SYSTEM WARNING` : "ACCESS DENIED"}
                                             </span>
@@ -568,17 +617,33 @@ export default function RfidScanner() {
                                     </div>
 
                                     {/* Scan Metadata */}
-                                    <div className="pt-6 flex items-center justify-center md:justify-start gap-4">
+                                    <div className="pt-6 flex flex-col md:flex-row items-center justify-center md:justify-start gap-4">
                                         <div className="px-3 py-1.5 rounded bg-slate-800/80 border border-slate-700 font-mono text-xs text-slate-400">
                                             UID: {lastScan.uid}
                                         </div>
                                         <div className="px-3 py-1.5 rounded bg-slate-800/80 border border-slate-700 font-mono text-xs text-slate-400">
                                             {fmt(lastScan.time)}
                                         </div>
-                                        <button onClick={() => setShowOverlay(false)} className="px-3 py-1.5 rounded text-slate-500 hover:text-white transition-colors cursor-pointer ml-auto">
-                                            Dismiss [ESC]
-                                        </button>
                                     </div>
+                                    
+                                    {/* Action Buttons for Verify mode */}
+                                    {lastScan.status === "verify" ? (
+                                        <div className="pt-6 flex flex-col md:flex-row items-center justify-center md:justify-start gap-3">
+                                            <Button onClick={confirmScan} disabled={processing} size="lg" className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-14 px-8 text-lg w-full md:w-auto shadow-[0_0_20px_#10b98166]">
+                                                {processing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-3" />}
+                                                CONFIRM {lastScan.action === 'checkin' ? "CHECK-IN" : "CHECK-OUT"}
+                                            </Button>
+                                            <Button onClick={cancelScan} disabled={processing} size="lg" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white font-bold h-14 px-8 text-lg w-full md:w-auto">
+                                                <XCircle className="w-5 h-5 mr-2" /> CANCEL 
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="pt-6 flex">
+                                            <Button onClick={() => setShowOverlay(false)} variant="outline" className="border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors w-full md:w-auto">
+                                                Close [ESC]
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
