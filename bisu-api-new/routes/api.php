@@ -32,6 +32,8 @@ use App\Models\User;
 
 Route::post('/login', [AuthController::class , 'login']);
 Route::post('/attendance/rfid-device', [AttendanceController::class , 'rfidDeviceScan']); // Public endpoint for NodeMCU hardware
+Route::post('/rfid-device-public', [AttendanceController::class , 'rfidDeviceScan']);
+Route::post('/test-public', fn() => response()->json(['status' => 'ok']));
 
 // TEMPORARY DEBUG: Check user existence and password hash (REMOVE AFTER FIXING)
 Route::any('/debug-user', function() {
