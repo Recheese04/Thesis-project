@@ -631,13 +631,6 @@ class AttendanceController extends Controller
             $data = $validator->validated();
 
             $authUser = null;
-            try {
-                if ($request->bearerToken()) {
-                    $authUser = auth('sanctum')->user();
-                }
-            } catch (\Throwable $e) {
-                $authUser = null;
-            }
             $event = null;
 
             // Auto-register / update last_seen_at for this hardware scanner
