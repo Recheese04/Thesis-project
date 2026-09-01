@@ -485,7 +485,6 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('/events/{id}/qr', [EventController::class , 'getQRCode']);
 
                 // Attendance
-                Route::post('/attendance/rfid-device', [AttendanceController::class , 'rfidDeviceScan']); // NodeMCU auto-detect event
                 Route::post('/attendance/checkin', [AttendanceController::class , 'checkIn']);
                 Route::post('/attendance/checkout', [AttendanceController::class , 'checkOut']);
                 Route::get('/attendance/my', [AttendanceController::class , 'getMyAttendance']);
