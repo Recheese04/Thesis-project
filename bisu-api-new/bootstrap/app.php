@@ -14,8 +14,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         // CORS is handled by Apache .htaccess — no PHP middleware needed
 
-        // ✅ FIX: Return JSON 401 instead of crashing with "Route [login] not defined"
-        $middleware->redirectGuestsTo(fn() => response()->json(['message' => 'Unauthenticated.'], 401));
+        // ✅ FIX: Return JSON 401 for auth routes instead of crashing with "Route [login] not defined"
+        $middleware->redirectGuestsTo(function (\Illuminate\Http\Request $request) {
+            if ($request->is('api/attendance/rfid-device') || $request->is('attendance/rfid-device')) {
+                return null;
+            }
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        });
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

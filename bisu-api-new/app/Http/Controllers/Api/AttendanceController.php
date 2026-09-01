@@ -782,7 +782,7 @@ class AttendanceController extends Controller
             ]), 200);
 
         }
-        catch (\Exception $e) {
+        catch (\Throwable $e) {
             Log::error('RFID device scan error: ' . $e->getMessage());
             return response()->json(['message' => 'Scan error: ' . $e->getMessage()], 500);
         }
