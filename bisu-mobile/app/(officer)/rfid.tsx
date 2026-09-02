@@ -195,6 +195,12 @@ export default function OfficerRFIDScanner() {
       setLastFailedScan(null);
       setStats({ total: 0, checkedIn: 0, checkedOut: 0 });
 
+      // Sync current mode to backend for the newly selected event
+      api.post('/scanner-sessions/mode', {
+        event_id: selectedEventId,
+        mode: scanMode,
+      }).catch(() => {});
+
       fetchEventStats(selectedEventId, false);
       const interval = setInterval(() => {
         fetchEventStats(selectedEventId, true);

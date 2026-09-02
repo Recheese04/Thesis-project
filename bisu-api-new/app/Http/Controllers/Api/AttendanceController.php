@@ -746,10 +746,8 @@ class AttendanceController extends Controller
                 'event_title' => $event->title,
             ];
 
-            // Retrieve active mode: event-specific -> org-specific -> fallback to smart
-            $mode = \Illuminate\Support\Facades\Cache::get("scanner_mode_{$event->id}")
-                ?: \Illuminate\Support\Facades\Cache::get("scanner_mode_org_{$event->organization_id}")
-                ?: 'smart';
+            // Retrieve active mode for this specific event only (smart = auto check-in then check-out)
+            $mode = \Illuminate\Support\Facades\Cache::get("scanner_mode_{$event->id}", 'smart');
 
             $attendance = Attendance::where('event_id', $event->id)
                 ->where('user_id', $user->id)
