@@ -28,6 +28,27 @@ interface ScanRecord {
   rawTime?: number;
 }
 
+const parseDateSafe = (dateStr: any): Date | null => {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
+  try {
+    const s = String(dateStr).trim();
+    if (!s) return null;
+    const iso = s.replace(' ', 'T');
+    const d = new Date(iso);
+    if (!isNaN(d.getTime())) return d;
+    const d2 = new Date(s.replace(/-/g, '/'));
+    if (!isNaN(d2.getTime())) return d2;
+  } catch (_) {}
+  return null;
+};
+
+const formatTimeSafe = (dateStr: any): string => {
+  const d = parseDateSafe(dateStr);
+  if (!d) return 'Just now';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+};
+
 export default function OfficerRFIDScanner() {
   const router = useRouter();
   const [events, setEvents] = useState<any[]>([]);
@@ -229,12 +250,14 @@ export default function OfficerRFIDScanner() {
             const course = typeof u.course === 'string' ? u.course : u.course?.name;
             const uid = u.rfid_uid || 'RFID';
 
+            const dIn = parseDateSafe(rec.time_in);
+
             // 1. If student checked in, create a distinct CHECK-IN log entry
             if (rec.time_in) {
               distinctLogs.push({
                 id: `${rec.id}-in`,
-                rawTime: new Date(rec.time_in).getTime(),
-                time: new Date(rec.time_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                rawTime: dIn ? dIn.getTime() : 0,
+                time: formatTimeSafe(rec.time_in),
                 uid,
                 success: true,
                 message: 'Check-In recorded',
@@ -246,11 +269,12 @@ export default function OfficerRFIDScanner() {
             }
 
             // 2. If student checked out, create a separate distinct CHECK-OUT log entry
-            if (rec.time_out) {
+            if (rec.time_out || rec.status === 'checked_out') {
+              const dOut = parseDateSafe(rec.time_out || rec.updated_at);
               distinctLogs.push({
                 id: `${rec.id}-out`,
-                rawTime: new Date(rec.time_out).getTime(),
-                time: new Date(rec.time_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                rawTime: dOut ? dOut.getTime() : (dIn ? dIn.getTime() + 1000 : 1),
+                time: formatTimeSafe(rec.time_out || rec.updated_at),
                 uid,
                 success: true,
                 message: 'Check-Out recorded',

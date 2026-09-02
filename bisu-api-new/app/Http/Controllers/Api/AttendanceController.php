@@ -750,7 +750,6 @@ class AttendanceController extends Controller
 
             $attendance = Attendance::where('event_id', $event->id)
                 ->where('user_id', $user->id)
-                ->whereDate('created_at', today())
                 ->orderBy('created_at', 'desc')
                 ->first();
 
