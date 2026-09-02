@@ -193,6 +193,11 @@ class ScannerSessionController extends Controller
 
             \Illuminate\Support\Facades\Cache::put("scanner_mode_{$data['event_id']}", $data['mode'], 86400);
 
+            $event = Event::find($data['event_id']);
+            if ($event) {
+                \Illuminate\Support\Facades\Cache::put("scanner_mode_org_{$event->organization_id}", $data['mode'], 86400);
+            }
+
             return response()->json([
                 'message' => "Scanner hardware mode set to {$data['mode']}",
                 'mode' => $data['mode'],

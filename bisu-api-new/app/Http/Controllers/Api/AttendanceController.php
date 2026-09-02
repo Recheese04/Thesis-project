@@ -746,7 +746,10 @@ class AttendanceController extends Controller
                 'event_title' => $event->title,
             ];
 
-            $mode = \Illuminate\Support\Facades\Cache::get("scanner_mode_{$event->id}", 'checkin');
+            // Retrieve active mode: event-specific -> org-specific -> fallback to smart
+            $mode = \Illuminate\Support\Facades\Cache::get("scanner_mode_{$event->id}")
+                ?: \Illuminate\Support\Facades\Cache::get("scanner_mode_org_{$event->organization_id}")
+                ?: 'smart';
 
             $attendance = Attendance::where('event_id', $event->id)
                 ->where('user_id', $user->id)
@@ -786,7 +789,37 @@ class AttendanceController extends Controller
                 ]), 200);
             }
 
-            // ── CHECK-IN MODE (DEFAULT) ─────────────────────────────────────────
+            // ── CHECK-IN MODE ───────────────────────────────────────────────────
+            if ($mode === 'checkin') {
+                if (!$attendance) {
+                    $attendance = Attendance::create([
+                        'event_id'        => $event->id,
+                        'user_id'         => $user->id,
+                        'attendance_type' => 'RFID',
+                        'time_in'         => now(),
+                        'status'          => 'checked_in',
+                    ]);
+                    return response()->json(array_merge($userPayload, [
+                        'action'  => 'checkin',
+                        'message' => 'Check-In recorded successfully!',
+                    ]), 201);
+                }
+
+                if ($attendance->status === 'checked_out' || !is_null($attendance->time_out)) {
+                    return response()->json(array_merge($userPayload, [
+                        'action'  => 'already_checkout',
+                        'message' => 'Already checked out for this event today.',
+                    ]), 200);
+                }
+
+                return response()->json(array_merge($userPayload, [
+                    'action'  => 'already_checkin',
+                    'message' => 'Student already checked in for this event.',
+                ]), 200);
+            }
+
+            // ── SMART MODE (DEFAULT / AUTO-TOGGLE) ──────────────────────────────
+            // 1st Tap: Check-in. 2nd Tap: Check-out. Subsequent: Already Checked Out.
             if (!$attendance) {
                 $attendance = Attendance::create([
                     'event_id'        => $event->id,
@@ -801,16 +834,21 @@ class AttendanceController extends Controller
                 ]), 201);
             }
 
-            if ($attendance->status === 'checked_out' || !is_null($attendance->time_out)) {
+            if ($attendance->status === 'checked_in' && is_null($attendance->time_out)) {
+                $attendance->time_out = now();
+                $attendance->status = 'checked_out';
+                $attendance->save();
+
                 return response()->json(array_merge($userPayload, [
-                    'action'  => 'already_checkout',
-                    'message' => 'Already checked out for this event today.',
+                    'action'   => 'checkout',
+                    'message'  => 'Check-Out recorded successfully!',
+                    'duration' => $attendance->formatted_duration,
                 ]), 200);
             }
 
             return response()->json(array_merge($userPayload, [
-                'action'  => 'already_checkin',
-                'message' => 'Student already checked in for this event.',
+                'action'  => 'already_checkout',
+                'message' => 'Student already checked out for this event.',
             ]), 200);
 
         }
