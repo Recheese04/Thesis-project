@@ -445,69 +445,84 @@ export default function OfficerFinance() {
           </View>
         </View>
 
-        {/* YEAR & ACADEMIC YEAR SELECTOR CHIPS */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 14 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Calendar size={13} color={textSecondary} />
-              <Text style={{ fontSize: 11, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginLeft: 5 }}>
-                Filter by Academic / Fiscal Year
-              </Text>
-            </View>
-            {selectedYear !== 'All' && (
-              <TouchableOpacity onPress={() => setSelectedYear('All')}>
-                <Text style={{ fontSize: 11, color: '#0fa968', fontWeight: '800' }}>Reset to All</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        {/* MAIN BODY CONTENT WITH EXPLICIT PADDING */}
+        <View style={{ paddingTop: 16 }}>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-            <TouchableOpacity
-              onPress={() => setSelectedYear('All')}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 8,
-                borderRadius: 12,
-                borderWidth: 1.5,
-                borderColor: selectedYear === 'All' ? '#0fa968' : border,
-                backgroundColor: selectedYear === 'All' ? (isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5') : cardBg,
-                marginRight: 8,
-                flexDirection: 'row',
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '800', color: selectedYear === 'All' ? '#0fa968' : textPrimary }}>
-                🌐 All Years
-              </Text>
-            </TouchableOpacity>
+          {/* ACADEMIC / FISCAL YEAR FILTER CARD */}
+          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+            <View style={{ 
+              backgroundColor: cardPanelBg, 
+              borderRadius: 16, 
+              padding: 14, 
+              borderWidth: 1, 
+              borderColor: cardPanelBorder, 
+              shadowColor: '#000', 
+              shadowOpacity: 0.04, 
+              shadowRadius: 6, 
+              elevation: 2 
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Calendar size={14} color="#0fa968" />
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: textPrimary, marginLeft: 6 }}>
+                    Select School / Fiscal Year
+                  </Text>
+                </View>
+                {selectedYear !== 'All' && (
+                  <TouchableOpacity onPress={() => setSelectedYear('All')} style={{ backgroundColor: isDark ? '#334155' : '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 10, color: '#0fa968', fontWeight: '800' }}>Reset to All</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-            {availableYears.map(yr => {
-              const isSelected = selectedYear === yr;
-              const isCurrent = yr === currentYearStr;
-              return (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
                 <TouchableOpacity
-                  key={yr}
-                  onPress={() => setSelectedYear(yr)}
+                  onPress={() => setSelectedYear('All')}
                   style={{
                     paddingHorizontal: 14,
                     paddingVertical: 8,
-                    borderRadius: 12,
+                    borderRadius: 10,
                     borderWidth: 1.5,
-                    borderColor: isSelected ? '#0fa968' : (isCurrent ? (isDark ? '#065f46' : '#bbf7d0') : border),
-                    backgroundColor: isSelected ? (isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5') : cardBg,
+                    borderColor: selectedYear === 'All' ? '#0fa968' : border,
+                    backgroundColor: selectedYear === 'All' ? (isDark ? 'rgba(16,185,129,0.2)' : '#dcfce7') : cardBg,
                     marginRight: 8,
                     flexDirection: 'row',
                     alignItems: 'center',
                   }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: isSelected ? '#0fa968' : textPrimary }}>
-                    {isCurrent ? `📅 ${yr} (Current)` : `⏳ ${yr} (Prior Year)`}
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: selectedYear === 'All' ? '#0fa968' : textPrimary }}>
+                    🌐 All Fiscal Years
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+
+                {availableYears.map(yr => {
+                  const isSelected = selectedYear === yr;
+                  const isCurrent = yr === currentYearStr;
+                  return (
+                    <TouchableOpacity
+                      key={yr}
+                      onPress={() => setSelectedYear(yr)}
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? '#0fa968' : (isCurrent ? (isDark ? '#065f46' : '#bbf7d0') : border),
+                        backgroundColor: isSelected ? (isDark ? 'rgba(16,185,129,0.2)' : '#dcfce7') : cardBg,
+                        marginRight: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: isSelected ? '#0fa968' : textPrimary }}>
+                        {isCurrent ? `📅 S.Y. ${yr} (Current)` : `⏳ S.Y. ${yr} (Prior Year)`}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
 
         {/* PRIOR YEAR DEBT ALERT BANNER */}
         {priorDebtsMembersCount > 0 && filterTab !== 'Prior Debts' && (
@@ -805,8 +820,9 @@ export default function OfficerFinance() {
               })}
             </View>
           </View>
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
+    </View>
 
       {/* GENERATE FEES MODAL */}
       <Modal visible={showGenerateModal} transparent animationType="fade" onRequestClose={() => setShowGenerateModal(false)}>
