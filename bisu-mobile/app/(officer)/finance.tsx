@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Alert, Modal, Image } from 'react-native';
 import api from '../../services/api';
 import { API_BASE_URL } from '../../constants/Config';
@@ -10,7 +10,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import {
   Search, Users, ChevronDown, ChevronUp,
-  CheckCircle2, Clock, Plus, CheckCircle, Wallet, X, Settings, Edit2, FileText, Printer
+  CheckCircle2, Clock, Plus, CheckCircle, Wallet, X, Settings, Edit2, FileText, Printer,
+  Calendar, Filter, AlertTriangle, History
 } from 'lucide-react-native';
 import LinearGradient from '../../components/ui/SafeLinearGradient';
 import * as Print from 'expo-print';
@@ -53,7 +54,12 @@ export default function OfficerFinance() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [expandedStudents, setExpandedStudents] = useState<Record<number, boolean>>({});
-  const [filterTab, setFilterTab] = useState<'All' | 'Fully Paid' | 'Pending' | 'No Fees'>('All');
+  const [filterTab, setFilterTab] = useState<'All' | 'Fully Paid' | 'Pending' | 'No Fees' | 'Prior Debts'>('All');
+
+  // Year Filtering States
+  const [selectedYear, setSelectedYear] = useState<string>('All');
+  const [selectedYearLevel, setSelectedYearLevel] = useState<string>('All');
+
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [selectedFeeTypeId, setSelectedFeeTypeId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -111,12 +117,37 @@ export default function OfficerFinance() {
     finally { setSavingMethod(false); }
   };
 
+  const currentYearStr = new Date().getFullYear().toString();
+
+  // Extract all distinct fee years from database
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<string>();
+    yearsSet.add(currentYearStr);
+    fees.forEach(f => {
+      if (f.created_at) {
+        const y = new Date(f.created_at).getFullYear().toString();
+        if (y && !isNaN(Number(y))) yearsSet.add(y);
+      }
+    });
+    return Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
+  }, [fees, currentYearStr]);
+
+  // Filter fees according to selected fiscal/academic year
+  const displayedFees = useMemo(() => {
+    if (selectedYear === 'All') return fees;
+    return fees.filter(f => {
+      if (!f.created_at) return true;
+      const y = new Date(f.created_at).getFullYear().toString();
+      return y === selectedYear;
+    });
+  }, [fees, selectedYear]);
+
   let totalExpected = 0;
   let totalCollected = 0;
   let paidCount = 0;
   let pendingCount = 0;
 
-  fees.forEach(f => {
+  displayedFees.forEach(f => {
     const amt = parseFloat(f.fee_type?.amount || '0');
     totalExpected += amt;
     if (f.status === 'paid' || f.status === 'completed') {
@@ -130,40 +161,111 @@ export default function OfficerFinance() {
   const pendingAmount = totalExpected - totalCollected;
   const percentCollected = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0;
 
-  const studentMap: Record<number, { id: number; name: string; student_number: string; items: any[]; feeStatus: 'Fully Paid' | 'Pending' | 'No Fees' }> = {};
+  const studentMap: Record<number, { 
+    id: number; 
+    name: string; 
+    student_number: string; 
+    year_level: string;
+    items: any[]; 
+    feeStatus: 'Fully Paid' | 'Pending' | 'No Fees';
+    hasPriorYearDebt: boolean;
+    priorYearDebts: string[];
+  }> = {};
 
   members.forEach((m: any) => {
     const uid = m.user_id;
     if (!studentMap[uid]) {
-      studentMap[uid] = { id: uid, name: `${m.user?.first_name || ''} ${m.user?.last_name || ''}`.trim() || '—', student_number: m.user?.student_number || '', items: [], feeStatus: 'No Fees' };
+      studentMap[uid] = { 
+        id: uid, 
+        name: `${m.user?.first_name || ''} ${m.user?.last_name || ''}`.trim() || '—', 
+        student_number: m.user?.student_number || '', 
+        year_level: m.user?.year_level || m.year_level || '',
+        items: [], 
+        feeStatus: 'No Fees',
+        hasPriorYearDebt: false,
+        priorYearDebts: [],
+      };
     }
   });
 
+  // Track all fees globally to detect prior year unpaid balances
   fees.forEach(item => {
     const uid = item.user_id;
     if (!uid) return;
     if (!studentMap[uid]) {
-      studentMap[uid] = { id: uid, name: item.user?.name || '—', student_number: item.user?.student_number || '', items: [], feeStatus: 'No Fees' };
+      studentMap[uid] = { 
+        id: uid, 
+        name: item.user?.name || `${item.user?.first_name || ''} ${item.user?.last_name || ''}`.trim() || '—', 
+        student_number: item.user?.student_number || '', 
+        year_level: item.user?.year_level || '',
+        items: [], 
+        feeStatus: 'No Fees',
+        hasPriorYearDebt: false,
+        priorYearDebts: [],
+      };
     }
+
+    const itemYear = item.created_at ? new Date(item.created_at).getFullYear().toString() : currentYearStr;
+    const isPaid = item.status === 'paid' || item.status === 'completed';
+    if (!isPaid && itemYear < currentYearStr) {
+      studentMap[uid].hasPriorYearDebt = true;
+      if (!studentMap[uid].priorYearDebts.includes(itemYear)) {
+        studentMap[uid].priorYearDebts.push(itemYear);
+      }
+    }
+  });
+
+  // Populate student items from displayed (filtered) fees
+  displayedFees.forEach(item => {
+    const uid = item.user_id;
+    if (!uid || !studentMap[uid]) return;
     studentMap[uid].items.push(item);
   });
 
   let fullyPaidMembersCount = 0;
   let pendingMembersCount = 0;
   let noFeesMembersCount = 0;
+  let priorDebtsMembersCount = 0;
 
   const studentList = Object.values(studentMap).map(student => {
-    if (student.items.length === 0) { student.feeStatus = 'No Fees'; noFeesMembersCount++; }
-    else {
+    if (student.hasPriorYearDebt) {
+      priorDebtsMembersCount++;
+    }
+
+    if (student.items.length === 0) { 
+      student.feeStatus = 'No Fees'; 
+      noFeesMembersCount++; 
+    } else {
       const isAllPaid = student.items.every(f => f.status === 'paid' || f.status === 'completed');
-      if (isAllPaid) { student.feeStatus = 'Fully Paid'; fullyPaidMembersCount++; }
-      else { student.feeStatus = 'Pending'; pendingMembersCount++; }
+      if (isAllPaid) { 
+        student.feeStatus = 'Fully Paid'; 
+        fullyPaidMembersCount++; 
+      } else { 
+        student.feeStatus = 'Pending'; 
+        pendingMembersCount++; 
+      }
     }
     return student;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
   const filtered = studentList.filter(s => {
-    if (filterTab !== 'All' && s.feeStatus !== filterTab) return false;
+    // 1. Fee Status Tab Filter
+    if (filterTab === 'Prior Debts') {
+      if (!s.hasPriorYearDebt) return false;
+    } else if (filterTab !== 'All' && s.feeStatus !== filterTab) {
+      return false;
+    }
+
+    // 2. Student Year Level Filter
+    if (selectedYearLevel !== 'All') {
+      const yl = (s.year_level || '').toLowerCase();
+      const target = selectedYearLevel.toLowerCase();
+      if (!yl.includes(target) && !yl.includes(target.replace(' year', ''))) {
+        return false;
+      }
+    }
+
+    // 3. Search Query Filter
     if (!search) return true;
     const q = search.toLowerCase();
     return s.name.toLowerCase().includes(q) || s.student_number.toLowerCase().includes(q);
@@ -200,7 +302,7 @@ export default function OfficerFinance() {
   const handlePrintReport = async () => {
     const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
     const feeTypeMap: Record<string, { name: string; amount: number; paid: number; pending: number }> = {};
-    fees.forEach(f => {
+    displayedFees.forEach(f => {
       const ftName = f.fee_type?.name || 'Unknown';
       const amt = parseFloat(f.fee_type?.amount || '0');
       if (!feeTypeMap[ftName]) feeTypeMap[ftName] = { name: ftName, amount: amt, paid: 0, pending: 0 };
@@ -214,8 +316,12 @@ export default function OfficerFinance() {
       const badge = s.feeStatus === 'Fully Paid' ? '<span style="color:#16a34a;font-weight:700">✓ Paid</span>'
         : s.feeStatus === 'Pending' ? '<span style="color:#ea580c;font-weight:700">⏳ Pending</span>'
         : '<span style="color:#94a3b8">No Fees</span>';
-      const itemDetails = s.items.map(i => `${i.fee_type?.name || 'Fee'}: ${i.status === 'paid' || i.status === 'completed' ? '✓' : '✗'}`).join(', ');
-      return `<tr><td>${s.name}</td><td>${s.student_number}</td><td style="text-align:center">${badge}</td><td style="font-size:10px">${itemDetails || '—'}</td></tr>`;
+      const priorDebtBadge = s.hasPriorYearDebt ? ` <span style="color:#dc2626;font-weight:700;font-size:10px">[Prior Balance: ${s.priorYearDebts.join(', ')}]</span>` : '';
+      const itemDetails = s.items.map(i => {
+        const itemYear = i.created_at ? new Date(i.created_at).getFullYear() : '';
+        return `${i.fee_type?.name || 'Fee'} (${itemYear}): ${i.status === 'paid' || i.status === 'completed' ? '✓' : '✗'}`;
+      }).join(', ');
+      return `<tr><td>${s.name}${priorDebtBadge}</td><td>${s.student_number}</td><td>${s.year_level || '—'}</td><td style="text-align:center">${badge}</td><td style="font-size:10px">${itemDetails || '—'}</td></tr>`;
     }).join('');
     const html = `<html><head><style>
       body{font-family:Helvetica,Arial,sans-serif;padding:30px;color:#1e293b}
@@ -232,7 +338,7 @@ export default function OfficerFinance() {
       .footer{margin-top:30px;font-size:10px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:10px}
     </style></head><body>
       <h1>📊 Finance Report</h1>
-      <div class="meta">Generated on ${today}</div>
+      <div class="meta">Period: <strong>${selectedYear === 'All' ? 'All Fiscal Years' : `Year ${selectedYear}`}</strong> • Generated on ${today}</div>
       <div class="summary">
         <div class="stat green"><div class="val">₱${totalCollected.toFixed(2)}</div><div class="lbl">Collected</div></div>
         <div class="stat orange"><div class="val">₱${pendingAmount.toFixed(2)}</div><div class="lbl">Pending</div></div>
@@ -242,11 +348,12 @@ export default function OfficerFinance() {
         <div class="stat"><div class="val">${fullyPaidMembersCount}</div><div class="lbl">Fully Paid</div></div>
         <div class="stat"><div class="val">${pendingMembersCount}</div><div class="lbl">Pending</div></div>
         <div class="stat"><div class="val">${noFeesMembersCount}</div><div class="lbl">No Fees</div></div>
+        <div class="stat"><div class="val">${priorDebtsMembersCount}</div><div class="lbl">Prior Year Debts</div></div>
       </div>
-      <h2>Fee Type Breakdown</h2>
+      <h2>Fee Type Breakdown (${selectedYear === 'All' ? 'All Years' : selectedYear})</h2>
       <table><thead><tr><th>Fee Type</th><th style="text-align:right">Amount</th><th style="text-align:center">Paid</th><th style="text-align:center">Pending</th><th style="text-align:right">Collected</th></tr></thead><tbody>${feeTypeRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8">No fee types yet</td></tr>'}</tbody></table>
       <h2>Student Payment Status</h2>
-      <table><thead><tr><th>Name</th><th>Student #</th><th style="text-align:center">Status</th><th>Details</th></tr></thead><tbody>${studentRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8">No students yet</td></tr>'}</tbody></table>
+      <table><thead><tr><th>Name</th><th>Student #</th><th>Year Level</th><th style="text-align:center">Status</th><th>Details</th></tr></thead><tbody>${studentRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8">No students yet</td></tr>'}</tbody></table>
       <div class="footer">Organization Finance Report • TapaSok App</div>
     </body></html>`;
     try {
@@ -338,6 +445,102 @@ export default function OfficerFinance() {
           </View>
         </View>
 
+        {/* YEAR & ACADEMIC YEAR SELECTOR CHIPS */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 14 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Calendar size={13} color={textSecondary} />
+              <Text style={{ fontSize: 11, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginLeft: 5 }}>
+                Filter by Academic / Fiscal Year
+              </Text>
+            </View>
+            {selectedYear !== 'All' && (
+              <TouchableOpacity onPress={() => setSelectedYear('All')}>
+                <Text style={{ fontSize: 11, color: '#0fa968', fontWeight: '800' }}>Reset to All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+            <TouchableOpacity
+              onPress={() => setSelectedYear('All')}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: selectedYear === 'All' ? '#0fa968' : border,
+                backgroundColor: selectedYear === 'All' ? (isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5') : cardBg,
+                marginRight: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '800', color: selectedYear === 'All' ? '#0fa968' : textPrimary }}>
+                🌐 All Years
+              </Text>
+            </TouchableOpacity>
+
+            {availableYears.map(yr => {
+              const isSelected = selectedYear === yr;
+              const isCurrent = yr === currentYearStr;
+              return (
+                <TouchableOpacity
+                  key={yr}
+                  onPress={() => setSelectedYear(yr)}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: isSelected ? '#0fa968' : (isCurrent ? (isDark ? '#065f46' : '#bbf7d0') : border),
+                    backgroundColor: isSelected ? (isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5') : cardBg,
+                    marginRight: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: isSelected ? '#0fa968' : textPrimary }}>
+                    {isCurrent ? `📅 ${yr} (Current)` : `⏳ ${yr} (Prior Year)`}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* PRIOR YEAR DEBT ALERT BANNER */}
+        {priorDebtsMembersCount > 0 && filterTab !== 'Prior Debts' && (
+          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+            <TouchableOpacity
+              onPress={() => setFilterTab('Prior Debts')}
+              style={{
+                backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2',
+                borderWidth: 1.5,
+                borderColor: isDark ? 'rgba(239, 68, 68, 0.35)' : '#fecaca',
+                borderRadius: 14,
+                padding: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
+                <AlertTriangle size={18} color="#ef4444" style={{ marginRight: 8 }} />
+                <View>
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: '#b91c1c' }}>
+                    {priorDebtsMembersCount} Member{priorDebtsMembersCount > 1 ? 's have' : ' has'} unpaid fees from prior years!
+                  </Text>
+                  <Text style={{ fontSize: 10, color: textSecondary, marginTop: 1 }}>
+                    Tap to filter students with carrying balances from previous years.
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#ef4444' }}>View →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
           {/* GREEN TOTAL CARD */}
           <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
             <View style={{ backgroundColor: '#0fa968', borderRadius: 16, padding: 24, elevation: 6 }}>
@@ -345,10 +548,17 @@ export default function OfficerFinance() {
                 <View style={{ width: 44, height: 44, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>₱</Text>
                 </View>
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>↗ {percentCollected}%</Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>↗ {percentCollected}%</Text>
+                  {selectedYear !== 'All' && (
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '700', marginTop: 2 }}>Year {selectedYear}</Text>
+                  )}
+                </View>
               </View>
               <View style={{ marginTop: 24 }}>
-                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '700', marginBottom: 4 }}>Total Collected</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '700', marginBottom: 4 }}>
+                  {selectedYear === 'All' ? 'Total Collected (All Years)' : `Total Collected (${selectedYear})`}
+                </Text>
                 <Text style={{ color: '#fff', fontSize: 36, fontWeight: '900', letterSpacing: -0.5 }}>₱{totalCollected.toFixed(2)}</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24 }}>
@@ -410,29 +620,81 @@ export default function OfficerFinance() {
                 </View>
                 <Text style={{ fontSize: 16, fontWeight: '800', color: textPrimary }}>Member Fee Status</Text>
               </View>
-              <Text style={{ fontSize: 11, color: textSecondary, marginBottom: 16 }}>Individual payment breakdown per member</Text>
+              <Text style={{ fontSize: 11, color: textSecondary, marginBottom: 16 }}>
+                {selectedYear === 'All' ? 'Showing all fiscal years' : `Filtered to Year ${selectedYear}`} • Individual breakdown per member
+              </Text>
 
-              {/* TABS */}
-              <View style={{ backgroundColor: tabBg, borderRadius: 12, flexDirection: 'row', padding: 4, marginBottom: 16 }}>
-                {[{ label: 'All', count: studentList.length }, { label: 'Fully Paid', count: fullyPaidMembersCount }, { label: 'Pending', count: pendingMembersCount }, { label: 'No Fees', count: noFeesMembersCount }].map((tab) => {
-                  const isActive = filterTab === tab.label;
-                  return (
-                    <TouchableOpacity key={tab.label} onPress={() => setFilterTab(tab.label as any)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 8, backgroundColor: isActive ? tabActiveBg : 'transparent', elevation: isActive ? 1 : 0 }}>
-                      <Text style={{ fontSize: 11, fontWeight: isActive ? '800' : '600', color: isActive ? tabActiveText : tabInactiveText }}>{tab.label}</Text>
-                      <Text style={{ fontSize: 9, fontWeight: isActive ? '800' : '600', color: isActive ? tabActiveText : tabInactiveText }}>({tab.count})</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              {/* TABS (STATUS) */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                <View style={{ backgroundColor: tabBg, borderRadius: 12, flexDirection: 'row', padding: 4 }}>
+                  {[
+                    { label: 'All', count: studentList.length },
+                    { label: 'Fully Paid', count: fullyPaidMembersCount },
+                    { label: 'Pending', count: pendingMembersCount },
+                    { label: 'Prior Debts', count: priorDebtsMembersCount },
+                    { label: 'No Fees', count: noFeesMembersCount },
+                  ].map((tab) => {
+                    const isActive = filterTab === tab.label;
+                    return (
+                      <TouchableOpacity 
+                        key={tab.label} 
+                        onPress={() => setFilterTab(tab.label as any)} 
+                        style={{ 
+                          paddingHorizontal: 12,
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          paddingVertical: 8, 
+                          borderRadius: 8, 
+                          backgroundColor: isActive ? tabActiveBg : 'transparent', 
+                          elevation: isActive ? 1 : 0,
+                          marginRight: 4,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: isActive ? '800' : '600', color: isActive ? tabActiveText : tabInactiveText }}>
+                          {tab.label === 'Prior Debts' ? `⚠️ Prior Debts (${tab.count})` : `${tab.label} (${tab.count})`}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+
+              {/* STUDENT YEAR LEVEL CHIPS FILTER */}
+              <View style={{ marginBottom: 16 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {['All', '1st Year', '2nd Year', '3rd Year', '4th Year'].map((level) => {
+                    const isLActive = selectedYearLevel === level;
+                    return (
+                      <TouchableOpacity
+                        key={level}
+                        onPress={() => setSelectedYearLevel(level)}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: isLActive ? '#2563eb' : border,
+                          backgroundColor: isLActive ? (isDark ? '#1e3a8a' : '#eff6ff') : cardBg,
+                          marginRight: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: isLActive ? '800' : '600', color: isLActive ? '#2563eb' : textSecondary }}>
+                          🎓 {level === 'All' ? 'All Year Levels' : level}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
 
               {/* SEARCH */}
               <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16, backgroundColor: inputBg }}>
                 <Search size={16} color={textMuted} />
-                <TextInput style={{ flex: 1, marginLeft: 10, fontSize: 13, color: textPrimary, padding: 0 }} placeholder="Search member..." placeholderTextColor={textMuted} value={search} onChangeText={setSearch} />
+                <TextInput style={{ flex: 1, marginLeft: 10, fontSize: 13, color: textPrimary, padding: 0 }} placeholder="Search member by name or student #..." placeholderTextColor={textMuted} value={search} onChangeText={setSearch} />
               </View>
 
               {/* LIST */}
-              {filtered.length === 0 ? <EmptyState icon="👥" message="No members found." /> : filtered.map(student => {
+              {filtered.length === 0 ? <EmptyState icon="👥" message="No members found matching filter." /> : filtered.map(student => {
                 const isOpen = expandedStudents[student.id];
                 return (
                   <View key={student.id} style={{ marginBottom: 10 }}>
@@ -441,8 +703,19 @@ export default function OfficerFinance() {
                         <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>{getInitials(student.name)}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>{student.name}</Text>
-                        <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>{student.student_number}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>{student.name}</Text>
+                          {student.hasPriorYearDebt && (
+                            <View style={{ backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 }}>
+                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#dc2626' }}>
+                                ⚠️ Past Unpaid ({student.priorYearDebts.join(',')})
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
+                          {student.student_number || 'No ID'} {student.year_level ? `• 🎓 ${student.year_level}` : ''}
+                        </Text>
                       </View>
                       {/* Status badge */}
                       <View style={{ backgroundColor: student.feeStatus === 'Fully Paid' ? (isDark ? 'rgba(16,185,129,0.15)' : '#dcfce7') : student.feeStatus === 'Pending' ? (isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7') : (isDark ? '#334155' : '#f1f5f9'), paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginRight: 8 }}>
@@ -453,23 +726,33 @@ export default function OfficerFinance() {
                     {isOpen && (
                       <View style={{ padding: 12, borderBottomWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, borderColor: border, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, marginTop: -6, paddingTop: 16, backgroundColor: isDark ? '#0f172a' : '#fafafa' }}>
                         {student.items.length === 0 ? (
-                          <Text style={{ fontSize: 12, color: textMuted, fontStyle: 'italic', textAlign: 'center', paddingVertical: 10 }}>No fees assigned</Text>
+                          <Text style={{ fontSize: 12, color: textMuted, fontStyle: 'italic', textAlign: 'center', paddingVertical: 10 }}>
+                            No fees assigned for {selectedYear === 'All' ? 'this student' : `year ${selectedYear}`}
+                          </Text>
                         ) : student.items.map(item => {
                           const isPaid = item.status === 'paid' || item.status === 'completed';
                           const title = item.fee_type?.name || 'Fee';
                           const isSubmitted = item.status === 'submitted';
                           const amt = item.fee_type?.amount ? parseFloat(item.fee_type.amount).toFixed(2) : '0.00';
+                          const itemYear = item.created_at ? new Date(item.created_at).getFullYear().toString() : currentYearStr;
+                          const isPriorYear = itemYear < currentYearStr;
+                          const formattedDate = item.created_at ? new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
                           
                           return isPaid ? (
                             <View key={`fee-${item.id}`} style={{ backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : '#f0fdf4', borderWidth: 1, borderColor: isDark ? '#065f46' : '#bbf7d0', borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
                               <View style={{ flex: 1 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                                   <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>{title}</Text>
                                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0fa968' }}>₱{amt}</Text>
                                 </View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                  <CheckCircle size={12} color="#0fa968" />
-                                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#0fa968', marginLeft: 4 }}>Paid</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <CheckCircle size={12} color="#0fa968" />
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#0fa968', marginLeft: 4 }}>Paid</Text>
+                                  </View>
+                                  <Text style={{ fontSize: 10, color: textSecondary }}>
+                                    • S.Y. {itemYear} {formattedDate ? `(${formattedDate})` : ''}
+                                  </Text>
                                 </View>
                               </View>
                               <TouchableOpacity onPress={() => handleUndoPaid(item.id)} style={{ marginLeft: 16, backgroundColor: isDark ? '#334155' : '#fff', borderWidth: 1, borderColor: border, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}>
@@ -477,13 +760,20 @@ export default function OfficerFinance() {
                               </TouchableOpacity>
                             </View>
                           ) : (
-                            <View key={`fee-${item.id}`} style={{ backgroundColor: isSubmitted ? (isDark ? 'rgba(59,130,246,0.1)' : '#eff6ff') : cardBg, borderWidth: 1, borderColor: isSubmitted ? (isDark ? '#1e40af' : '#bfdbfe') : border, borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
+                            <View key={`fee-${item.id}`} style={{ backgroundColor: isSubmitted ? (isDark ? 'rgba(59,130,246,0.1)' : '#eff6ff') : (isPriorYear ? (isDark ? 'rgba(239, 68, 68, 0.08)' : '#fff1f2') : cardBg), borderWidth: 1, borderColor: isSubmitted ? (isDark ? '#1e40af' : '#bfdbfe') : (isPriorYear ? (isDark ? '#991b1b' : '#fecdd3') : border), borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
                               <View style={{ flex: 1 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                  <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>{title}</Text>
-                                  <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>₱{amt}</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary }}>{title}</Text>
+                                    {isPriorYear && (
+                                      <View style={{ backgroundColor: isDark ? '#7f1d1d' : '#ffe4e6', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
+                                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#e11d48' }}>Prior Year ({itemYear})</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                  <Text style={{ fontSize: 13, fontWeight: '800', color: isPriorYear ? '#e11d48' : textPrimary }}>₱{amt}</Text>
                                 </View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                                   {isSubmitted ? (
                                     <>
                                       <Clock size={12} color="#3b82f6" />
@@ -491,10 +781,15 @@ export default function OfficerFinance() {
                                     </>
                                   ) : (
                                     <>
-                                      <Clock size={12} color="#f59e0b" />
-                                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#f59e0b', marginLeft: 4 }}>Pending</Text>
+                                      <Clock size={12} color={isPriorYear ? '#e11d48' : '#f59e0b'} />
+                                      <Text style={{ fontSize: 11, fontWeight: '700', color: isPriorYear ? '#e11d48' : '#f59e0b', marginLeft: 4 }}>
+                                        {isPriorYear ? 'Unpaid from Past Year' : 'Pending'}
+                                      </Text>
                                     </>
                                   )}
+                                  <Text style={{ fontSize: 10, color: textSecondary }}>
+                                    • S.Y. {itemYear} {formattedDate ? `(${formattedDate})` : ''}
+                                  </Text>
                                 </View>
                               </View>
                               <TouchableOpacity onPress={() => setReviewingFee(item)} style={{ marginLeft: 16, backgroundColor: isSubmitted ? '#2563eb' : '#0fa968', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }}>
