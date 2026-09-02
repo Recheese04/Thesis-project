@@ -24,7 +24,8 @@ interface ScanRecord {
   userName?: string;
   studentNumber?: string;
   course?: string;
-  action?: 'checkin' | 'checkout' | 'already_checkout' | 'unknown';
+  action?: 'checkin' | 'checkout' | 'already_checkout' | 'unknown' | string;
+  rawTime?: number;
 }
 
 export default function OfficerRFIDScanner() {
@@ -45,6 +46,7 @@ export default function OfficerRFIDScanner() {
   // Scan History
   const [scanHistory, setScanHistory] = useState<ScanRecord[]>([]);
   const [lastScan, setLastScan] = useState<ScanRecord | null>(null);
+  const [lastFailedScan, setLastFailedScan] = useState<any | null>(null);
 
   // Member Search & Manual Attendance Modal
   const [showMemberModal, setShowMemberModal] = useState(false);
@@ -62,6 +64,7 @@ export default function OfficerRFIDScanner() {
   const border = isDark ? '#334155' : '#e2e8f0';
 
   const inputRef = useRef<TextInput>(null);
+  const lastScanThrottleRef = useRef<{ uid: string; time: number }>({ uid: '', time: 0 });
 
   // Scanner Session & Devices (Officer Hardware Assignment)
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -91,7 +94,7 @@ export default function OfficerRFIDScanner() {
 
   const handleStartSession = async () => {
     if (!selectedEventId) {
-      Alert.alert('Select Event', 'Please select an event first.');
+      Alert.alert('Select Event', 'Please select an ongoing event first.');
       return;
     }
     setLoadingSession(true);
@@ -149,21 +152,37 @@ export default function OfficerRFIDScanner() {
 
   useEffect(() => {
     if (selectedEventId) {
+      // Clear old event's data immediately when event changes
+      setScanHistory([]);
+      setLastScan(null);
+      setLastFailedScan(null);
+      setStats({ total: 0, checkedIn: 0, checkedOut: 0 });
+
       fetchEventStats(selectedEventId, false);
       const interval = setInterval(() => {
         fetchEventStats(selectedEventId, true);
       }, 3000);
       return () => clearInterval(interval);
+    } else {
+      setScanHistory([]);
+      setLastScan(null);
+      setLastFailedScan(null);
+      setStats({ total: 0, checkedIn: 0, checkedOut: 0 });
     }
   }, [selectedEventId]);
 
   const fetchEvents = async () => {
+    setLoadingEvents(true);
     try {
-      const res = await api.get('/officer/events');
-      const eventList = res.data.events || [];
-      setEvents(eventList);
-      if (eventList.length > 0) {
-        setSelectedEventId(eventList[0].id);
+      const res = await api.get('/events?role=officer');
+      const allEvents = Array.isArray(res.data) ? res.data : (res.data?.data || res.data?.events || []);
+      // STRICT FILTER: Only show events that are currently 'ongoing'
+      const ongoingEvents = allEvents.filter((ev: any) => ev.status === 'ongoing');
+      setEvents(ongoingEvents);
+      if (ongoingEvents.length > 0) {
+        setSelectedEventId(ongoingEvents[0].id);
+      } else {
+        setSelectedEventId(null);
       }
     } catch (_) { }
     setLoadingEvents(false);
@@ -183,34 +202,65 @@ export default function OfficerRFIDScanner() {
           checkedOut,
         });
 
-        // Sync live attendance records from database into scanHistory & lastScan UI
-        if (Array.isArray(records) && records.length > 0) {
-          const syncedRecords: ScanRecord[] = records.map((rec: any) => {
-            const u = rec.user || rec.student || {};
-            const timeRaw = rec.time_out || rec.time_in || rec.created_at;
-            const formattedTime = timeRaw
-              ? new Date(timeRaw).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-              : 'Just now';
+        // Sync individual Check-In and Check-Out actions into chronological history
+        if (Array.isArray(records)) {
+          const distinctLogs: ScanRecord[] = [];
 
-            const isCheckedOut = rec.status === 'checked_out' || !!rec.time_out;
-            return {
-              id: String(rec.id),
-              time: formattedTime,
-              uid: u.rfid_uid || 'RFID',
-              success: true,
-              message: isCheckedOut ? 'Check-Out recorded' : 'Check-In recorded',
-              userName: u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Student',
-              studentNumber: u.student_number || u.student_id,
-              course: typeof u.course === 'string' ? u.course : u.course?.name,
-              action: isCheckedOut ? 'checkout' : 'checkin',
-            };
+          records.forEach((rec: any) => {
+            const u = rec.user || rec.student || {};
+            const userName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Student';
+            const studentNumber = u.student_number || u.student_id;
+            const course = typeof u.course === 'string' ? u.course : u.course?.name;
+            const uid = u.rfid_uid || 'RFID';
+
+            // 1. If student checked in, create a distinct CHECK-IN log entry
+            if (rec.time_in) {
+              distinctLogs.push({
+                id: `${rec.id}-in`,
+                rawTime: new Date(rec.time_in).getTime(),
+                time: new Date(rec.time_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                uid,
+                success: true,
+                message: 'Check-In recorded',
+                userName,
+                studentNumber,
+                course,
+                action: 'checkin',
+              });
+            }
+
+            // 2. If student checked out, create a separate distinct CHECK-OUT log entry
+            if (rec.time_out) {
+              distinctLogs.push({
+                id: `${rec.id}-out`,
+                rawTime: new Date(rec.time_out).getTime(),
+                time: new Date(rec.time_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                uid,
+                success: true,
+                message: 'Check-Out recorded',
+                userName,
+                studentNumber,
+                course,
+                action: 'checkout',
+              });
+            }
           });
 
-          setScanHistory(syncedRecords);
+          // Sort latest actions at the very top
+          distinctLogs.sort((a, b) => (b.rawTime || 0) - (a.rawTime || 0));
 
-          if (syncedRecords.length > 0) {
-            setLastScan(syncedRecords[0]);
+          setScanHistory(distinctLogs);
+
+          if (distinctLogs.length > 0 && !lastScan) {
+            setLastScan(distinctLogs[0]);
           }
+        }
+
+        // Sync live failed scans from backend cache
+        if (res.data.last_failed_scan) {
+          setLastFailedScan(res.data.last_failed_scan);
+        } else {
+          setLastFailedScan(null);
         }
       }
     } catch (_) {
@@ -236,7 +286,7 @@ export default function OfficerRFIDScanner() {
 
   const openMemberModal = () => {
     if (!selectedEventId) {
-      Alert.alert('Select Event', 'Please select an active event first.');
+      Alert.alert('Select Event', 'Please select an active ongoing event first.');
       return;
     }
     setShowMemberModal(true);
@@ -247,9 +297,16 @@ export default function OfficerRFIDScanner() {
     const cleanUid = uidToScan.trim();
     if (!cleanUid) return;
     if (!selectedEventId) {
-      Alert.alert('Select Event', 'Please select an active event first before scanning.');
+      Alert.alert('Select Event', 'Please select an ongoing event first before scanning.');
       return;
     }
+
+    // Cooldown throttle: Prevent same card from multi-firing within 2.5 seconds
+    const now = Date.now();
+    if (lastScanThrottleRef.current.uid === cleanUid && now - lastScanThrottleRef.current.time < 2500) {
+      return;
+    }
+    lastScanThrottleRef.current = { uid: cleanUid, time: now };
 
     setScanning(true);
 
@@ -262,16 +319,19 @@ export default function OfficerRFIDScanner() {
       });
 
       const data = res.data;
+      const actionType = scanMode === 'checkout' ? 'checkout' : 'checkin';
+      const isAlready = data.message && (data.message.toLowerCase().includes('already'));
+
       const newRecord: ScanRecord = {
         id: Date.now().toString(),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         uid: cleanUid,
-        success: true,
-        message: data.message || `Scan (${scanMode === 'checkout' ? 'Check-Out' : 'Check-In'}) registered successfully!`,
+        success: !isAlready,
+        message: data.message || `Scan (${actionType === 'checkout' ? 'Check-Out' : 'Check-In'}) recorded successfully!`,
         userName: data.user_name,
         studentNumber: data.student_number,
         course: data.course,
-        action: scanMode,
+        action: actionType,
       };
 
       setLastScan(newRecord);
@@ -290,9 +350,10 @@ export default function OfficerRFIDScanner() {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         uid: cleanUid,
         success: false,
-        message: errData.message || 'Card scan failed or unrecognized.',
+        message: errData.message || (scanMode === 'checkout' ? 'Check-Out failed.' : 'Check-In failed.'),
         userName: errData.user_name,
-        action: 'unknown',
+        studentNumber: errData.student_number,
+        action: scanMode === 'checkout' ? 'checkout' : 'checkin',
       };
 
       setLastScan(failRecord);
@@ -324,7 +385,7 @@ export default function OfficerRFIDScanner() {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         uid: 'MANUAL',
         success: true,
-        message: res.data?.message || `Manual ${type === 'checkin' ? 'check-in' : 'check-out'} recorded`,
+        message: res.data?.message || `Manual ${type === 'checkin' ? 'Check-In' : 'Check-Out'} recorded`,
         userName: name,
         studentNumber: memberUser.user?.student_number || memberUser.student_number,
         course: memberUser.user?.course?.name || memberUser.course,
@@ -334,7 +395,7 @@ export default function OfficerRFIDScanner() {
       setLastScan(newRecord);
       setScanHistory(prev => [newRecord, ...prev]);
       fetchEventStats(selectedEventId);
-      Alert.alert('Success', `Recorded manual ${type === 'checkin' ? 'check-in' : 'check-out'} for ${name}.`);
+      Alert.alert('Success', `Recorded manual ${type === 'checkin' ? 'Check-In' : 'Check-Out'} for ${name}.`);
     } catch (err: any) {
       const msg = err.response?.data?.message || err.response?.data?.errors?.user_id?.[0] || `Failed to record manual ${type}.`;
       Alert.alert('Manual Attendance Status', msg);
@@ -423,15 +484,35 @@ export default function OfficerRFIDScanner() {
 
           {/* Active Event Selector */}
           {events.length === 0 ? (
-            <View style={{ backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fffbeb', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : '#fef3c7', marginBottom: 20 }}>
-              <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 14 }}>No Active Events Found</Text>
-              <Text style={{ color: textSecondary, fontSize: 12, marginTop: 2 }}>Please create or activate an event in the Event Management tab first.</Text>
+            <View style={{ backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fffbeb', padding: 18, borderRadius: 18, borderWidth: 1.5, borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : '#fef3c7', marginBottom: 20 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 15 }}>No Ongoing Events Found</Text>
+                  <Text style={{ color: textSecondary, fontSize: 12, marginTop: 4, lineHeight: 17 }}>
+                    Only events with status <Text style={{ fontWeight: '800', color: '#d97706' }}>"Ongoing"</Text> appear here for attendance scanning.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={fetchEvents}
+                  style={{
+                    backgroundColor: '#2563eb',
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}
+                >
+                  <RefreshCw size={12} color="#ffffff" style={{ marginRight: 4 }} />
+                  <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 11 }}>Refresh</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: textPrimary, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                  Active Event
+                  Ongoing Event
                 </Text>
                 <TouchableOpacity onPress={() => selectedEventId && fetchEventStats(selectedEventId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <RefreshCw size={12} color="#3b82f6" />
@@ -787,19 +868,82 @@ export default function OfficerRFIDScanner() {
                 </View>
               )}
 
+              {/* FAILED SCAN ALERT BANNER (Hardware scanner errors surfaced from backend cache) */}
+              {lastFailedScan && (
+                <View style={{
+                  backgroundColor: lastFailedScan.action === 'not_member'
+                    ? (isDark ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb')
+                    : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2'),
+                  borderWidth: 1.5,
+                  borderColor: lastFailedScan.action === 'not_member'
+                    ? (isDark ? 'rgba(245, 158, 11, 0.5)' : '#fcd34d')
+                    : (isDark ? 'rgba(239, 68, 68, 0.5)' : '#fca5a5'),
+                  borderRadius: 18,
+                  padding: 16,
+                  marginBottom: 20,
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <XCircle size={22} color={lastFailedScan.action === 'not_member' ? '#f59e0b' : '#ef4444'} />
+                    <Text style={{
+                      fontWeight: '900', fontSize: 14, marginLeft: 8,
+                      color: lastFailedScan.action === 'not_member' ? '#b45309' : '#b91c1c',
+                      flex: 1,
+                    }}>
+                      {lastFailedScan.action === 'not_member' ? '⚠️ Not an Org Member' : '❌ Unknown RFID Card'}
+                    </Text>
+                    <View style={{
+                      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+                      backgroundColor: lastFailedScan.action === 'not_member' ? '#fef3c7' : '#fee2e2',
+                    }}>
+                      <Text style={{
+                        fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.6,
+                        color: lastFailedScan.action === 'not_member' ? '#92400e' : '#991b1b',
+                      }}>DENIED</Text>
+                    </View>
+                  </View>
+
+                  <View style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.8)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
+                    {lastFailedScan.user_name ? (
+                      <>
+                        <Text style={{ fontSize: 15, fontWeight: '900', color: textPrimary }}>{lastFailedScan.user_name}</Text>
+                        {lastFailedScan.student_number && (
+                          <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>Student No: {lastFailedScan.student_number}</Text>
+                        )}
+                        <Text style={{ fontSize: 11, color: textSecondary, marginTop: 4 }}>{lastFailedScan.message}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: '800', color: textPrimary }}>
+                          UID: {lastFailedScan.rfid_uid || 'Unknown'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: textSecondary, marginTop: 4 }}>{lastFailedScan.message}</Text>
+                      </>
+                    )}
+                    <Text style={{ fontSize: 10, color: textSecondary, marginTop: 6 }}>
+                      🕐 {lastFailedScan.scanned_at} · Event: {lastFailedScan.event_title}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
               {/* RECENT SCAN SESSION LOG */}
               <View style={{ backgroundColor: bgCard, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 18 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Clock size={16} color="#3b82f6" />
                     <Text style={{ fontSize: 14, fontWeight: '800', color: textPrimary, marginLeft: 6 }}>
-                      Session Scan History
+                      Attendance History
                     </Text>
                   </View>
                   <Text style={{ fontSize: 11, color: textSecondary, fontWeight: '700' }}>
-                    {scanHistory.length} Scans
+                    {scanHistory.length} Records
                   </Text>
                 </View>
+                {selectedEventId && events.find((e: any) => e.id === selectedEventId) && (
+                  <Text style={{ fontSize: 11, color: '#3b82f6', fontWeight: '700', marginBottom: 12 }}>
+                    📅 {events.find((e: any) => e.id === selectedEventId)?.title}
+                  </Text>
+                )}
 
                 {scanHistory.length === 0 ? (
                   <View style={{ paddingVertical: 20, alignItems: 'center' }}>
@@ -843,14 +987,22 @@ export default function OfficerRFIDScanner() {
 
                         {item.action && (
                           <View style={{
-                            paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6,
-                            backgroundColor: item.action === 'checkin' ? '#d1fae5' : '#fee2e2'
+                            paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+                            backgroundColor: item.action === 'checkin'
+                              ? '#d1fae5'
+                              : item.action === 'checkout'
+                                ? '#fef3c7'
+                                : '#fee2e2'
                           }}>
                             <Text style={{
-                              fontSize: 9, fontWeight: '900', textTransform: 'uppercase',
-                              color: item.action === 'checkin' ? '#047857' : '#991b1b'
+                              fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5,
+                              color: item.action === 'checkin'
+                                ? '#047857'
+                                : item.action === 'checkout'
+                                  ? '#b45309'
+                                  : '#dc2626'
                             }}>
-                              {item.action}
+                              {item.action === 'checkin' ? 'CHECK-IN' : item.action === 'checkout' ? 'CHECK-OUT' : item.action}
                             </Text>
                           </View>
                         )}

@@ -178,7 +178,13 @@ class AttendanceController extends Controller
                 'checked_out' => $attendance->where('status', 'checked_out')->count(),
             ];
 
-            return response()->json(['attendance' => $attendance, 'stats' => $stats]);
+            $lastFailedScan = \Illuminate\Support\Facades\Cache::get("last_failed_rfid_" . $eventId);
+
+            return response()->json([
+                'attendance' => $attendance,
+                'stats' => $stats,
+                'last_failed_scan' => $lastFailedScan,
+            ]);
 
         }
         catch (\Exception $e) {
@@ -615,7 +621,6 @@ class AttendanceController extends Controller
 
     public function rfidDeviceScan(Request $request)
     {
-        return response()->json(['test' => 'reached_rfid_device_scan']);
         try {
             $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
                 'rfid_uid' => 'required|string',
@@ -701,12 +706,15 @@ class AttendanceController extends Controller
             // Find user by RFID
             $user = User::where('rfid_uid', $data['rfid_uid'])->first();
             if (!$user) {
-                return response()->json([
-                    'message' => 'No user found with this RFID card.',
-                    'action' => 'unknown',
+                $failedPayload = [
+                    'action' => 'unknown_card',
+                    'message' => 'Unknown RFID card — not registered to any student.',
                     'rfid_uid' => $data['rfid_uid'],
                     'event_title' => $event->title,
-                ], 404);
+                    'scanned_at' => now()->toTimeString(),
+                ];
+                \Illuminate\Support\Facades\Cache::put("last_failed_rfid_{$event->id}", $failedPayload, 30);
+                return response()->json($failedPayload, 404);
             }
 
             // Verify if student is an active member of this organization
@@ -716,13 +724,16 @@ class AttendanceController extends Controller
                 ->exists();
 
             if (!$isMember) {
-                return response()->json([
-                    'message' => 'Access Denied: This student is not a member of this organization.',
-                    'action' => 'unknown',
+                $failedPayload = [
+                    'action' => 'not_member',
+                    'message' => 'Access Denied: Student is not an active member of this organization.',
                     'user_name' => trim($user->first_name . ' ' . $user->last_name),
                     'student_number' => $user->student_number,
                     'event_title' => $event->title,
-                ], 403);
+                    'scanned_at' => now()->toTimeString(),
+                ];
+                \Illuminate\Support\Facades\Cache::put("last_failed_rfid_{$event->id}", $failedPayload, 30);
+                return response()->json($failedPayload, 403);
             }
 
             $userPayload = [
@@ -744,42 +755,38 @@ class AttendanceController extends Controller
             // CASE 1: Never checked in today → check IN
             if (!$attendance) {
                 $attendance = Attendance::create([
-                    'event_id' => $event->id,
-                    'user_id' => $user->id,
+                    'event_id'        => $event->id,
+                    'user_id'         => $user->id,
                     'attendance_type' => 'RFID',
-                    'time_in' => now(),
-                    'status' => 'checked_in',
+                    'time_in'         => now(),
+                    'status'          => 'checked_in',
                 ]);
                 return response()->json(array_merge($userPayload, [
-                    'action' => 'checkin',
-                    'message' => 'Checked in successfully!',
+                    'action'  => 'checkin',
+                    'message' => 'Check-In recorded successfully!',
                 ]), 201);
             }
 
-            // CASE 2: Currently checked in → check OUT
-            if ($attendance->status === 'checked_in' && is_null($attendance->time_out)) {
-                $attendance->time_out = now();
-                $attendance->status = 'checked_out';
-                $attendance->save();
+            // CASE 2: Already checked in — ignore double scan, just confirm
+            if ($attendance->status === 'checked_in') {
                 return response()->json(array_merge($userPayload, [
-                    'action' => 'checkout',
-                    'message' => 'Checked out successfully!',
-                    'duration' => $attendance->formatted_duration,
+                    'action'  => 'already_checkin',
+                    'message' => 'Already checked in for this event.',
                 ]), 200);
             }
 
             // CASE 3: Already checked out today
             if ($attendance->status === 'checked_out') {
                 return response()->json(array_merge($userPayload, [
-                    'action' => 'already_checkout',
+                    'action'  => 'already_checkout',
                     'message' => 'Already checked out for this event today.',
                 ]), 200);
             }
 
             // Fallback
             return response()->json(array_merge($userPayload, [
-                'action' => 'already_checkin',
-                'message' => 'Already checked in.',
+                'action'  => 'already_checkin',
+                'message' => 'Already recorded for this event.',
             ]), 200);
 
         }

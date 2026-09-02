@@ -26,7 +26,7 @@ const char *ssid = "POSTANES WIFI";
 const char *password = "Rechie@James!4!";
 const char* device_token = "2c4f3c61aa79d533";
 
-String URL = "https://thesis-project-production-c531.up.railway.app/api/attendance/rfid-device"; 
+String URL = "https://thesis-project-production-ba33.up.railway.app/api/attendance/rfid-device"; 
 
 // Track last card scanned and time to prevent duplicate rapid scans of the same card
 String lastScannedUID = "";

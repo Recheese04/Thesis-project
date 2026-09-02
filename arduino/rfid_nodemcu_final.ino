@@ -5,7 +5,7 @@
  * 
  * Wi-Fi SSID  : POSTANES WIFI
  * Wi-Fi Pass  : Rechie@James!4!
- * Server API  : https://thesis-project-production-c531.up.railway.app/api/attendance/rfid-device
+ * Server API  : https://thesis-project-production-ba33.up.railway.app/api/attendance/rfid-device
  * 
  * WIRING DIAGRAM:
  *   RC522 Pin  ->  NodeMCU Pin
@@ -35,7 +35,7 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 // Wi-Fi Credentials & Server Configuration
 const char *ssid = "POSTANES WIFI";
 const char *password = "Rechie@James!4!";
-const char* URL = "https://thesis-project-production-c531.up.railway.app/api/attendance/rfid-device";
+const char* URL = "https://thesis-project-production-ba33.up.railway.app/api/attendance/rfid-device";
 
 // Card Scan Anti-Duplicate Cooldown (2 seconds for same card)
 String lastScannedUID = "";

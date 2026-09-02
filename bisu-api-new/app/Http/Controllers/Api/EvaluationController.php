@@ -24,7 +24,7 @@ class EvaluationController extends Controller
     public function index(Request $request)
     {
         try {
-            $user  = auth()->user();
+            $user = auth()->user();
             $query = EventEvaluation::with(['event.organization', 'questions'])
                 ->orderBy('created_at', 'desc');
 
@@ -84,17 +84,17 @@ class EvaluationController extends Controller
             }
 
             $data = $request->validate([
-                'event_id'                          => 'required|exists:events,id',
-                'title'                             => 'nullable|string|max:255',
-                'description'                       => 'nullable|string',
-                'is_anonymous'                      => 'nullable|boolean',
-                'expires_at'                        => 'nullable|date',
-                'questions'                         => 'required|array|min:1',
-                'questions.*.question_text'         => 'required|string',
-                'questions.*.question_type'         => 'required|in:rating,text,multiple_choice,yes_no',
-                'questions.*.is_required'           => 'nullable|boolean',
-                'questions.*.order_index'           => 'nullable|integer',
-                'questions.*.options'               => 'nullable|array',
+                'event_id' => 'required|exists:events,id',
+                'title' => 'nullable|string|max:255',
+                'description' => 'nullable|string',
+                'is_anonymous' => 'nullable|boolean',
+                'expires_at' => 'nullable|date',
+                'questions' => 'required|array|min:1',
+                'questions.*.question_text' => 'required|string',
+                'questions.*.question_type' => 'required|in:rating,text,multiple_choice,yes_no',
+                'questions.*.is_required' => 'nullable|boolean',
+                'questions.*.order_index' => 'nullable|integer',
+                'questions.*.options' => 'nullable|array',
                 'questions.*.options.*.option_text' => 'required_if:questions.*.question_type,multiple_choice|string|max:255',
                 'questions.*.options.*.order_index' => 'nullable|integer',
             ]);
@@ -112,13 +112,13 @@ class EvaluationController extends Controller
             DB::beginTransaction();
 
             $evaluation = EventEvaluation::create([
-                'event_id'     => $data['event_id'],
-                'title'        => $data['title'] ?? 'Event Evaluation',
-                'description'  => $data['description'] ?? null,
+                'event_id' => $data['event_id'],
+                'title' => $data['title'] ?? 'Event Evaluation',
+                'description' => $data['description'] ?? null,
                 'is_anonymous' => $data['is_anonymous'] ?? false,
-                'status'       => 'open',
-                'created_by'   => $user->id,
-                'expires_at'   => $data['expires_at'] ?? null,
+                'status' => 'open',
+                'created_by' => $user->id,
+                'expires_at' => $data['expires_at'] ?? null,
             ]);
 
             foreach ($data['questions'] as $index => $q) {
@@ -126,8 +126,8 @@ class EvaluationController extends Controller
                     'evaluation_id' => $evaluation->id,
                     'question_text' => $q['question_text'],
                     'question_type' => $q['question_type'],
-                    'is_required'   => $q['is_required'] ?? true,
-                    'order_index'   => $q['order_index'] ?? $index,
+                    'is_required' => $q['is_required'] ?? true,
+                    'order_index' => $q['order_index'] ?? $index,
                 ]);
 
                 if ($q['question_type'] === 'multiple_choice' && !empty($q['options'])) {
@@ -146,7 +146,7 @@ class EvaluationController extends Controller
             $evaluation->load(['event.organization', 'questions.options']);
 
             return response()->json([
-                'message'    => 'Evaluation has been created successfully!',
+                'message' => 'Evaluation has been created successfully!',
                 'evaluation' => $evaluation,
             ], 201);
 
@@ -166,7 +166,7 @@ class EvaluationController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $user       = auth()->user();
+            $user = auth()->user();
             $evaluation = EventEvaluation::findOrFail($id);
 
             if (!$user->isAdmin()) {
@@ -176,17 +176,17 @@ class EvaluationController extends Controller
             }
 
             $data = $request->validate([
-                'title'        => 'nullable|string|max:255',
-                'description'  => 'nullable|string',
+                'title' => 'nullable|string|max:255',
+                'description' => 'nullable|string',
                 'is_anonymous' => 'nullable|boolean',
-                'status'       => 'nullable|in:open,closed',
+                'status' => 'nullable|in:open,closed',
             ]);
 
             $evaluation->update($data);
             $evaluation->load(['event.organization', 'questions.options']);
 
             return response()->json([
-                'message'    => 'Evaluation has been updated successfully!',
+                'message' => 'Evaluation has been updated successfully!',
                 'evaluation' => $evaluation,
             ]);
 
@@ -204,7 +204,7 @@ class EvaluationController extends Controller
     public function destroy($id)
     {
         try {
-            $user       = auth()->user();
+            $user = auth()->user();
             $evaluation = EventEvaluation::findOrFail($id);
 
             if (!$user->isAdmin()) {
@@ -231,7 +231,7 @@ class EvaluationController extends Controller
     public function officerEvents(Request $request)
     {
         try {
-            $user  = auth()->user();
+            $user = auth()->user();
             $orgIds = \App\Models\Designation::where('user_id', $user->id)
                 ->where('status', 'active')
                 ->whereNotIn('designation', ['Member'])
@@ -247,11 +247,11 @@ class EvaluationController extends Controller
                 ->orderBy('event_date', 'desc')
                 ->get()
                 ->map(fn($event) => [
-                    'id'                => $event->id,
-                    'title'             => $event->title,
-                    'event_date'        => $event->event_date?->format('M d, Y'),
+                    'id' => $event->id,
+                    'title' => $event->title,
+                    'event_date' => $event->event_date?->format('M d, Y'),
                     'evaluation_status' => $event->evaluation?->status ?? null,
-                    'expires_at'        => $event->evaluation?->expires_at ?? null,
+                    'expires_at' => $event->evaluation?->expires_at ?? null,
                 ]);
 
             return response()->json(['events' => $events]);
@@ -279,7 +279,7 @@ class EvaluationController extends Controller
             if (!$evaluation) {
                 return response()->json([
                     'evaluation' => null,
-                    'submitted'  => false,
+                    'submitted' => false,
                 ]);
             }
 
@@ -289,7 +289,7 @@ class EvaluationController extends Controller
                     ->where('organization_id', $evaluation->event->organization_id)
                     ->where('status', 'active')
                     ->exists();
-                
+
                 if (!$isMember) {
                     return response()->json(['message' => 'Unauthorized. You are not a member of this organization.'], 403);
                 }
@@ -299,13 +299,13 @@ class EvaluationController extends Controller
                     ->where('user_id', $user->id)
                     ->whereNotNull('time_out')
                     ->exists();
-                
+
                 if (!$hasCheckedOut) {
                     return response()->json(['message' => 'Evaluation is not yet available. You must check out of the event first.'], 403);
                 }
             }
 
-            $userId    = $user->id;
+            $userId = $user->id;
             $submitted = false;
 
             if ($userId) {
@@ -316,7 +316,7 @@ class EvaluationController extends Controller
 
             return response()->json([
                 'evaluation' => $evaluation,
-                'submitted'  => $submitted,
+                'submitted' => $submitted,
             ]);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Error fetching evaluation', 'error' => $e->getMessage()], 500);
@@ -349,11 +349,11 @@ class EvaluationController extends Controller
             }
 
             $data = $request->validate([
-                'answers'                => 'required|array|min:1',
-                'answers.*.question_id'  => 'required|exists:evaluation_questions,id',
+                'answers' => 'required|array|min:1',
+                'answers.*.question_id' => 'required|exists:evaluation_questions,id',
                 'answers.*.rating_value' => 'nullable|integer|min:1|max:5',
-                'answers.*.text_value'   => 'nullable|string',
-                'answers.*.option_id'    => 'nullable|exists:evaluation_question_options,id',
+                'answers.*.text_value' => 'nullable|string',
+                'answers.*.option_id' => 'nullable|exists:evaluation_question_options,id',
                 'answers.*.yes_no_value' => 'nullable|boolean',
             ]);
 
@@ -361,17 +361,17 @@ class EvaluationController extends Controller
 
             $response = EvaluationResponse::create([
                 'evaluation_id' => $evaluation->id,
-                'user_id'       => $userId,
-                'submitted_at'  => now(),
+                'user_id' => $userId,
+                'submitted_at' => now(),
             ]);
 
             foreach ($data['answers'] as $answer) {
                 EvaluationAnswer::create([
-                    'response_id'  => $response->id,
-                    'question_id'  => $answer['question_id'],
+                    'response_id' => $response->id,
+                    'question_id' => $answer['question_id'],
                     'rating_value' => $answer['rating_value'] ?? null,
-                    'text_value'   => $answer['text_value'] ?? null,
-                    'option_id'    => $answer['option_id'] ?? null,
+                    'text_value' => $answer['text_value'] ?? null,
+                    'option_id' => $answer['option_id'] ?? null,
                     'yes_no_value' => $answer['yes_no_value'] ?? null,
                 ]);
             }
@@ -415,11 +415,11 @@ class EvaluationController extends Controller
             }
 
             $data = $request->validate([
-                'answers'                => 'required|array|min:1',
-                'answers.*.question_id'  => 'required|exists:evaluation_questions,id',
+                'answers' => 'required|array|min:1',
+                'answers.*.question_id' => 'required|exists:evaluation_questions,id',
                 'answers.*.rating_value' => 'nullable|integer|min:1|max:5',
-                'answers.*.text_value'   => 'nullable|string',
-                'answers.*.option_id'    => 'nullable|exists:evaluation_question_options,id',
+                'answers.*.text_value' => 'nullable|string',
+                'answers.*.option_id' => 'nullable|exists:evaluation_question_options,id',
                 'answers.*.yes_no_value' => 'nullable|boolean',
             ]);
 
@@ -427,17 +427,17 @@ class EvaluationController extends Controller
 
             $response = EvaluationResponse::create([
                 'evaluation_id' => $evaluation->id,
-                'user_id'       => $userId,
-                'submitted_at'  => now(),
+                'user_id' => $userId,
+                'submitted_at' => now(),
             ]);
 
             foreach ($data['answers'] as $answer) {
                 EvaluationAnswer::create([
-                    'response_id'  => $response->id,
-                    'question_id'  => $answer['question_id'],
+                    'response_id' => $response->id,
+                    'question_id' => $answer['question_id'],
                     'rating_value' => $answer['rating_value'] ?? null,
-                    'text_value'   => $answer['text_value'] ?? null,
-                    'option_id'    => $answer['option_id'] ?? null,
+                    'text_value' => $answer['text_value'] ?? null,
+                    'option_id' => $answer['option_id'] ?? null,
                     'yes_no_value' => $answer['yes_no_value'] ?? null,
                 ]);
             }
@@ -462,7 +462,7 @@ class EvaluationController extends Controller
     public function addQuestions(Request $request, $id)
     {
         try {
-            $user       = auth()->user();
+            $user = auth()->user();
             $evaluation = EventEvaluation::with('questions')->findOrFail($id);
 
             if (!$user->isAdmin()) {
@@ -472,12 +472,12 @@ class EvaluationController extends Controller
             }
 
             $data = $request->validate([
-                'questions'                         => 'required|array|min:1',
-                'questions.*.question_text'         => 'required|string',
-                'questions.*.question_type'         => 'required|in:rating,text,multiple_choice,yes_no',
-                'questions.*.is_required'           => 'nullable|boolean',
-                'questions.*.order_index'           => 'nullable|integer',
-                'questions.*.options'               => 'nullable|array',
+                'questions' => 'required|array|min:1',
+                'questions.*.question_text' => 'required|string',
+                'questions.*.question_type' => 'required|in:rating,text,multiple_choice,yes_no',
+                'questions.*.is_required' => 'nullable|boolean',
+                'questions.*.order_index' => 'nullable|integer',
+                'questions.*.options' => 'nullable|array',
                 'questions.*.options.*.option_text' => 'required_if:questions.*.question_type,multiple_choice|string|max:255',
                 'questions.*.options.*.order_index' => 'nullable|integer',
             ]);
@@ -489,8 +489,8 @@ class EvaluationController extends Controller
                     'evaluation_id' => $evaluation->id,
                     'question_text' => $q['question_text'],
                     'question_type' => $q['question_type'],
-                    'is_required'   => $q['is_required'] ?? true,
-                    'order_index'   => $q['order_index'] ?? $index,
+                    'is_required' => $q['is_required'] ?? true,
+                    'order_index' => $q['order_index'] ?? $index,
                 ]);
 
                 if ($q['question_type'] === 'multiple_choice' && !empty($q['options'])) {
@@ -509,7 +509,7 @@ class EvaluationController extends Controller
             $evaluation->load(['event.organization', 'questions.options']);
 
             return response()->json([
-                'message'    => 'Questions added successfully!',
+                'message' => 'Questions added successfully!',
                 'evaluation' => $evaluation,
             ]);
 
@@ -530,7 +530,7 @@ class EvaluationController extends Controller
     public function results($id)
     {
         try {
-            $user       = auth()->user();
+            $user = auth()->user();
             $evaluation = EventEvaluation::with(['questions.options', 'event.organization'])
                 ->findOrFail($id);
 
@@ -546,7 +546,7 @@ class EvaluationController extends Controller
                 $answers = EvaluationAnswer::where('question_id', $question->id)->get();
 
                 $summary = [
-                    'question_id'   => $question->id,
+                    'question_id' => $question->id,
                     'question_text' => $question->question_text,
                     'question_type' => $question->question_type,
                     'total_answers' => $answers->count(),
@@ -564,15 +564,15 @@ class EvaluationController extends Controller
 
                 if ($question->question_type === 'yes_no') {
                     $summary['yes_count'] = $answers->where('yes_no_value', true)->count();
-                    $summary['no_count']  = $answers->where('yes_no_value', false)->count();
+                    $summary['no_count'] = $answers->where('yes_no_value', false)->count();
                 }
 
                 if ($question->question_type === 'multiple_choice') {
                     $summary['option_counts'] = $question->options->map(function ($option) use ($answers) {
                         return [
-                            'option_id'   => $option->id,
+                            'option_id' => $option->id,
                             'option_text' => $option->option_text,
-                            'count'       => $answers->where('option_id', $option->id)->count(),
+                            'count' => $answers->where('option_id', $option->id)->count(),
                         ];
                     });
                 }
@@ -581,9 +581,9 @@ class EvaluationController extends Controller
             });
 
             return response()->json([
-                'evaluation'      => $evaluation,
+                'evaluation' => $evaluation,
                 'total_responses' => $totalResponses,
-                'results'         => $results,
+                'results' => $results,
             ]);
 
         } catch (\Exception $e) {
@@ -601,7 +601,7 @@ class EvaluationController extends Controller
     public function studentEvaluations(Request $request)
     {
         try {
-            $user   = auth()->user();
+            $user = auth()->user();
             $userId = $user->id;
 
             // 1. Get organization IDs where the student is an active member
@@ -619,12 +619,12 @@ class EvaluationController extends Controller
             // AND the student has personally checked out
             $evaluations = EventEvaluation::with(['event:id,title,status', 'questions:id,evaluation_id'])
                 ->where('status', 'open')
-                ->whereHas('event', function($query) use ($orgIds, $userId) {
+                ->whereHas('event', function ($query) use ($orgIds, $userId) {
                     $query->whereIn('organization_id', $orgIds)
-                          ->whereHas('attendances', function($aq) use ($userId) {
-                              $aq->where('user_id', $userId)
+                        ->whereHas('attendances', function ($aq) use ($userId) {
+                            $aq->where('user_id', $userId)
                                 ->whereNotNull('time_out');
-                          });
+                        });
                 })
                 ->orderBy('created_at', 'desc')
                 ->get()
@@ -634,16 +634,16 @@ class EvaluationController extends Controller
                         ->exists();
 
                     return [
-                        'id'              => $evaluation->id,
-                        'title'           => $evaluation->title,
-                        'description'     => $evaluation->description,
-                        'status'          => $evaluation->status,
-                        'is_anonymous'    => $evaluation->is_anonymous,
+                        'id' => $evaluation->id,
+                        'title' => $evaluation->title,
+                        'description' => $evaluation->description,
+                        'status' => $evaluation->status,
+                        'is_anonymous' => $evaluation->is_anonymous,
                         'questions_count' => $evaluation->questions->count(),
-                        'has_responded'   => $hasResponded,
-                        'expires_at'      => $evaluation->expires_at,
-                        'event'           => $evaluation->event ? [
-                            'id'    => $evaluation->event->id,
+                        'has_responded' => $hasResponded,
+                        'expires_at' => $evaluation->expires_at,
+                        'event' => $evaluation->event ? [
+                            'id' => $evaluation->event->id,
                             'title' => $evaluation->event->title,
                         ] : null,
                     ];
@@ -670,7 +670,7 @@ class EvaluationController extends Controller
             }
 
             $data = $request->validate([
-                'inputs' => 'required|string', 
+                'inputs' => 'required|string',
             ]);
 
             $systemPrompt = "You are an expert student evaluation analyst. Your task is to accurately summarize a collection of student text responses for a specific evaluation question. 
@@ -701,7 +701,7 @@ class EvaluationController extends Controller
             if ($response->successful()) {
                 $resData = $response->json();
                 $text = $resData['candidates'][0]['content']['parts'][0]['text'] ?? null;
-                
+
                 if (!$text) {
                     Log::error('Gemini Summarization: No text in response', ['data' => $resData]);
                     return response()->json(['error' => 'No summary text generated.'], 500);
