@@ -291,7 +291,7 @@ export default function OfficerRFIDScanner() {
 
           setScanHistory(distinctLogs);
 
-          if (distinctLogs.length > 0 && !lastScan) {
+          if (distinctLogs.length > 0) {
             setLastScan(distinctLogs[0]);
           }
         }
