@@ -179,4 +179,26 @@ class ScannerSessionController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Update active scanner mode for an event (checkin vs checkout).
+     */
+    public function setMode(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'event_id' => 'required|exists:events,id',
+                'mode' => 'required|in:checkin,checkout,smart',
+            ]);
+
+            \Illuminate\Support\Facades\Cache::put("scanner_mode_{$data['event_id']}", $data['mode'], 86400);
+
+            return response()->json([
+                'message' => "Scanner hardware mode set to {$data['mode']}",
+                'mode' => $data['mode'],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error setting mode', 'error' => $e->getMessage()], 500);
+        }
+    }
 }

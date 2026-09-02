@@ -507,6 +507,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/scanner-sessions/start', [ScannerSessionController::class, 'start']);
     Route::post('/scanner-sessions/stop', [ScannerSessionController::class, 'stop']);
     Route::get('/scanner-sessions/active', [ScannerSessionController::class, 'active']);
+    Route::post('/scanner-sessions/mode', [ScannerSessionController::class, 'setMode']);
     Route::get('/scanner-devices', [ScannerDeviceController::class, 'index']);
     Route::put('/scanner-devices/{id}/rename', [ScannerDeviceController::class, 'rename']);
 

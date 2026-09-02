@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert,
-  ScrollView, Image, Modal, FlatList
+  ScrollView, Image, Modal, FlatList, RefreshControl
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../../services/api';
@@ -35,6 +35,7 @@ export default function OfficerRFIDScanner() {
   const [rfidInput, setRfidInput] = useState('');
   const [scanning, setScanning] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Scan Mode: 'checkin' (force check-in) or 'checkout' (force check-out)
   const [scanMode, setScanMode] = useState<'checkin' | 'checkout'>('checkin');
@@ -71,6 +72,21 @@ export default function OfficerRFIDScanner() {
   const [loadingSession, setLoadingSession] = useState(false);
   const [devices, setDevices] = useState<any[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchEvents(),
+        fetchActiveSession(),
+        fetchDevices(),
+        selectedEventId ? fetchEventStats(selectedEventId, true) : Promise.resolve(),
+      ]);
+    } catch (_) {
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     fetchEvents();
@@ -404,6 +420,16 @@ export default function OfficerRFIDScanner() {
     }
   };
 
+  const handleModeChange = (mode: 'checkin' | 'checkout') => {
+    setScanMode(mode);
+    if (selectedEventId) {
+      api.post('/scanner-sessions/mode', {
+        event_id: selectedEventId,
+        mode: mode,
+      }).catch(() => {});
+    }
+  };
+
   const filteredMembers = members.filter(m => {
     const u = m.user || m;
     const name = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase();
@@ -426,7 +452,19 @@ export default function OfficerRFIDScanner() {
 
   return (
     <OfficerPageWrapper activeRoute="rfid">
-      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#2563eb']}
+            tintColor="#2563eb"
+          />
+        }
+      >
         {/* Header Area with Tarsi */}
         <View style={{ position: 'relative', overflow: 'hidden' }}>
 
@@ -452,8 +490,31 @@ export default function OfficerRFIDScanner() {
               </Text>
             </View>
 
-            <View style={{ width: 44, height: 44, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 14, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 }}>
-              <CreditCard size={20} color={isDark ? '#94a3b8' : '#2563eb'} />
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                onPress={onRefresh}
+                disabled={refreshing}
+                style={{
+                  width: 44,
+                  height: 44,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+                  borderWidth: 1,
+                  borderColor: border,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#000',
+                  shadowOpacity: 0.05,
+                  shadowRadius: 6,
+                  elevation: 2,
+                }}
+              >
+                <RefreshCw size={18} color="#2563eb" />
+              </TouchableOpacity>
+
+              <View style={{ width: 44, height: 44, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 14, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 }}>
+                <CreditCard size={20} color={isDark ? '#94a3b8' : '#2563eb'} />
+              </View>
             </View>
           </View>
 
@@ -626,7 +687,7 @@ export default function OfficerRFIDScanner() {
                       paddingVertical: 10,
                       borderRadius: 12,
                       alignItems: 'center',
-                      justify: 'center',
+                      justifyContent: 'center',
                     }}
                   >
                     {loadingSession ? (
@@ -714,7 +775,7 @@ export default function OfficerRFIDScanner() {
                 </Text>
                 <View style={{ flexDirection: 'row', backgroundColor: isDark ? '#0f172a' : '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 16 }}>
                   <TouchableOpacity
-                    onPress={() => setScanMode('checkin')}
+                    onPress={() => handleModeChange('checkin')}
                     style={{
                       flex: 1,
                       paddingVertical: 10,
@@ -729,7 +790,7 @@ export default function OfficerRFIDScanner() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={() => setScanMode('checkout')}
+                    onPress={() => handleModeChange('checkout')}
                     style={{
                       flex: 1,
                       paddingVertical: 10,

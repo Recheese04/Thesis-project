@@ -746,13 +746,48 @@ class AttendanceController extends Controller
                 'event_title' => $event->title,
             ];
 
+            $mode = \Illuminate\Support\Facades\Cache::get("scanner_mode_{$event->id}", 'checkin');
+
             $attendance = Attendance::where('event_id', $event->id)
                 ->where('user_id', $user->id)
                 ->whereDate('created_at', today())
                 ->orderBy('created_at', 'desc')
                 ->first();
 
-            // CASE 1: Never checked in today → check IN
+            // ── CHECK-OUT MODE ──────────────────────────────────────────────────
+            if ($mode === 'checkout') {
+                if (!$attendance) {
+                    $failedPayload = [
+                        'action' => 'no_checkin',
+                        'message' => 'Cannot check out — student has not checked in yet.',
+                        'user_name' => trim($user->first_name . ' ' . $user->last_name),
+                        'student_number' => $user->student_number,
+                        'event_title' => $event->title,
+                        'scanned_at' => now()->toTimeString(),
+                    ];
+                    \Illuminate\Support\Facades\Cache::put("last_failed_rfid_{$event->id}", $failedPayload, 30);
+                    return response()->json($failedPayload, 400);
+                }
+
+                if ($attendance->status === 'checked_out' || !is_null($attendance->time_out)) {
+                    return response()->json(array_merge($userPayload, [
+                        'action'  => 'already_checkout',
+                        'message' => 'Student already checked out for this event.',
+                    ]), 200);
+                }
+
+                $attendance->time_out = now();
+                $attendance->status = 'checked_out';
+                $attendance->save();
+
+                return response()->json(array_merge($userPayload, [
+                    'action'   => 'checkout',
+                    'message'  => 'Check-Out recorded successfully!',
+                    'duration' => $attendance->formatted_duration,
+                ]), 200);
+            }
+
+            // ── CHECK-IN MODE (DEFAULT) ─────────────────────────────────────────
             if (!$attendance) {
                 $attendance = Attendance::create([
                     'event_id'        => $event->id,
@@ -767,26 +802,16 @@ class AttendanceController extends Controller
                 ]), 201);
             }
 
-            // CASE 2: Already checked in — ignore double scan, just confirm
-            if ($attendance->status === 'checked_in') {
-                return response()->json(array_merge($userPayload, [
-                    'action'  => 'already_checkin',
-                    'message' => 'Already checked in for this event.',
-                ]), 200);
-            }
-
-            // CASE 3: Already checked out today
-            if ($attendance->status === 'checked_out') {
+            if ($attendance->status === 'checked_out' || !is_null($attendance->time_out)) {
                 return response()->json(array_merge($userPayload, [
                     'action'  => 'already_checkout',
                     'message' => 'Already checked out for this event today.',
                 ]), 200);
             }
 
-            // Fallback
             return response()->json(array_merge($userPayload, [
                 'action'  => 'already_checkin',
-                'message' => 'Already recorded for this event.',
+                'message' => 'Student already checked in for this event.',
             ]), 200);
 
         }
