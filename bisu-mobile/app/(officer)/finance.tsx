@@ -74,14 +74,30 @@ export default function OfficerFinance() {
 
   const [showYearModal, setShowYearModal] = useState(false);
 
+  const [apiSchoolYears, setApiSchoolYears] = useState<string[]>([]);
+
+  // Predefined School Years covering 2024 up to 2032-2033
+  const DEFAULT_SCHOOL_YEARS = [
+    '2032-2033',
+    '2031-2032',
+    '2030-2031',
+    '2029-2030',
+    '2028-2029',
+    '2027-2028',
+    '2026-2027',
+    '2025-2026',
+    '2024-2025',
+  ];
+
   const fetchData = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
     try {
-      const [feesRes, membersRes, typesRes, methodsRes] = await Promise.allSettled([
+      const [feesRes, membersRes, typesRes, methodsRes, syRes] = await Promise.allSettled([
         api.get(`/organizations/${orgId}/student-fees`),
         api.get(`/organizations/${orgId}/members?status=active`),
         api.get(`/fee-types`),
         api.get(`/payment-methods`),
+        api.get(`/school-years`),
       ]);
 
       if (feesRes.status === 'fulfilled') {
@@ -96,6 +112,9 @@ export default function OfficerFinance() {
       }
       if (methodsRes.status === 'fulfilled') {
         setPaymentMethods(Array.isArray(methodsRes.value.data) ? methodsRes.value.data : []);
+      }
+      if (syRes.status === 'fulfilled' && Array.isArray(syRes.value.data)) {
+        setApiSchoolYears(syRes.value.data.map((s: any) => s.name).filter(Boolean));
       }
     } catch (_) { }
     setLoading(false);
@@ -121,26 +140,62 @@ export default function OfficerFinance() {
 
   const currentYearStr = new Date().getFullYear().toString();
 
-  // Extract all distinct fee years from database
+  // Combine predefined academic years, API school years, and distinct fee years
   const availableYears = useMemo(() => {
     const yearsSet = new Set<string>();
-    yearsSet.add(currentYearStr);
+
+    // 1. Add predefined school years (2024 to 2033)
+    DEFAULT_SCHOOL_YEARS.forEach(sy => yearsSet.add(sy));
+
+    // 2. Add school years from API database
+    apiSchoolYears.forEach(sy => yearsSet.add(sy));
+
+    // 3. Extract distinct years from existing fees
     fees.forEach(f => {
+      if (f.school_year?.name) {
+        yearsSet.add(f.school_year.name);
+      }
       if (f.created_at) {
         const y = new Date(f.created_at).getFullYear().toString();
         if (y && !isNaN(Number(y))) yearsSet.add(y);
       }
     });
+
     return Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
-  }, [fees, currentYearStr]);
+  }, [fees, apiSchoolYears]);
 
   // Filter fees according to selected fiscal/academic year
   const displayedFees = useMemo(() => {
     if (selectedYear === 'All') return fees;
     return fees.filter(f => {
+      // Direct school year relationship check
+      if (f.school_year?.name) {
+        if (f.school_year.name === selectedYear || f.school_year.name.includes(selectedYear)) {
+          return true;
+        }
+      }
+
       if (!f.created_at) return true;
-      const y = new Date(f.created_at).getFullYear().toString();
-      return y === selectedYear;
+      const d = new Date(f.created_at);
+      const feeYear = d.getFullYear();
+      const feeMonth = d.getMonth() + 1; // 1 to 12
+
+      // If selectedYear is format "YYYY-YYYY" (e.g. "2026-2027")
+      if (selectedYear.includes('-')) {
+        const [startYStr, endYStr] = selectedYear.split('-');
+        const startY = parseInt(startYStr, 10);
+        const endY = parseInt(endYStr, 10);
+        if (!isNaN(startY) && !isNaN(endY)) {
+          // Matches 1st semester (June-Dec of start year) or 2nd sem (Jan-May of end year) or start year
+          if (feeYear === startY && feeMonth >= 6) return true;
+          if (feeYear === endY && feeMonth <= 5) return true;
+          if (feeYear === startY) return true;
+          return false;
+        }
+      }
+
+      // If selectedYear is single year format (e.g. "2026")
+      return feeYear.toString() === selectedYear;
     });
   }, [fees, selectedYear]);
 
@@ -886,7 +941,22 @@ export default function OfficerFinance() {
 
               {availableYears.map(yr => {
                 const isSelected = selectedYear === yr;
-                const isCurrent = yr === currentYearStr;
+                const isCurrent = yr.includes(currentYearStr) || yr === currentYearStr;
+                const startYear = parseInt(yr.split('-')[0], 10);
+                const isUpcoming = !isNaN(startYear) && startYear > parseInt(currentYearStr, 10);
+
+                const titleLabel = isCurrent
+                  ? `📅 S.Y. ${yr} (Current Active)`
+                  : isUpcoming
+                    ? `🔮 S.Y. ${yr} (Upcoming)`
+                    : `⏳ S.Y. ${yr} (Past Year)`;
+
+                const subtitleLabel = isCurrent
+                  ? 'Current active school year records'
+                  : isUpcoming
+                    ? 'Upcoming academic year records'
+                    : 'Past records & carrying balances';
+
                 return (
                   <TouchableOpacity
                     key={yr}
@@ -904,10 +974,10 @@ export default function OfficerFinance() {
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 14, fontWeight: '800', color: isSelected ? '#0fa968' : textPrimary }}>
-                        {isCurrent ? `📅 School Year ${yr} (Current)` : `⏳ School Year ${yr} (Prior Year)`}
+                        {titleLabel}
                       </Text>
                       <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
-                        {isCurrent ? 'Current active school year records' : 'Past year records & carrying balances'}
+                        {subtitleLabel}
                       </Text>
                     </View>
                     {isSelected && <CheckCircle size={18} color="#0fa968" />}
