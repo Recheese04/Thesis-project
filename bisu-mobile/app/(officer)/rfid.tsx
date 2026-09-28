@@ -779,7 +779,7 @@ export default function OfficerRFIDScanner() {
                             }}
                           >
                             <TouchableOpacity onPress={() => setSelectedDeviceId(dev.device_id)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dev.is_online ? '#10b981' : '#94a3b8', marginRight: 6 }} />
+                              <Text style={{ fontSize: 11, marginRight: 5 }}>📟</Text>
                               <Text style={{ fontSize: 11, fontWeight: '800', color: isSelected ? '#2563eb' : textPrimary }}>
                                 {dev.name !== 'Unnamed Scanner' ? dev.name : dev.device_id}
                               </Text>

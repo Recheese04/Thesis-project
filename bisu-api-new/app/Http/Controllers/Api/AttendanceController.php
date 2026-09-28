@@ -640,15 +640,14 @@ class AttendanceController extends Controller
             $authUser = null;
             $event = null;
 
-            // Auto-register / update last_seen_at for this hardware scanner
+            // Auto-register hardware scanner if new
             if (!empty($data['device_id'])) {
                 try {
-                    ScannerDevice::updateOrCreate(
-                        ['device_id' => $data['device_id']],
-                        ['last_seen_at' => now()]
+                    ScannerDevice::firstOrCreate(
+                        ['device_id' => $data['device_id']]
                     );
                 } catch (\Throwable $e) {
-                    Log::warning('ScannerDevice update skipped: ' . $e->getMessage());
+                    Log::warning('ScannerDevice registration skipped: ' . $e->getMessage());
                 }
             }
 

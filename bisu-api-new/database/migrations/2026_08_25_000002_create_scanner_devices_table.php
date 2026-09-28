@@ -13,11 +13,9 @@ return new class extends Migration
             $table->string('device_id')->unique(); // MAC address e.g. "84:F3:EB:A1:B2:C3"
             $table->string('name')->default('Unnamed Scanner');
             $table->foreignId('organization_id')->nullable()->constrained('organizations')->onDelete('set null');
-            $table->timestamp('last_seen_at')->nullable();
             $table->timestamps();
 
             $table->index('device_id');
-            $table->index(['organization_id', 'last_seen_at']);
         });
 
         // Add device_id column to scanner_sessions table

@@ -28,15 +28,12 @@ class ScannerDeviceController extends Controller
                 });
             }
 
-            $devices = $query->orderBy('last_seen_at', 'desc')->get()->map(function ($device) {
+            $devices = $query->orderBy('name', 'asc')->get()->map(function ($device) {
                 return [
                     'id' => $device->id,
                     'device_id' => $device->device_id,
                     'name' => $device->name,
                     'organization_id' => $device->organization_id,
-                    'is_online' => $device->is_online,
-                    'last_seen_at' => $device->last_seen_at ? $device->last_seen_at->toIso8601String() : null,
-                    'last_seen_human' => $device->last_seen_at ? $device->last_seen_at->diffForHumans() : 'Never',
                 ];
             });
 
@@ -80,7 +77,6 @@ class ScannerDeviceController extends Controller
                     'id' => $device->id,
                     'device_id' => $device->device_id,
                     'name' => $device->name,
-                    'is_online' => $device->is_online,
                 ],
             ]);
 
