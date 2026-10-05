@@ -8,13 +8,19 @@ import EmptyState from '../../components/ui/EmptyState';
 import StudentPageWrapper from '../../components/ui/StudentPageWrapper';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ClipboardEdit, CheckCircle2, ArrowLeft, Send, Clock, AlertCircle } from 'lucide-react-native';
+import { ClipboardEdit, CheckCircle2, ArrowLeft, Send, Clock, AlertCircle, Calendar } from 'lucide-react-native';
 import EvaluationPopup from '../../components/ui/EvaluationPopup';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 export default function StudentEvaluations() {
   const { isDark, colors } = useTheme();
   const [evaluations, setEvaluations] = useState<any[]>([]);
+
+  // School Year Filter state
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedYearId, setSelectedYearId] = useState<number | string>('all');
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const cardBg = isDark ? '#1e293b' : '#fff';
@@ -40,14 +46,18 @@ export default function StudentEvaluations() {
 
   const fetchEvals = async () => {
     try {
-      const res = await api.get('/student/evaluations');
+      const params: any = {};
+      if (selectedYearId && selectedYearId !== 'all') {
+        params.school_year_id = selectedYearId;
+      }
+      const res = await api.get('/student/evaluations', { params });
       setEvaluations(res.data.evaluations || []);
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchEvals(); }, []);
+  useEffect(() => { fetchEvals(); }, [selectedYearId]);
 
   const openEvaluation = async (evUrlId: number, evEventId: number) => {
     try {
@@ -126,10 +136,20 @@ export default function StudentEvaluations() {
                 </Text>
               </View>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                 <View style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
-                    <ClipboardEdit size={16} color={accentColor} />
-                 </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity 
+                  onPress={() => setIsYearModalOpen(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: selectedYear !== 'All' ? '#7c3aed' : border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: selectedYear !== 'All' ? (isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff') : cardBg }}
+                >
+                  <Calendar size={14} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+                  <Text style={{ fontSize: 12, color: selectedYear !== 'All' ? '#7c3aed' : textPrimary, fontWeight: '600', marginLeft: 4 }}>
+                    {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+                  <ClipboardEdit size={16} color={accentColor} />
+                </View>
               </View>
             </View>
 
@@ -234,6 +254,16 @@ export default function StudentEvaluations() {
         onClose={() => setSelectedEval(null)}
         evaluation={selectedEval}
         onSuccess={() => fetchEvals()}
+      />
+
+      <SchoolYearFilterModal
+        visible={isYearModalOpen}
+        onClose={() => setIsYearModalOpen(false)}
+        selectedYear={selectedYear}
+        onSelectYear={(name, id) => {
+          setSelectedYear(name);
+          setSelectedYearId(id);
+        }}
       />
     </StudentPageWrapper>
   );

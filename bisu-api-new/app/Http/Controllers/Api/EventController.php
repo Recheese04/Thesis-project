@@ -171,8 +171,10 @@ class EventController extends Controller
                 }
             }
 
-            if ($request->has('school_year_id') && $request->school_year_id != 'all') {
-                $query->where('school_year_id', $request->school_year_id);
+            if ($request->has('school_year_id')) {
+                if ($request->school_year_id !== 'all') {
+                    $query->where('school_year_id', $request->school_year_id);
+                }
             } else {
                 // Default to active year if no filter is provided
                 $activeYear = SchoolYear::where('is_active', true)->first();
@@ -374,8 +376,10 @@ class EventController extends Controller
                 }
             }
 
-            if ($request->has('school_year_id') && $request->school_year_id != 'all') {
-                $query->where('school_year_id', $request->school_year_id);
+            if ($request->has('school_year_id')) {
+                if ($request->school_year_id !== 'all') {
+                    $query->where('school_year_id', $request->school_year_id);
+                }
             } else {
                 $activeYear = SchoolYear::where('is_active', true)->first();
                 if ($activeYear) {

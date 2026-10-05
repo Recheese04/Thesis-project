@@ -11,9 +11,16 @@ class StudentFeeController extends Controller
 {
     public function index(Request $request, $orgId)
     {
-        $fees = StudentFee::with(['user', 'feeType'])
-            ->where('organization_id', $orgId)
-            ->get();
+        $query = StudentFee::with(['user', 'feeType.schoolYear', 'paymentMethod'])
+            ->where('organization_id', $orgId);
+
+        if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+            $query->whereHas('feeType', function ($q) use ($request) {
+                $q->where('school_year_id', $request->school_year_id);
+            });
+        }
+
+        $fees = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json($fees);
     }

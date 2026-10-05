@@ -8,9 +8,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
   Search, Users, ChevronDown, ChevronUp,
-  CheckCircle, Clock, AlertTriangle, DollarSign, BookOpen
+  CheckCircle, Clock, AlertTriangle, DollarSign, BookOpen, Calendar
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 export default function OfficerObligations() {
   const { membership } = useAuth();
@@ -33,6 +34,11 @@ export default function OfficerObligations() {
   const cardPanelBg = isDark ? '#1e293b' : '#fff';
   const cardPanelBorder = isDark ? '#334155' : '#f1f5f9';
 
+  // School Year Filter state
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedYearId, setSelectedYearId] = useState<number | string>('all');
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
+
   const [fees, setFees] = useState<any[]>([]);
   const [consequences, setConsequences] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
@@ -45,9 +51,13 @@ export default function OfficerObligations() {
   const fetchData = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
     try {
+      const params: any = {};
+      if (selectedYearId && selectedYearId !== 'all') {
+        params.school_year_id = selectedYearId;
+      }
       const [oblRes, membersRes] = await Promise.all([
-        api.get(`/organizations/${orgId}/obligations`),
-        api.get(`/organizations/${orgId}/members?status=active`),
+        api.get(`/organizations/${orgId}/obligations`, { params }),
+        api.get(`/organizations/${orgId}/members?status=active`, { params }),
       ]);
       setFees(oblRes.data.fees || []);
       setConsequences(oblRes.data.consequences || []);
@@ -55,7 +65,7 @@ export default function OfficerObligations() {
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);
-  }, [orgId]);
+  }, [orgId, selectedYearId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -158,7 +168,17 @@ export default function OfficerObligations() {
             </View>
 
             {/* Quick Actions moved to the right */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+               <TouchableOpacity 
+                  onPress={() => setIsYearModalOpen(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: selectedYear !== 'All' ? '#7c3aed' : border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: selectedYear !== 'All' ? (isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff') : cardBg }}
+               >
+                  <Calendar size={14} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+                  <Text style={{ fontSize: 12, color: selectedYear !== 'All' ? '#7c3aed' : textPrimary, fontWeight: '600', marginLeft: 4 }}>
+                    {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+                  </Text>
+               </TouchableOpacity>
+
                <View style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
                   <BookOpen size={16} color={isDark ? '#94a3b8' : '#8b5cf6'} />
                </View>
@@ -327,6 +347,17 @@ export default function OfficerObligations() {
           </View>
         </ScrollView>
       </View>
+
+      <SchoolYearFilterModal
+        visible={isYearModalOpen}
+        onClose={() => setIsYearModalOpen(false)}
+        selectedYear={selectedYear}
+        onSelectYear={(name, id) => {
+          setSelectedYear(name);
+          setSelectedYearId(id);
+        }}
+      />
+
     </OfficerPageWrapper>
   );
 }

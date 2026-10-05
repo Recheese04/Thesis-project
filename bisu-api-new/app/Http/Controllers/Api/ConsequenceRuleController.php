@@ -10,12 +10,20 @@ use Illuminate\Support\Facades\Auth;
 class ConsequenceRuleController extends Controller
 {
     // GET /api/organizations/{orgId}/consequence-rules
-    public function index($orgId)
+    public function index(Request $request, $orgId)
     {
-        $rules = ConsequenceRule::with('event')
-            ->where('organization_id', $orgId)
-            ->latest()
-            ->get();
+        $query = ConsequenceRule::with(['event', 'feeType', 'schoolYear'])
+            ->where('organization_id', $orgId);
+
+        if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+            $yearId = $request->school_year_id;
+            $query->where(function ($q) use ($yearId) {
+                $q->where('school_year_id', $yearId)
+                  ->orWhereHas('event', fn($eq) => $eq->where('school_year_id', $yearId));
+            });
+        }
+
+        $rules = $query->latest()->get();
 
         return response()->json($rules);
     }
@@ -25,12 +33,23 @@ class ConsequenceRuleController extends Controller
     {
         $validated = $request->validate([
             'event_id'                => 'nullable|exists:events,id',
+            'school_year_id'          => 'nullable|exists:school_years,id',
             'consequence_title'       => 'required|string|max:255',
             'consequence_description' => 'nullable|string',
             'due_days'                => 'required|integer|min:1',
             'type'                    => 'required|in:financial,task,warning,suspension',
             'fee_type_id'             => 'nullable|exists:fee_types,id',
         ]);
+
+        if (empty($validated['school_year_id'])) {
+            if (!empty($validated['event_id'])) {
+                $validated['school_year_id'] = \App\Models\Event::where('id', $validated['event_id'])->value('school_year_id');
+            }
+            if (empty($validated['school_year_id'])) {
+                $activeYear = \App\Models\SchoolYear::where('is_active', true)->first();
+                $validated['school_year_id'] = $activeYear?->id;
+            }
+        }
 
         $rule = ConsequenceRule::create([
             ...$validated,

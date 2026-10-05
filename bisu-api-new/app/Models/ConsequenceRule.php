@@ -14,6 +14,7 @@ class ConsequenceRule extends Model
 
     protected $fillable = [
         'organization_id',
+        'school_year_id',
         'event_id',
         'consequence_title',
         'consequence_description',
@@ -22,6 +23,11 @@ class ConsequenceRule extends Model
         'fee_type_id',
         'created_by',
     ];
+
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class);
+    }
 
     public function feeType()
     {

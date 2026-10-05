@@ -155,6 +155,9 @@ export default function OfficerFinance() {
       if (f.school_year?.name) {
         yearsSet.add(f.school_year.name);
       }
+      if (f.fee_type?.school_year?.name) {
+        yearsSet.add(f.fee_type.school_year.name);
+      }
       if (f.created_at) {
         const y = new Date(f.created_at).getFullYear().toString();
         if (y && !isNaN(Number(y))) yearsSet.add(y);
@@ -168,9 +171,14 @@ export default function OfficerFinance() {
   const displayedFees = useMemo(() => {
     if (selectedYear === 'All') return fees;
     return fees.filter(f => {
-      // Direct school year relationship check
+      // Direct school year relationship check (either on student fee or via fee type)
       if (f.school_year?.name) {
         if (f.school_year.name === selectedYear || f.school_year.name.includes(selectedYear)) {
+          return true;
+        }
+      }
+      if (f.fee_type?.school_year?.name) {
+        if (f.fee_type.school_year.name === selectedYear || f.fee_type.school_year.name.includes(selectedYear)) {
           return true;
         }
       }

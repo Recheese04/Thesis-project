@@ -8,6 +8,7 @@ import PaymentModal from '../../components/ui/PaymentModal';
 import { useTheme } from '../../context/ThemeContext';
 import { Clock, CheckCircle, DollarSign, AlertTriangle, Calendar as CalendarIcon, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 export default function StudentObligations() {
   const { isDark, colors } = useTheme();
@@ -15,6 +16,11 @@ export default function StudentObligations() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'awaiting' | 'completed'>('pending');
+
+  // School Year Filter state
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedYearId, setSelectedYearId] = useState<number | string>('all');
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
 
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedFeeId, setSelectedFeeId] = useState<number | null>(null);
@@ -26,7 +32,11 @@ export default function StudentObligations() {
 
   const fetchData = async () => {
     try {
-      const res = await api.get('/student/obligations');
+      const params: any = {};
+      if (selectedYearId && selectedYearId !== 'all') {
+        params.school_year_id = selectedYearId;
+      }
+      const res = await api.get('/student/obligations', { params });
       const data = res.data || {};
       const fees = Array.isArray(data.fees) ? data.fees : [];
       const consequences = Array.isArray(data.consequences) ? data.consequences : [];
@@ -36,7 +46,7 @@ export default function StudentObligations() {
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [selectedYearId]);
 
   const openPaymentModal = (fee: any, amountStr: string) => {
     setSelectedFeeId(fee.id);
@@ -105,6 +115,16 @@ export default function StudentObligations() {
                 Obligations
               </Text>
             </View>
+
+            <TouchableOpacity 
+              onPress={() => setIsYearModalOpen(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: selectedYear !== 'All' ? '#7c3aed' : border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: selectedYear !== 'All' ? (isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff') : cardBg }}
+            >
+              <CalendarIcon size={14} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+              <Text style={{ fontSize: 12, color: selectedYear !== 'All' ? '#7c3aed' : textPrimary, fontWeight: '600', marginLeft: 4 }}>
+                {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={{ position: 'relative', minHeight: 120, justifyContent: 'flex-end', paddingBottom: 10, marginTop: 10 }}>
@@ -333,6 +353,16 @@ export default function StudentObligations() {
           initialProof={selectedFeeProof}
           onSuccess={() => {
             fetchData();
+          }}
+        />
+
+        <SchoolYearFilterModal
+          visible={isYearModalOpen}
+          onClose={() => setIsYearModalOpen(false)}
+          selectedYear={selectedYear}
+          onSelectYear={(name, id) => {
+            setSelectedYear(name);
+            setSelectedYearId(id);
           }}
         />
       </View>

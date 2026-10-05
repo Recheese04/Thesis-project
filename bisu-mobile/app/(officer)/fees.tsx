@@ -10,6 +10,7 @@ import {
   UserPlus, Calendar
 } from 'lucide-react-native';
 import EmptyState from '../../components/ui/EmptyState';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 export default function OfficerFees() {
     const { isDark } = useTheme();
@@ -20,6 +21,11 @@ export default function OfficerFees() {
     const [modalVisible, setModalVisible] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [editingFee, setEditingFee] = useState<any>(null);
+
+    // School Year Filter state
+    const [selectedYear, setSelectedYear] = useState('All');
+    const [selectedYearId, setSelectedYearId] = useState<number | string>('all');
+    const [isYearModalOpen, setIsYearModalOpen] = useState(false);
 
     const { width } = useWindowDimensions();
     const numColumns = width > 800 ? 2 : 1;
@@ -42,8 +48,12 @@ export default function OfficerFees() {
 
     const fetchData = useCallback(async () => {
         try {
+            const params: any = {};
+            if (selectedYearId && selectedYearId !== 'all') {
+                params.school_year_id = selectedYearId;
+            }
             const [feesRes, orgsRes] = await Promise.all([
-                api.get('/fee-types'),
+                api.get('/fee-types', { params }),
                 api.get('/profile/my-organizations')
             ]);
             setFees(feesRes.data.fees || []);
@@ -60,7 +70,7 @@ export default function OfficerFees() {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [orgId]);
+    }, [orgId, selectedYearId]);
 
     useFocusEffect(
         useCallback(() => {
@@ -90,6 +100,7 @@ export default function OfficerFees() {
                     description,
                     amount,
                     type,
+                    school_year_id: (selectedYearId && selectedYearId !== 'all') ? selectedYearId : undefined,
                 });
             }
             
@@ -189,13 +200,25 @@ export default function OfficerFees() {
                             </View>
                         </View>
                         
-                        <TouchableOpacity 
-                            onPress={() => { resetForm(); setModalVisible(true); }} 
-                            style={{ backgroundColor: '#0fa968', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderRadius: 14, elevation: 4 }}
-                        >
-                            <Plus size={20} color="#fff" />
-                            <Text style={{ color: '#fff', marginLeft: 12, fontSize: width > 600 ? 18 : 16, fontWeight: '800' }}>Add New Category</Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity 
+                                onPress={() => { resetForm(); setModalVisible(true); }} 
+                                style={{ flex: 1, backgroundColor: '#0fa968', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, elevation: 4 }}
+                            >
+                                <Plus size={20} color="#fff" />
+                                <Text style={{ color: '#fff', marginLeft: 8, fontSize: width > 600 ? 18 : 15, fontWeight: '800' }}>Add Category</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={() => setIsYearModalOpen(true)}
+                                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: selectedYear !== 'All' ? '#7c3aed' : border, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 14, backgroundColor: selectedYear !== 'All' ? (isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff') : cardBg }}
+                            >
+                                <Calendar size={18} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+                                <Text style={{ fontSize: 13, color: selectedYear !== 'All' ? '#7c3aed' : textPrimary, fontWeight: '700', marginLeft: 6 }}>
+                                    {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <FlatList
@@ -358,6 +381,16 @@ export default function OfficerFees() {
                         </View>
                     </View>
                 </Modal>
+
+            <SchoolYearFilterModal
+                visible={isYearModalOpen}
+                onClose={() => setIsYearModalOpen(false)}
+                selectedYear={selectedYear}
+                onSelectYear={(name, id) => {
+                    setSelectedYear(name);
+                    setSelectedYearId(id);
+                }}
+            />
 
         </OfficerPageWrapper>
     );

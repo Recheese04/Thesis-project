@@ -7,7 +7,8 @@ import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { Search, Mail, Phone, MoreVertical, Copy, Plus, ArrowUpCircle, X } from 'lucide-react-native';
+import { Search, Mail, Phone, MoreVertical, Copy, Plus, ArrowUpCircle, X, Calendar } from 'lucide-react-native';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 export default function OfficerMembers() {
   const { isDark, colors } = useTheme();
@@ -22,6 +23,11 @@ export default function OfficerMembers() {
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [showRolePicker, setShowRolePicker] = useState(false);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+
+  // School Year filter state
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedYearId, setSelectedYearId] = useState<string | number>('all');
+  const [showYearModal, setShowYearModal] = useState(false);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const cardBg = isDark ? '#1e293b' : '#fff';
@@ -38,12 +44,18 @@ export default function OfficerMembers() {
   const orgId = membership?.organization_id;
   const isAdviser = (membership?.designation || '').toLowerCase() === 'adviser';
 
-  const fetchData = async () => {
+  const fetchData = async (syId?: string | number) => {
     try {
       if (orgId) {
+        const targetSY = syId !== undefined ? syId : selectedYearId;
+        const params: Record<string, any> = {};
+        if (targetSY && targetSY !== 'all') {
+          params.school_year_id = targetSY;
+        }
+
         const [orgInfoRes, membersRes] = await Promise.all([
           api.get(`/organizations/${orgId}`),
-          api.get(`/organizations/${orgId}/members`),
+          api.get(`/organizations/${orgId}/members`, { params }),
         ]);
         setOrgDetails(orgInfoRes.data);
         const list = Array.isArray(membersRes.data) ? membersRes.data : [];
@@ -214,9 +226,32 @@ export default function OfficerMembers() {
             />
           </View>
 
-          <View style={{ marginBottom: 8, paddingHorizontal: 4 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: textPrimary }}>Member List</Text>
-            <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>All active organization members</Text>
+          <View style={{ marginBottom: 12, paddingHorizontal: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: textPrimary }}>Member List</Text>
+              <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
+                {selectedYear === 'All' ? 'All active organization members' : `S.Y. ${selectedYear} members`}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setShowYearModal(true)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff',
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: isDark ? 'rgba(124,58,237,0.3)' : '#ede9fe',
+              }}
+            >
+              <Calendar size={14} color="#7c3aed" />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#7c3aed' }}>
+                {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {filtered.length === 0
@@ -444,6 +479,19 @@ export default function OfficerMembers() {
             </View>
           </View>
         </Modal>
+
+        {/* School Year Filter Modal */}
+        <SchoolYearFilterModal
+          visible={showYearModal}
+          onClose={() => setShowYearModal(false)}
+          selectedYear={selectedYear}
+          onSelectYear={(name, id) => {
+            setSelectedYear(name);
+            setSelectedYearId(id);
+            fetchData(id);
+          }}
+          title="Filter Members by S.Y."
+        />
 
       </View>
     </OfficerPageWrapper>

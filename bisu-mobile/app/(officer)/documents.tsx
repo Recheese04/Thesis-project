@@ -10,6 +10,7 @@ import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
 import * as DocumentPicker from 'expo-document-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 const categories = ['ACADEMIC', 'ORGANIZATION', 'CERTIFICATE', 'FINANCIAL', 'OTHER'];
 
@@ -40,6 +41,9 @@ export default function OfficerDocuments() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedYearId, setSelectedYearId] = useState<number | string>('all');
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [newDoc, setNewDoc] = useState({ title: '', category: 'ACADEMIC', file: null as any });
@@ -48,14 +52,18 @@ export default function OfficerDocuments() {
   const fetchData = async () => {
     if (!orgId) return;
     try {
-      const res = await api.get(`/organizations/${orgId}/documents`);
+      const params: any = {};
+      if (selectedYearId && selectedYearId !== 'all') {
+        params.school_year_id = selectedYearId;
+      }
+      const res = await api.get(`/organizations/${orgId}/documents`, { params });
       setDocs(Array.isArray(res.data) ? res.data : []);
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchData(); }, [orgId]);
+  useEffect(() => { fetchData(); }, [orgId, selectedYearId]);
 
   const handleDownload = (doc: any) => {
     const url = `${API_BASE_URL.replace('/api', '')}/api/documents/${doc.id}/download`;
@@ -106,6 +114,9 @@ export default function OfficerDocuments() {
     const formData = new FormData();
     formData.append('title', newDoc.title);
     formData.append('category', newDoc.category);
+    if (selectedYearId && selectedYearId !== 'all') {
+      formData.append('school_year_id', selectedYearId.toString());
+    }
     
     formData.append('file', {
       uri: newDoc.file.uri,
@@ -226,27 +237,44 @@ export default function OfficerDocuments() {
             />
           </View>
 
-          <View style={{ position: 'relative', width: 160, zIndex: 50 }}>
-            <TouchableOpacity 
-              onPress={() => setIsCategoryPickerOpen(!isCategoryPickerOpen)}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: cardBg }}
-            >
-              <Text style={{ fontSize: 13, color: textPrimary, fontWeight: '600' }}>{categoryFilter === 'All' ? 'All Categories' : categoryFilter}</Text>
-              <ChevronDown size={16} color={textSecondary} />
-            </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 50 }}>
+            <View style={{ position: 'relative', flex: 1, zIndex: 50 }}>
+              <TouchableOpacity 
+                onPress={() => setIsCategoryPickerOpen(!isCategoryPickerOpen)}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: cardBg }}
+              >
+                <Text style={{ fontSize: 13, color: textPrimary, fontWeight: '600' }} numberOfLines={1}>
+                  {categoryFilter === 'All' ? 'All Categories' : categoryFilter}
+                </Text>
+                <ChevronDown size={16} color={textSecondary} />
+              </TouchableOpacity>
 
-            {isCategoryPickerOpen && (
-              <View style={{ position: 'absolute', top: '110%', left: 0, right: 0, backgroundColor: modalBg, borderWidth: 1, borderColor: borderLight, borderRadius: 12, paddingVertical: 4, zIndex: 50, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10 }}>
-                <TouchableOpacity onPress={() => { setCategoryFilter('All'); setIsCategoryPickerOpen(false); }} style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderLight }}>
-                  <Text style={{ fontSize: 13, color: categoryFilter === 'All' ? '#2563eb' : textPrimary, fontWeight: categoryFilter === 'All' ? '800' : '400' }}>All Categories</Text>
-                </TouchableOpacity>
-                {categories.map((cat, i) => (
-                  <TouchableOpacity key={cat} onPress={() => { setCategoryFilter(cat); setIsCategoryPickerOpen(false); }} style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: i < categories.length - 1 ? 1 : 0, borderBottomColor: borderLight }}>
-                    <Text style={{ fontSize: 13, color: categoryFilter === cat ? '#2563eb' : textPrimary, fontWeight: categoryFilter === cat ? '800' : '400' }}>{cat}</Text>
+              {isCategoryPickerOpen && (
+                <View style={{ position: 'absolute', top: '110%', left: 0, right: 0, backgroundColor: modalBg, borderWidth: 1, borderColor: borderLight, borderRadius: 12, paddingVertical: 4, zIndex: 50, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10 }}>
+                  <TouchableOpacity onPress={() => { setCategoryFilter('All'); setIsCategoryPickerOpen(false); }} style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderLight }}>
+                    <Text style={{ fontSize: 13, color: categoryFilter === 'All' ? '#2563eb' : textPrimary, fontWeight: categoryFilter === 'All' ? '800' : '400' }}>All Categories</Text>
                   </TouchableOpacity>
-                ))}
+                  {categories.map((cat, i) => (
+                    <TouchableOpacity key={cat} onPress={() => { setCategoryFilter(cat); setIsCategoryPickerOpen(false); }} style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: i < categories.length - 1 ? 1 : 0, borderBottomColor: borderLight }}>
+                      <Text style={{ fontSize: 13, color: categoryFilter === cat ? '#2563eb' : textPrimary, fontWeight: categoryFilter === cat ? '800' : '400' }}>{cat}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity 
+              onPress={() => setIsYearModalOpen(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: selectedYear !== 'All' ? '#7c3aed' : border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: selectedYear !== 'All' ? (isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff') : cardBg, flex: 1 }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                <CalendarIcon size={14} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+                <Text style={{ fontSize: 13, color: selectedYear !== 'All' ? '#7c3aed' : textPrimary, fontWeight: '600' }} numberOfLines={1}>
+                  {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+                </Text>
               </View>
-            )}
+              <ChevronDown size={14} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -389,6 +417,16 @@ export default function OfficerDocuments() {
           </View>
         </View>
       </Modal>
+
+      <SchoolYearFilterModal
+        visible={isYearModalOpen}
+        onClose={() => setIsYearModalOpen(false)}
+        selectedYear={selectedYear}
+        onSelectYear={(name, id) => {
+          setSelectedYear(name);
+          setSelectedYearId(id);
+        }}
+      />
 
     </OfficerPageWrapper>
   );

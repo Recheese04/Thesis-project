@@ -685,13 +685,20 @@ export default function UserManagement() {
                             </p>
                             {allMemberships.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
-                                {allMemberships.map((m, i) => (
-                                  <span key={i} className="inline-flex items-center gap-0.5 bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-medium px-1.5 py-0.5 rounded-full">
-                                    <Users className="w-2.5 h-2.5" />
-                                    {m.organization?.name ?? "—"}
-                                    {rk === "2" && <span className="text-slate-400 capitalize"> · {m.designation || 'Member'}</span>}
-                                  </span>
-                                ))}
+                                {allMemberships.map((m, i) => {
+                                  const isOfficerRole = m.designation && m.designation !== 'Member';
+                                  return (
+                                    <span key={i} className={`inline-flex items-center gap-1 border text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                      isOfficerRole
+                                        ? "bg-[#1e4db7]/10 text-[#1e4db7] border-[#1e4db7]/20"
+                                        : "bg-blue-50 text-blue-600 border-blue-200"
+                                    }`}>
+                                      <Users className="w-2.5 h-2.5" />
+                                      {m.organization?.name ?? "—"}
+                                      <span className="font-bold"> · {m.designation || 'Member'}</span>
+                                    </span>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -736,10 +743,22 @@ export default function UserManagement() {
                               <MoreHorizontal className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40 rounded-xl border-slate-100 shadow-lg p-1">
+                          <DropdownMenuContent align="end" className="w-48 rounded-xl border-slate-100 shadow-lg p-1">
                             <DropdownMenuItem onClick={() => { setEditUser(user); setFormOpen(true); }}
                               className="rounded-lg text-slate-700 focus:bg-blue-50 focus:text-[#0f2d5e] gap-2 cursor-pointer text-sm">
                               <Pencil className="w-3.5 h-3.5" /> Edit Account
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedUserIds([user.id]);
+                                const primaryOrg = user.all_memberships?.[0];
+                                setBulkOrgId(primaryOrg ? String(primaryOrg.organization_id) : (organizations[0]?.id ? String(organizations[0]?.id) : ""));
+                                setBulkDesignation(primaryOrg?.designation || "Member");
+                                setBulkAssignOrgOpen(true);
+                              }}
+                              className="rounded-lg text-slate-700 focus:bg-blue-50 focus:text-[#0f2d5e] gap-2 cursor-pointer text-sm"
+                            >
+                              <Star className="w-3.5 h-3.5 text-[#1e4db7]" /> Change Designation
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-slate-100 my-1" />
                             <DropdownMenuItem onClick={() => setDeleteTarget(user)}
@@ -928,13 +947,15 @@ function BulkAssignOrgDialog({ open, onClose, onConfirm, organizations, count, b
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Member" className="text-xs">Member</SelectItem>
-                <SelectItem value="Officer" className="text-xs">Officer</SelectItem>
                 <SelectItem value="President" className="text-xs">President</SelectItem>
                 <SelectItem value="Vice President" className="text-xs">Vice President</SelectItem>
                 <SelectItem value="Secretary" className="text-xs">Secretary</SelectItem>
                 <SelectItem value="Treasurer" className="text-xs">Treasurer</SelectItem>
                 <SelectItem value="Auditor" className="text-xs">Auditor</SelectItem>
                 <SelectItem value="PIO" className="text-xs">PIO</SelectItem>
+                <SelectItem value="P.R.O." className="text-xs">P.R.O.</SelectItem>
+                <SelectItem value="Adviser" className="text-xs">Adviser</SelectItem>
+                <SelectItem value="Officer" className="text-xs">Officer</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -950,7 +971,7 @@ function BulkAssignOrgDialog({ open, onClose, onConfirm, organizations, count, b
             className="rounded-xl text-xs h-9 bg-[#0f2d5e] hover:bg-[#1e4db7] text-white shadow-sm gap-1.5"
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Building2 className="w-3.5 h-3.5" />}
-            Assign Organization
+            Save Designation
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

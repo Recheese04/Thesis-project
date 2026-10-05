@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Image } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Image, Modal } from 'react-native';
 import api from '../../services/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import EmptyState from '../../components/ui/EmptyState';
@@ -7,7 +7,7 @@ import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { Download, Calendar as CalendarIcon, Users, CheckCircle2, XCircle, Search, List, Grid } from 'lucide-react-native';
+import { Download, Calendar as CalendarIcon, Users, CheckCircle2, XCircle, Search, List, Grid, ChevronDown, X } from 'lucide-react-native';
 
 export default function OfficerAttendance() {
   const { isDark, colors } = useTheme();
@@ -32,33 +32,127 @@ export default function OfficerAttendance() {
   const [filteredAttendance, setFilteredAttendance] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'All' | 'Grouped'>('Grouped');
 
-  const fetchEvents = async () => {
+  // School Year States
+  const currentYearStr = new Date().getFullYear().toString();
+  const [apiSchoolYears, setApiSchoolYears] = useState<any[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string>('All');
+  const [selectedYearId, setSelectedYearId] = useState<string | number>('all');
+  const [showYearModal, setShowYearModal] = useState(false);
+
+  const DEFAULT_SCHOOL_YEARS = [
+    '2032-2033',
+    '2031-2032',
+    '2030-2031',
+    '2029-2030',
+    '2028-2029',
+    '2027-2028',
+    '2026-2027',
+    '2025-2026',
+    '2024-2025',
+  ];
+
+  const fetchSchoolYears = async () => {
     try {
-      const res = await api.get('/events?role=officer');
-      setEvents(Array.isArray(res.data) ? res.data : []);
+      const res = await api.get('/school-years');
+      if (Array.isArray(res.data)) {
+        setApiSchoolYears(res.data);
+      }
+    } catch (_) {}
+  };
+
+  const fetchEvents = async (syId?: string | number) => {
+    try {
+      const targetSY = syId !== undefined ? syId : selectedYearId;
+      const params: Record<string, any> = { role: 'officer' };
+      if (targetSY && targetSY !== 'all') {
+        params.school_year_id = targetSY;
+      } else if (targetSY === 'all') {
+        params.school_year_id = 'all';
+      }
+      const res = await api.get('/events', { params });
+      const rawEvents = Array.isArray(res.data) ? res.data : [];
+
+      // If a school year name is chosen without a db id, client filter as well
+      const filteredEvents = rawEvents.filter(e => {
+        if (selectedYear === 'All') return true;
+        if (targetSY !== 'all' && e.school_year_id) {
+          return String(e.school_year_id) === String(targetSY);
+        }
+        if (e.school_year?.name) {
+          return e.school_year.name === selectedYear || e.school_year.name.includes(selectedYear);
+        }
+        const dStr = e.start_time || e.event_date;
+        if (!dStr) return true;
+        const d = new Date(dStr);
+        const evYear = d.getFullYear();
+        const evMonth = d.getMonth() + 1;
+        if (selectedYear.includes('-')) {
+          const [startYStr, endYStr] = selectedYear.split('-');
+          const startY = parseInt(startYStr, 10);
+          const endY = parseInt(endYStr, 10);
+          if (!isNaN(startY) && !isNaN(endY)) {
+            if (evYear === startY && evMonth >= 6) return true;
+            if (evYear === endY && evMonth <= 5) return true;
+            if (evYear === startY) return true;
+            return false;
+          }
+        }
+        return evYear.toString() === selectedYear;
+      });
+
+      setEvents(filteredEvents);
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);
   };
 
   const fetchAttendance = async (eventId: number) => {
-    setLoading(true);
+    setLoadingAttendance(true);
     try {
       const res = await api.get(`/attendance/event/${eventId}`);
-      const attData = res.data.attendance || [];
-      setAttendance(attData);
-      setFilteredAttendance(attData);
-      setStats(res.data.stats || { total: 0, checked_in: 0, checked_out: 0 });
-    } catch (_) {}
-    setLoading(false);
-    setRefreshing(false);
+      const raw = res.data;
+      const records = Array.isArray(raw)
+        ? raw
+        : (Array.isArray(raw?.attendance) ? raw.attendance : []);
+      setAttendance(records);
+
+      if (raw?.stats) {
+        setStats(raw.stats);
+      } else {
+        setStats({
+          total: records.length,
+          checked_in: records.filter((r: any) => r.status === 'checked_in').length,
+          checked_out: records.filter((r: any) => r.status === 'checked_out').length,
+        });
+      }
+    } catch (err) {
+      console.error("Fetch attendance error:", err);
+      setAttendance([]);
+      setStats({ total: 0, checked_in: 0, checked_out: 0 });
+    } finally {
+      setLoadingAttendance(false);
+      setRefreshing(false);
+    }
   };
 
-  useEffect(() => { fetchEvents(); }, [orgId]);
+  useEffect(() => {
+    fetchSchoolYears();
+    fetchEvents();
+  }, [orgId]);
+
+  const availableYears = React.useMemo(() => {
+    const map = new Map<string, { id?: number; name: string }>();
+    DEFAULT_SCHOOL_YEARS.forEach(name => map.set(name, { name }));
+    apiSchoolYears.forEach(sy => {
+      if (sy.name) map.set(sy.name, { id: sy.id, name: sy.name });
+    });
+    return Array.from(map.values()).sort((a, b) => b.name.localeCompare(a.name));
+  }, [apiSchoolYears]);
 
   useEffect(() => {
     const q = searchQuery.toLowerCase();
@@ -75,8 +169,18 @@ export default function OfficerAttendance() {
     else fetchEvents();
   };
 
-  const getInitials = (fName: string, lName: string) => {
-     return `${(fName || '?')[0].toUpperCase()}${(lName || '')[0]?.toUpperCase() || ''}`;
+  const getInitials = (fName?: string, lName?: string) => {
+    if (fName && lName) {
+      return `${fName[0] || ''}${lName[0] || ''}`.toUpperCase();
+    }
+    if (fName) {
+      const parts = fName.trim().split(' ');
+      if (parts.length > 1) {
+        return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
+      }
+      return (fName[0] || '?').toUpperCase();
+    }
+    return '?';
   };
 
   const getStatusColor = (st: string) => {
@@ -110,8 +214,14 @@ export default function OfficerAttendance() {
            key={ev.id} 
            activeOpacity={0.7}
            onPress={() => {
-              if (isSelected) { setSelectedEvent(null); setAttendance([]); }
-              else { setSelectedEvent(ev); fetchAttendance(ev.id); }
+              if (isSelected) {
+                 setSelectedEvent(null);
+                 setAttendance([]);
+                 setStats(null);
+              } else {
+                 setSelectedEvent(ev);
+                 fetchAttendance(ev.id);
+              }
            }}
            style={{ 
               borderWidth: 1, 
@@ -182,9 +292,27 @@ export default function OfficerAttendance() {
           <View style={{ paddingHorizontal: 20, paddingTop: 20, zIndex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             
             <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
-                Attendance Monitoring
-              </Text>
+              <TouchableOpacity
+                onPress={() => setShowYearModal(true)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5',
+                  borderWidth: 1.5,
+                  borderColor: '#0fa968',
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 12,
+                  alignSelf: 'flex-start',
+                  marginBottom: 6,
+                }}
+              >
+                <CalendarIcon size={13} color="#0fa968" style={{ marginRight: 5 }} />
+                <Text style={{ fontSize: 11, fontWeight: '900', color: '#0fa968', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {selectedYear === 'All' ? 'S.Y. ALL YEARS' : `S.Y. ${selectedYear}`}
+                </Text>
+                <ChevronDown size={13} color="#0fa968" style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
               <Text style={{ fontSize: 26, fontWeight: '900', color: textPrimary, letterSpacing: -0.5 }} numberOfLines={1}>
                 {selectedEvent ? 'Live Tracker' : 'Attendance'}
               </Text>
@@ -245,9 +373,15 @@ export default function OfficerAttendance() {
                )}
             </View>
 
-            {selectedEvent && stats && (
-               <>
-                  {/* STATS */}
+            {selectedEvent && (
+               loadingAttendance ? (
+                  <View style={{ backgroundColor: cardBg, borderRadius: 20, borderWidth: 1, borderColor: border, padding: 32, alignItems: 'center', marginBottom: 16 }}>
+                     <ActivityIndicator size="small" color="#2563eb" />
+                     <Text style={{ fontSize: 12, color: textSecondary, marginTop: 8, fontWeight: '600' }}>Loading attendance records...</Text>
+                  </View>
+               ) : stats ? (
+                  <>
+                     {/* STATS */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, marginHorizontal: -4 }}>
                      <StatBox label="Total Check-ins" value={stats.total || 0} icon={Users} colorClass={{ bg: isDark ? 'rgba(37,99,235,0.1)' : '#eff6ff', icon: '#2563eb' }} />
                      <StatBox label="Currently In" value={stats.checked_in || 0} icon={CheckCircle2} colorClass={{ bg: isDark ? 'rgba(22,163,74,0.1)' : '#f0fdf4', icon: '#16a34a' }} />
@@ -309,10 +443,124 @@ export default function OfficerAttendance() {
                      )}
                   </View>
                </>
+               ) : null
             )}
             
             <View style={{ height: 24 }} />
          </ScrollView>
+
+        {/* SCHOOL YEAR MODAL */}
+        <Modal visible={showYearModal} transparent animationType="fade" onRequestClose={() => setShowYearModal(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <View style={{ backgroundColor: modalBg, width: '100%', borderRadius: 16, padding: 24, elevation: 10, borderWidth: isDark ? 1 : 0, borderColor: '#334155' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <CalendarIcon size={18} color="#0fa968" style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: textPrimary }}>Select School Year</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowYearModal(false)}><X size={20} color={textMuted} /></TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 12, color: textSecondary, marginBottom: 18, lineHeight: 18 }}>
+                Filter events and attendance records by academic year.
+              </Text>
+
+              <ScrollView style={{ maxHeight: 300, marginBottom: 16 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedYear('All');
+                    setSelectedYearId('all');
+                    setSelectedEvent(null);
+                    setShowYearModal(false);
+                    fetchEvents('all');
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 14,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: selectedYear === 'All' ? '#0fa968' : border,
+                    backgroundColor: selectedYear === 'All' ? (isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5') : cardBg,
+                    marginBottom: 8,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: selectedYear === 'All' ? '#0fa968' : textPrimary }}>
+                      🌐 All School Years
+                    </Text>
+                    <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
+                      Show all events across all academic years
+                    </Text>
+                  </View>
+                  {selectedYear === 'All' && <CheckCircle2 size={18} color="#0fa968" />}
+                </TouchableOpacity>
+
+                {availableYears.map(sy => {
+                  const isSelected = selectedYear === sy.name;
+                  const isCurrent = sy.name.includes(currentYearStr) || sy.name === currentYearStr;
+                  const startYear = parseInt(sy.name.split('-')[0], 10);
+                  const isUpcoming = !isNaN(startYear) && startYear > parseInt(currentYearStr, 10);
+
+                  const titleLabel = isCurrent
+                    ? `📅 S.Y. ${sy.name} (Current Active)`
+                    : isUpcoming
+                      ? `🔮 S.Y. ${sy.name} (Upcoming)`
+                      : `⏳ S.Y. ${sy.name} (Past Year)`;
+
+                  const subtitleLabel = isCurrent
+                    ? 'Current active academic year events'
+                    : isUpcoming
+                      ? 'Upcoming academic year events & schedule'
+                      : 'Past academic year event archives';
+
+                  return (
+                    <TouchableOpacity
+                      key={sy.name}
+                      onPress={() => {
+                        setSelectedYear(sy.name);
+                        setSelectedYearId(sy.id || 'all');
+                        setSelectedEvent(null);
+                        setShowYearModal(false);
+                        if (sy.id) {
+                          fetchEvents(sy.id);
+                        } else {
+                          fetchEvents('all');
+                        }
+                      }}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        padding: 14,
+                        borderRadius: 12,
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? '#0fa968' : border,
+                        backgroundColor: isSelected ? (isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5') : cardBg,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: isSelected ? '#0fa968' : textPrimary }}>
+                          {titleLabel}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
+                          {subtitleLabel}
+                        </Text>
+                      </View>
+                      {isSelected && <CheckCircle2 size={18} color="#0fa968" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <TouchableOpacity
+                onPress={() => setShowYearModal(false)}
+                style={{ backgroundColor: isDark ? '#334155' : '#f1f5f9', paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: textSecondary, fontSize: 13, fontWeight: '800' }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </OfficerPageWrapper>
   );
@@ -357,14 +605,13 @@ export default function OfficerAttendance() {
               </View>
               <View style={{ flex: 1 }}>
                  <Text style={{ fontSize: 10, color: textSecondary, fontWeight: '500', marginBottom: 2 }}>Duration</Text>
-                 <Text style={{ fontSize: 12, fontWeight: '800', color: textPrimary }}>—</Text> 
-                 {/* Duration calculation can be added if required later, kept blank per design */}
+                 <Text style={{ fontSize: 12, fontWeight: '800', color: textPrimary }}>{record.formatted_duration || '—'}</Text>
               </View>
            </View>
 
            <View style={{ flexDirection: 'row', marginTop: 8 }}>
               <View style={{ borderWidth: 1, borderColor: border, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                 <Text style={{ fontSize: 9, fontWeight: '700', color: textSecondary, letterSpacing: 0.5 }}>RFID</Text>
+                 <Text style={{ fontSize: 9, fontWeight: '700', color: textSecondary, letterSpacing: 0.5 }}>{record.attendance_type || 'N/A'}</Text>
               </View>
            </View>
         </View>

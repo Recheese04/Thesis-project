@@ -21,9 +21,19 @@ class FeeTypeController extends Controller
             ->whereNotIn('designation', ['Member', 'member'])
             ->pluck('organization_id');
             
-        $fees = FeeType::with('creator')
-            ->whereIn('organization_id', $orgIds)
-            ->get();
+        $query = FeeType::with(['creator', 'schoolYear']);
+
+        if ($request->filled('organization_id')) {
+            $query->where('organization_id', $request->organization_id);
+        } else {
+            $query->whereIn('organization_id', $orgIds);
+        }
+
+        if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+            $query->where('school_year_id', $request->school_year_id);
+        }
+
+        $fees = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json(['fees' => $fees]);
     }
@@ -37,6 +47,7 @@ class FeeTypeController extends Controller
 
         $validated = $request->validate([
             'organization_id' => 'required|exists:organizations,id',
+            'school_year_id' => 'nullable|exists:school_years,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'amount' => 'required|numeric|min:0',
@@ -59,7 +70,13 @@ class FeeTypeController extends Controller
             $validated['type'] = 'other';
         }
 
+        if (empty($validated['school_year_id'])) {
+            $activeYear = \App\Models\SchoolYear::where('is_active', true)->first();
+            $validated['school_year_id'] = $activeYear?->id;
+        }
+
         $fee = FeeType::create($validated);
+        $fee->load('schoolYear');
 
         return response()->json(['message' => 'Fee type created successfully.', 'fee' => $fee], 201);
     }

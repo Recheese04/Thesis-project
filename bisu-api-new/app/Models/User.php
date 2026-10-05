@@ -35,7 +35,7 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'is_active'  => 'boolean',
+        'is_active' => 'boolean',
         'is_deleted' => 'boolean',
     ];
 
@@ -91,7 +91,8 @@ class User extends Authenticatable
 
     public function getOfficerDesignation(): ?Designation
     {
-        if ($this->isAdmin()) return null;
+        if ($this->isAdmin())
+            return null;
 
         return Designation::where('user_id', $this->id)
             ->whereNotIn('designation', ['Member'])
@@ -118,8 +119,10 @@ class User extends Authenticatable
 
     public function isOfficerOf($organizationId): bool
     {
-        if ($this->isAdmin()) return true;
-        if (!$organizationId) return false;
+        if ($this->isAdmin())
+            return true;
+        if (!$organizationId)
+            return false;
 
         return Designation::where('user_id', $this->id)
             ->where('organization_id', $organizationId)

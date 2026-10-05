@@ -108,40 +108,40 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $needsStudent = in_array($request->user_type_id, ['2', 2, '3', 3]);
-        $isOfficer    = in_array($request->user_type_id, ['2', 2]);
-        $isStudent    = in_array($request->user_type_id, ['3', 3]);
+        $isOfficer = in_array($request->user_type_id, ['2', 2]);
+        $isStudent = in_array($request->user_type_id, ['3', 3]);
 
         $rules = [
-            'email'        => 'required|email|unique:users,email',
-            'password'     => 'nullable|string|min:8',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'nullable|string|min:8',
             'user_type_id' => 'required|exists:user_types,id',
-            'is_active'    => 'nullable|in:0,1',
-            'rfid_uid'     => 'nullable|string|max:50|unique:users,rfid_uid',
+            'is_active' => 'nullable|in:0,1',
+            'rfid_uid' => 'nullable|string|max:50|unique:users,rfid_uid',
         ];
 
         if ($needsStudent) {
             $rules += [
-                'first_name'     => 'required|string|max:100',
-                'middle_name'    => 'nullable|string|max:100',
-                'last_name'      => 'required|string|max:100',
+                'first_name' => 'required|string|max:100',
+                'middle_name' => 'nullable|string|max:100',
+                'last_name' => 'required|string|max:100',
                 'student_number' => 'required|string|max:50|unique:users,student_number',
-                'college_id'  => 'required|exists:colleges,id',
-                'year_level'     => 'required|string|max:20',
+                'college_id' => 'required|exists:colleges,id',
+                'year_level' => 'required|string|max:20',
                 'contact_number' => 'nullable|string|max:20',
-                'course_id'      => 'nullable|exists:courses,id',
-                'street'         => 'nullable|string|max:255',
-                'barangay'       => 'nullable|string|max:100',
-                'city'           => 'nullable|string|max:100',
-                'province'       => 'nullable|string|max:100',
-                'zip_code'       => 'nullable|string|max:10',
+                'course_id' => 'nullable|exists:courses,id',
+                'street' => 'nullable|string|max:255',
+                'barangay' => 'nullable|string|max:100',
+                'city' => 'nullable|string|max:100',
+                'province' => 'nullable|string|max:100',
+                'zip_code' => 'nullable|string|max:10',
             ];
         }
 
         if ($isOfficer || $isStudent) {
             $rules += [
-                'org_memberships'                       => 'nullable|array',
-                'org_memberships.*.organization_id'     => 'required|exists:organizations,id',
-                'org_memberships.*.designation'          => 'nullable|string|max:100',
+                'org_memberships' => 'nullable|array',
+                'org_memberships.*.organization_id' => 'required|exists:organizations,id',
+                'org_memberships.*.designation' => 'nullable|string|max:100',
             ];
         }
 
@@ -157,31 +157,31 @@ class UserController extends Controller
         try {
             $password = !empty($data['password']) ? $data['password'] : 'password';
             $userPayload = [
-                'email'         => $data['email'],
+                'email' => $data['email'],
                 'password_hash' => Hash::make($password),
-                'user_type_id'  => $data['user_type_id'],
-                'is_active'     => ($data['is_active'] ?? '1') == '1',
-                'rfid_uid'      => $data['rfid_uid'] ?? null,
+                'user_type_id' => $data['user_type_id'],
+                'is_active' => ($data['is_active'] ?? '1') == '1',
+                'rfid_uid' => $data['rfid_uid'] ?? null,
             ];
 
             if ($needsStudent) {
                 $userPayload['student_number'] = $data['student_number'];
-                $userPayload['first_name']     = $data['first_name'];
-                $userPayload['middle_name']    = $data['middle_name'] ?? null;
-                $userPayload['last_name']      = $data['last_name'];
-                $userPayload['college_id']  = $data['college_id'];
-                $userPayload['year_level']     = $data['year_level'];
+                $userPayload['first_name'] = $data['first_name'];
+                $userPayload['middle_name'] = $data['middle_name'] ?? null;
+                $userPayload['last_name'] = $data['last_name'];
+                $userPayload['college_id'] = $data['college_id'];
+                $userPayload['year_level'] = $data['year_level'];
                 $userPayload['contact_number'] = $data['contact_number'] ?? null;
-                $userPayload['course_id']      = $data['course_id'] ?? null;
+                $userPayload['course_id'] = $data['course_id'] ?? null;
             }
 
             $user = User::create($userPayload);
 
             if ($needsStudent && !empty($data['street']) || !empty($data['city'])) {
                 $address = \App\Models\Address::create([
-                    'street'   => $data['street'] ?? null,
+                    'street' => $data['street'] ?? null,
                     'barangay' => $data['barangay'] ?? null,
-                    'city'     => $data['city'] ?? null,
+                    'city' => $data['city'] ?? null,
                     'province' => $data['province'] ?? null,
                     'zip_code' => $data['zip_code'] ?? null,
                 ]);
@@ -193,10 +193,10 @@ class UserController extends Controller
                 foreach ($data['org_memberships'] as $m) {
                     Designation::create([
                         'organization_id' => $m['organization_id'],
-                        'user_id'         => $user->id,
-                        'designation'     => $m['designation'] ?? 'Member',
-                        'status'          => 'active',
-                        'joined_date'     => now()->toDateString(),
+                        'user_id' => $user->id,
+                        'designation' => $m['designation'] ?? 'Member',
+                        'status' => 'active',
+                        'joined_date' => now()->toDateString(),
                     ]);
                 }
             }
@@ -215,44 +215,44 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
-        $user         = User::findOrFail($id);
+        $user = User::findOrFail($id);
         $needsStudent = in_array($request->user_type_id, ['2', 2, '3', 3]);
-        $isOfficer    = in_array($request->user_type_id, ['2', 2]);
-        $isStudent    = in_array($request->user_type_id, ['3', 3]);
+        $isOfficer = in_array($request->user_type_id, ['2', 2]);
+        $isStudent = in_array($request->user_type_id, ['3', 3]);
 
         $rules = [
-            'email'        => "required|email|unique:users,email,{$user->id}",
-            'password'     => 'nullable|string|min:8',
+            'email' => "required|email|unique:users,email,{$user->id}",
+            'password' => 'nullable|string|min:8',
             'user_type_id' => 'required|exists:user_types,id',
-            'is_active'    => 'nullable|in:0,1',
-            'rfid_uid'     => "nullable|string|max:50|unique:users,rfid_uid,{$user->id}",
+            'is_active' => 'nullable|in:0,1',
+            'rfid_uid' => "nullable|string|max:50|unique:users,rfid_uid,{$user->id}",
         ];
 
         if ($needsStudent) {
             $uniqueRule = "required|string|max:50|unique:users,student_number,{$user->id}";
 
             $rules += [
-                'first_name'     => 'required|string|max:100',
-                'middle_name'    => 'nullable|string|max:100',
-                'last_name'      => 'required|string|max:100',
+                'first_name' => 'required|string|max:100',
+                'middle_name' => 'nullable|string|max:100',
+                'last_name' => 'required|string|max:100',
                 'student_number' => $uniqueRule,
-                'college_id'  => 'required|exists:colleges,id',
-                'year_level'     => 'required|string|max:20',
+                'college_id' => 'required|exists:colleges,id',
+                'year_level' => 'required|string|max:20',
                 'contact_number' => 'nullable|string|max:20',
-                'course_id'      => 'nullable|exists:courses,id',
-                'street'         => 'nullable|string|max:255',
-                'barangay'       => 'nullable|string|max:100',
-                'city'           => 'nullable|string|max:100',
-                'province'       => 'nullable|string|max:100',
-                'zip_code'       => 'nullable|string|max:10',
+                'course_id' => 'nullable|exists:courses,id',
+                'street' => 'nullable|string|max:255',
+                'barangay' => 'nullable|string|max:100',
+                'city' => 'nullable|string|max:100',
+                'province' => 'nullable|string|max:100',
+                'zip_code' => 'nullable|string|max:10',
             ];
         }
 
         if ($isOfficer || $isStudent) {
             $rules += [
-                'org_memberships'                   => 'nullable|array',
+                'org_memberships' => 'nullable|array',
                 'org_memberships.*.organization_id' => 'required|exists:organizations,id',
-                'org_memberships.*.designation'      => 'nullable|string|max:100',
+                'org_memberships.*.designation' => 'nullable|string|max:100',
             ];
         }
 
@@ -267,9 +267,9 @@ class UserController extends Controller
         DB::beginTransaction();
         try {
             $userUpdate = [
-                'email'        => $data['email'],
+                'email' => $data['email'],
                 'user_type_id' => $data['user_type_id'],
-                'is_active'    => isset($data['is_active']) ? $data['is_active'] == '1' : $user->is_active,
+                'is_active' => isset($data['is_active']) ? $data['is_active'] == '1' : $user->is_active,
             ];
 
             if (array_key_exists('rfid_uid', $data)) {
@@ -278,13 +278,13 @@ class UserController extends Controller
 
             if ($needsStudent) {
                 $userUpdate['student_number'] = $data['student_number'];
-                $userUpdate['first_name']     = $data['first_name'];
-                $userUpdate['middle_name']    = $data['middle_name'] ?? null;
-                $userUpdate['last_name']      = $data['last_name'];
-                $userUpdate['college_id']  = $data['college_id'];
-                $userUpdate['year_level']     = $data['year_level'];
+                $userUpdate['first_name'] = $data['first_name'];
+                $userUpdate['middle_name'] = $data['middle_name'] ?? null;
+                $userUpdate['last_name'] = $data['last_name'];
+                $userUpdate['college_id'] = $data['college_id'];
+                $userUpdate['year_level'] = $data['year_level'];
                 $userUpdate['contact_number'] = $data['contact_number'] ?? null;
-                $userUpdate['course_id']      = $data['course_id'] ?? null;
+                $userUpdate['course_id'] = $data['course_id'] ?? null;
             }
 
             if (!empty($data['password'])) {
@@ -296,17 +296,17 @@ class UserController extends Controller
             if ($needsStudent && (!empty($data['street']) || !empty($data['city']))) {
                 if ($user->address_id) {
                     $user->address->update([
-                        'street'   => $data['street'] ?? null,
+                        'street' => $data['street'] ?? null,
                         'barangay' => $data['barangay'] ?? null,
-                        'city'     => $data['city'] ?? null,
+                        'city' => $data['city'] ?? null,
                         'province' => $data['province'] ?? null,
                         'zip_code' => $data['zip_code'] ?? null,
                     ]);
                 } else {
                     $address = \App\Models\Address::create([
-                        'street'   => $data['street'] ?? null,
+                        'street' => $data['street'] ?? null,
                         'barangay' => $data['barangay'] ?? null,
-                        'city'     => $data['city'] ?? null,
+                        'city' => $data['city'] ?? null,
                         'province' => $data['province'] ?? null,
                         'zip_code' => $data['zip_code'] ?? null,
                     ]);
@@ -316,18 +316,48 @@ class UserController extends Controller
             }
 
             if ($needsStudent) {
-                // Deactivate all existing memberships then re-create from submitted list
-                Designation::where('user_id', $user->id)->update(['status' => 'inactive']);
+                $activeYear = \App\Models\SchoolYear::where('is_active', true)->first();
+                $schoolYearId = $activeYear?->id;
 
+                $submittedOrgIds = [];
                 foreach ($data['org_memberships'] ?? [] as $m) {
+                    $orgId = (int) $m['organization_id'];
+                    $submittedOrgIds[] = $orgId;
+                    $desig = !empty($m['designation']) ? $m['designation'] : 'Member';
+
                     Designation::updateOrCreate(
-                        ['user_id' => $user->id, 'organization_id' => $m['organization_id']],
                         [
-                            'designation'  => $m['designation'] ?? 'Member',
-                            'status'       => 'active',
-                            'joined_date'  => now()->toDateString(),
+                            'user_id'        => $user->id,
+                            'organization_id' => $orgId,
+                            'school_year_id' => $schoolYearId,
+                        ],
+                        [
+                            'designation' => $desig,
+                            'status'      => 'active',
+                            'joined_date' => now()->toDateString(),
                         ]
                     );
+                }
+
+                // Deactivate memberships for this active school year that were removed from submitted list
+                Designation::where('user_id', $user->id)
+                    ->where('school_year_id', $schoolYearId)
+                    ->whereNotIn('organization_id', $submittedOrgIds)
+                    ->update(['status' => 'inactive']);
+
+                // Synchronize system role (user_type_id: 2 for Officer, 3 for Student)
+                if ($user->user_type_id != 1) {
+                    $hasOfficerRole = Designation::where('user_id', $user->id)
+                        ->where('status', 'active')
+                        ->whereNotIn(DB::raw('LOWER(designation)'), ['member'])
+                        ->exists();
+
+                    if ($hasOfficerRole || $user->user_type_id == 2) {
+                        $user->user_type_id = 2;
+                    } else {
+                        $user->user_type_id = 3;
+                    }
+                    $user->save();
                 }
             }
 
@@ -348,17 +378,23 @@ class UserController extends Controller
 
     private function deleteUserDependencies(array $ids)
     {
-        try { Designation::whereIn('user_id', $ids)->delete(); } catch (\Throwable $t) {}
-        try { DB::table('personal_access_tokens')->where('tokenable_type', User::class)->whereIn('tokenable_id', $ids)->delete(); } catch (\Throwable $t) {}
+        try {
+            Designation::whereIn('user_id', $ids)->delete();
+        } catch (\Throwable $t) {
+        }
+        try {
+            DB::table('personal_access_tokens')->where('tokenable_type', User::class)->whereIn('tokenable_id', $ids)->delete();
+        } catch (\Throwable $t) {
+        }
 
         $tables = [
-            'push_tokens'          => 'user_id',
-            'attendances'          => 'user_id',
-            'student_fees'         => 'user_id',
+            'push_tokens' => 'user_id',
+            'attendances' => 'user_id',
+            'student_fees' => 'user_id',
             'student_consequences' => 'user_id',
             'evaluation_responses' => 'user_id',
-            'group_chat_members'   => 'user_id',
-            'messages'             => 'user_id',
+            'group_chat_members' => 'user_id',
+            'messages' => 'user_id',
         ];
 
         foreach ($tables as $table => $column) {
@@ -383,7 +419,10 @@ class UserController extends Controller
             $this->deleteUserDependencies([$user->id]);
             $user->delete();
             if ($addressId) {
-                try { Address::where('id', $addressId)->delete(); } catch (\Throwable $t) {}
+                try {
+                    Address::where('id', $addressId)->delete();
+                } catch (\Throwable $t) {
+                }
             }
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
@@ -391,7 +430,10 @@ class UserController extends Controller
             return response()->json(['message' => 'Account deleted successfully.']);
 
         } catch (\Throwable $e) {
-            try { DB::statement('SET FOREIGN_KEY_CHECKS=1;'); } catch (\Throwable $t) {}
+            try {
+                DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+            } catch (\Throwable $t) {
+            }
             DB::rollBack();
             Log::error('User delete error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
             return response()->json(['message' => 'Error deleting account: ' . $e->getMessage()], 500);
@@ -402,28 +444,28 @@ class UserController extends Controller
     public function importStudents(Request $request)
     {
         $request->validate([
-            'students'                  => 'required|array|min:1|max:500',
+            'students' => 'required|array|min:1|max:500',
             'students.*.student_number' => 'required|string|max:50',
-            'students.*.first_name'     => 'required|string|max:100',
-            'students.*.middle_name'    => 'nullable|string|max:100',
-            'students.*.last_name'      => 'required|string|max:100',
-            'students.*.email'          => 'required|email|max:255',
-            'students.*.college_id'     => 'required|integer|exists:colleges,id',
-            'students.*.course_id'      => 'nullable',
-            'students.*.course'         => 'nullable|string|max:255',
-            'students.*.year_level'     => 'required|string|max:20',
+            'students.*.first_name' => 'required|string|max:100',
+            'students.*.middle_name' => 'nullable|string|max:100',
+            'students.*.last_name' => 'required|string|max:100',
+            'students.*.email' => 'required|email|max:255',
+            'students.*.college_id' => 'required|integer|exists:colleges,id',
+            'students.*.course_id' => 'nullable',
+            'students.*.course' => 'nullable|string|max:255',
+            'students.*.year_level' => 'required|string|max:20',
             'students.*.contact_number' => 'nullable|string|max:20',
-            'students.*.street'         => 'nullable|string|max:255',
-            'students.*.barangay'       => 'nullable|string|max:100',
-            'students.*.city'           => 'nullable|string|max:100',
-            'students.*.province'       => 'nullable|string|max:100',
-            'students.*.zip_code'       => 'nullable|string|max:10',
+            'students.*.street' => 'nullable|string|max:255',
+            'students.*.barangay' => 'nullable|string|max:100',
+            'students.*.city' => 'nullable|string|max:100',
+            'students.*.province' => 'nullable|string|max:100',
+            'students.*.zip_code' => 'nullable|string|max:10',
         ]);
 
-        $rows    = $request->students;
+        $rows = $request->students;
         $created = 0;
         $skipped = [];
-        $errors  = [];
+        $errors = [];
 
         DB::beginTransaction();
         try {
@@ -445,9 +487,9 @@ class UserController extends Controller
                     $addressId = null;
                     if (!empty($row['barangay']) || !empty($row['city']) || !empty($row['street']) || !empty($row['province'])) {
                         $address = \App\Models\Address::create([
-                            'street'   => $row['street'] ?? null,
+                            'street' => $row['street'] ?? null,
                             'barangay' => $row['barangay'] ?? null,
-                            'city'     => $row['city'] ?? null,
+                            'city' => $row['city'] ?? null,
                             'province' => $row['province'] ?? null,
                             'zip_code' => $row['zip_code'] ?? null,
                         ]);
@@ -457,7 +499,7 @@ class UserController extends Controller
                     // Resolve course / program (by ID or name)
                     $courseId = null;
                     if (!empty($row['course_id']) && is_numeric($row['course_id'])) {
-                        $courseId = (int)$row['course_id'];
+                        $courseId = (int) $row['course_id'];
                     } elseif (!empty($row['course'])) {
                         $cVal = trim($row['course']);
                         $hasCodeCol = Schema::hasColumn('courses', 'code');
@@ -472,7 +514,7 @@ class UserController extends Controller
                         } else {
                             $courseData = [
                                 'college_id' => $row['college_id'],
-                                'name'       => $cVal,
+                                'name' => $cVal,
                             ];
                             if ($hasCodeCol) {
                                 $codeClean = strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $cVal), 0, 10));
@@ -485,18 +527,18 @@ class UserController extends Controller
 
                     User::create([
                         'student_number' => $row['student_number'],
-                        'first_name'     => $row['first_name'],
-                        'middle_name'    => $row['middle_name'] ?? null,
-                        'last_name'      => $row['last_name'],
-                        'college_id'     => $row['college_id'],
-                        'course_id'      => $courseId,
-                        'year_level'     => $row['year_level'],
+                        'first_name' => $row['first_name'],
+                        'middle_name' => $row['middle_name'] ?? null,
+                        'last_name' => $row['last_name'],
+                        'college_id' => $row['college_id'],
+                        'course_id' => $courseId,
+                        'year_level' => $row['year_level'],
                         'contact_number' => $row['contact_number'] ?? null,
-                        'email'          => $row['email'],
-                        'address_id'     => $addressId,
-                        'password_hash'  => Hash::make('password'),
-                        'user_type_id'   => 3,
-                        'is_active'      => true,
+                        'email' => $row['email'],
+                        'address_id' => $addressId,
+                        'password_hash' => Hash::make('password'),
+                        'user_type_id' => 3,
+                        'is_active' => true,
                     ]);
 
                     $created++;
@@ -511,8 +553,8 @@ class UserController extends Controller
                 'message' => "{$created} student(s) imported successfully.",
                 'created' => $created,
                 'skipped' => $skipped,
-                'errors'  => $errors,
-                'total'   => count($rows),
+                'errors' => $errors,
+                'total' => count($rows),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -524,7 +566,7 @@ class UserController extends Controller
     public function bulkDestroy(Request $request)
     {
         $request->validate([
-            'user_ids'   => 'required|array|min:1',
+            'user_ids' => 'required|array|min:1',
             'user_ids.*' => 'required|exists:users,id',
         ]);
 
@@ -538,14 +580,20 @@ class UserController extends Controller
             $this->deleteUserDependencies($ids);
             User::whereIn('id', $ids)->delete();
             if (!empty($addressIds)) {
-                try { Address::whereIn('id', $addressIds)->delete(); } catch (\Throwable $t) {}
+                try {
+                    Address::whereIn('id', $addressIds)->delete();
+                } catch (\Throwable $t) {
+                }
             }
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
             DB::commit();
             return response()->json(['message' => count($ids) . ' account(s) deleted successfully.']);
         } catch (\Throwable $e) {
-            try { DB::statement('SET FOREIGN_KEY_CHECKS=1;'); } catch (\Throwable $t) {}
+            try {
+                DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+            } catch (\Throwable $t) {
+            }
             DB::rollBack();
             Log::error('User bulk delete error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
             return response()->json(['message' => 'Error deleting accounts: ' . $e->getMessage()], 500);
@@ -555,9 +603,9 @@ class UserController extends Controller
     public function bulkStatus(Request $request)
     {
         $request->validate([
-            'user_ids'   => 'required|array|min:1',
+            'user_ids' => 'required|array|min:1',
             'user_ids.*' => 'required|exists:users,id',
-            'is_active'  => 'required|boolean',
+            'is_active' => 'required|boolean',
         ]);
 
         try {
@@ -575,10 +623,10 @@ class UserController extends Controller
     public function bulkAssignOrg(Request $request)
     {
         $request->validate([
-            'user_ids'        => 'required|array|min:1',
-            'user_ids.*'      => 'required|exists:users,id',
+            'user_ids' => 'required|array|min:1',
+            'user_ids.*' => 'required|exists:users,id',
             'organization_id' => 'required|exists:organizations,id',
-            'designation'     => 'nullable|string|max:100',
+            'designation' => 'nullable|string|max:100',
         ]);
 
         try {
@@ -586,11 +634,37 @@ class UserController extends Controller
             $orgId = $request->organization_id;
             $designation = $request->designation ?: 'Member';
 
+            $activeYear = \App\Models\SchoolYear::where('is_active', true)->first();
+            $schoolYearId = $activeYear?->id;
+
             foreach ($ids as $userId) {
                 Designation::updateOrCreate(
-                    ['user_id' => $userId, 'organization_id' => $orgId],
-                    ['designation' => $designation, 'status' => 'active']
+                    [
+                        'user_id'         => $userId,
+                        'organization_id' => $orgId,
+                        'school_year_id'  => $schoolYearId,
+                    ],
+                    [
+                        'designation' => $designation,
+                        'status'      => 'active',
+                        'joined_date' => now()->toDateString(),
+                    ]
                 );
+
+                $targetUser = User::find($userId);
+                if ($targetUser && $targetUser->user_type_id != 1) {
+                    if (strtolower($designation) !== 'member') {
+                        $targetUser->update(['user_type_id' => 2]); // Officer
+                    } else {
+                        $hasOtherOfficerRole = Designation::where('user_id', $userId)
+                            ->where('status', 'active')
+                            ->whereNotIn(DB::raw('LOWER(designation)'), ['member'])
+                            ->exists();
+                        if (!$hasOtherOfficerRole && $targetUser->user_type_id == 2) {
+                            $targetUser->update(['user_type_id' => 3]); // Student
+                        }
+                    }
+                }
             }
 
             $org = Organization::find($orgId);

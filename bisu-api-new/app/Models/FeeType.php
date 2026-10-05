@@ -13,12 +13,18 @@ class FeeType extends Model
 
     protected $fillable = [
         'organization_id',
+        'school_year_id',
         'created_by',
         'name',
         'description',
         'amount',
         'type',
     ];
+
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class);
+    }
 
     public function organization()
     {

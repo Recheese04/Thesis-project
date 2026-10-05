@@ -5,7 +5,8 @@ import EmptyState from '../../components/ui/EmptyState';
 import StudentPageWrapper from '../../components/ui/StudentPageWrapper';
 import { useTheme } from '../../context/ThemeContext';
 import { API_BASE_URL } from '../../constants/Config';
-import { Download } from 'lucide-react-native';
+import { Download, Calendar } from 'lucide-react-native';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 const categoryIcon: Record<string, string> = {
   minutes: '📝', financial: '💰', general: '📄', report: '📊', other: '📁',
@@ -17,6 +18,11 @@ export default function StudentDocuments() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // School Year Filter state
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedYearId, setSelectedYearId] = useState<number | string>('all');
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
+
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const cardBg = isDark ? '#1e293b' : '#fff';
   const border = isDark ? '#334155' : '#f1f5f9';
@@ -27,14 +33,18 @@ export default function StudentDocuments() {
 
   const fetchData = async () => {
     try {
-      const res = await api.get('/student/documents');
+      const params: any = {};
+      if (selectedYearId && selectedYearId !== 'all') {
+        params.school_year_id = selectedYearId;
+      }
+      const res = await api.get('/student/documents', { params });
       setDocs(Array.isArray(res.data) ? res.data : []);
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [selectedYearId]);
 
   const handleDownload = (doc: any) => {
     const url = `${API_BASE_URL.replace('/api', '')}/api/documents/${doc.id}/download`;
@@ -56,9 +66,20 @@ export default function StudentDocuments() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} />}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ backgroundColor: cardBg, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: textPrimary }}>Documents 📁</Text>
-          <Text style={{ fontSize: 14, color: textSecondary, marginTop: 4 }}>{docs.length} files</Text>
+        <View style={{ backgroundColor: cardBg, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Text style={{ fontSize: 24, fontWeight: '800', color: textPrimary }}>Documents 📁</Text>
+            <Text style={{ fontSize: 14, color: textSecondary, marginTop: 4 }}>{docs.length} files</Text>
+          </View>
+          <TouchableOpacity 
+            onPress={() => setIsYearModalOpen(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: selectedYear !== 'All' ? '#7c3aed' : border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: selectedYear !== 'All' ? (isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff') : cardBg }}
+          >
+            <Calendar size={14} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+            <Text style={{ fontSize: 12, color: selectedYear !== 'All' ? '#7c3aed' : textPrimary, fontWeight: '600', marginLeft: 4 }}>
+              {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
@@ -80,6 +101,17 @@ export default function StudentDocuments() {
         </View>
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      <SchoolYearFilterModal
+        visible={isYearModalOpen}
+        onClose={() => setIsYearModalOpen(false)}
+        selectedYear={selectedYear}
+        onSelectYear={(name, id) => {
+          setSelectedYear(name);
+          setSelectedYearId(id);
+        }}
+      />
+
     </StudentPageWrapper>
   );
 }

@@ -178,9 +178,12 @@ Route::middleware('auth:sanctum')->group(function () {
         }
     );
 
-    Route::post('/profile/join-by-code', function (Request $request) {
+    $joinByCodeHandler = function (Request $request) {
         $user = $request->user();
-        if (!$user->student_number) {
+        if ($user->isAdmin()) {
+            return response()->json(['message' => 'Administrators cannot join organizations as members.'], 403);
+        }
+        if (!$user->student_number && !$user->isOfficer()) {
             return response()->json(['message' => 'Only students can join organizations.'], 403);
         }
 
@@ -212,11 +215,15 @@ Route::middleware('auth:sanctum')->group(function () {
             'message' => 'Successfully joined ' . $org->name . '!',
             'organization' => $org
         ]);
-    });
+    };
 
-    Route::delete('/profile/organizations/{orgId}/leave', function (Request $request, $orgId) {
+    Route::post('/profile/join-by-code', $joinByCodeHandler);
+    Route::post('/profile/organizations/join', $joinByCodeHandler);
+    Route::post('/profile/organization/join', $joinByCodeHandler);
+
+    $leaveOrgHandler = function (Request $request, $orgId) {
         $user = $request->user();
-        if (!$user->student_number) {
+        if (!$user->student_number && !$user->isOfficer()) {
             return response()->json(['message' => 'Only students can leave organizations.'], 403);
         }
 
@@ -232,7 +239,10 @@ Route::middleware('auth:sanctum')->group(function () {
         $membership->delete();
 
         return response()->json(['message' => 'You have successfully left the organization.']);
-    });
+    };
+
+    Route::delete('/profile/organizations/{orgId}/leave', $leaveOrgHandler);
+    Route::delete('/profile/organization/{orgId}/leave', $leaveOrgHandler);
 
     Route::post(
         '/organizations/{orgId}/join-request',
@@ -527,6 +537,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/student/announcements', [AnnouncementController::class, 'studentIndex']);
     Route::get('/student/obligations', [ObligationController::class, 'myObligations']);
     Route::get('/student/documents', [DocumentController::class, 'studentIndex']);
+    Route::get('/student/attendance', [AttendanceController::class, 'getMyAttendance']); // alias for /attendance/my
 
     // Messages (DMs + Org group chat)
     // ⚠️ /messages/members MUST come before /messages

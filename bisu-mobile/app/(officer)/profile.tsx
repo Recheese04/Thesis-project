@@ -146,7 +146,7 @@ export default function OfficerProfile() {
     if (!inviteCode.trim()) return Alert.alert('Error', 'Please enter an invite code.');
     setJoining(true);
     try {
-      await api.post('/profile/organizations/join', { invite_code: inviteCode.trim() });
+      await api.post('/profile/join-by-code', { invite_code: inviteCode.trim() });
       Alert.alert('Success', 'Successfully joined organization!');
       setInviteCode('');
       fetchOrgs();

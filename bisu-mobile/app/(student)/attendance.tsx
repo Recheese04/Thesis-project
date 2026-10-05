@@ -7,12 +7,19 @@ import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
 import { CheckCircle2, XCircle, Calendar } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { TouchableOpacity } from 'react-native';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 export default function StudentAttendance() {
   const { isDark, colors } = useTheme();
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // School Year Filter state
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedYearId, setSelectedYearId] = useState<number | string>('all');
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
 
   const bg = isDark ? '#0f172a' : '#f8fafc';
   const cardBg = isDark ? '#1e293b' : '#fff';
@@ -27,14 +34,18 @@ export default function StudentAttendance() {
 
   const fetchAttendance = async () => {
     try {
-      const res = await api.get('/attendance/my');
+      const params: any = {};
+      if (selectedYearId && selectedYearId !== 'all') {
+        params.school_year_id = selectedYearId;
+      }
+      const res = await api.get('/attendance/my', { params });
       setAttendance(Array.isArray(res.data) ? res.data : []);
     } catch (_) {}
     setLoading(false);
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchAttendance(); }, []);
+  useEffect(() => { fetchAttendance(); }, [selectedYearId]);
 
   if (loading && !refreshing) return (
     <StudentPageWrapper activeRoute="attendance">
@@ -96,9 +107,15 @@ export default function StudentAttendance() {
 
             {/* Quick Actions moved to the right */}
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-               <View style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff', borderWidth: 1, borderColor: border, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
-                  <Calendar size={16} color={isDark ? '#94a3b8' : '#2563eb'} />
-               </View>
+               <TouchableOpacity 
+                  onPress={() => setIsYearModalOpen(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: selectedYear !== 'All' ? '#7c3aed' : border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: selectedYear !== 'All' ? (isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff') : cardBg }}
+               >
+                  <Calendar size={14} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+                  <Text style={{ fontSize: 12, color: selectedYear !== 'All' ? '#7c3aed' : textPrimary, fontWeight: '600', marginLeft: 4 }}>
+                    {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+                  </Text>
+               </TouchableOpacity>
             </View>
           </View>
 
@@ -239,6 +256,17 @@ export default function StudentAttendance() {
 
         </View>
       </ScrollView>
+
+      <SchoolYearFilterModal
+        visible={isYearModalOpen}
+        onClose={() => setIsYearModalOpen(false)}
+        selectedYear={selectedYear}
+        onSelectYear={(name, id) => {
+          setSelectedYear(name);
+          setSelectedYearId(id);
+        }}
+      />
+
     </StudentPageWrapper>
   );
 }

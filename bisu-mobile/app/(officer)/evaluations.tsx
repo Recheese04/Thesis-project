@@ -8,6 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ClipboardList, Plus, Search, ChevronRight, ArrowLeft, Star, MessageSquare, ThumbsUp, Trash2, Calendar, ListChecks, CheckCircle2, Clock, X } from 'lucide-react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 const TYPE_ICONS = { rating: Star, text: MessageSquare, multiple_choice: ListChecks, yes_no: ThumbsUp };
 const TYPE_LABELS = { rating: "Rating (1–5)", text: "Open Text", multiple_choice: "Multiple Choice", yes_no: "Yes / No" };
@@ -38,6 +39,11 @@ export default function OfficerEvaluations() {
   const [view, setView] = useState<'list' | 'manage' | 'create'>('list');
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
+  // School Year Filter state
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedYearId, setSelectedYearId] = useState<number | string>('all');
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
+
   // Event List state
   const [events, setEvents] = useState<any[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -62,7 +68,11 @@ export default function OfficerEvaluations() {
 
   const fetchEvents = async () => {
     try {
-      const res = await api.get('/officer/events');
+      const params: any = {};
+      if (selectedYearId && selectedYearId !== 'all') {
+        params.school_year_id = selectedYearId;
+      }
+      const res = await api.get('/officer/events', { params });
       setEvents(res.data.events ?? res.data ?? []);
     } catch (_) {}
     setLoadingList(false);
@@ -73,7 +83,7 @@ export default function OfficerEvaluations() {
     if (view === 'list') {
       fetchEvents();
     }
-  }, [view]);
+  }, [view, selectedYearId]);
 
   const loadEvaluation = async (ev: any) => {
     setSelectedEvent(ev);
@@ -203,16 +213,28 @@ export default function OfficerEvaluations() {
             </View>
           )}
 
-          {/* Search */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }}>
-            <Search size={18} color={textMuted} />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search events..."
-              style={{ flex: 1, marginLeft: 8, fontSize: 15, color: textPrimary, paddingVertical: 0 }}
-              placeholderTextColor={textMuted}
-            />
+          {/* Search & School Year Filter */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }}>
+              <Search size={18} color={textMuted} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search events..."
+                style={{ flex: 1, marginLeft: 8, fontSize: 14, color: textPrimary, paddingVertical: 0 }}
+                placeholderTextColor={textMuted}
+              />
+            </View>
+
+            <TouchableOpacity 
+              onPress={() => setIsYearModalOpen(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: selectedYear !== 'All' ? '#7c3aed' : border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: selectedYear !== 'All' ? (isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff') : cardBg }}
+            >
+              <Calendar size={14} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+              <Text style={{ fontSize: 13, color: selectedYear !== 'All' ? '#7c3aed' : textPrimary, fontWeight: '600', marginLeft: 6 }}>
+                {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -533,6 +555,16 @@ export default function OfficerEvaluations() {
       {view === 'list' && renderList()}
       {view === 'manage' && renderManage()}
       {view === 'create' && renderCreate()}
+
+      <SchoolYearFilterModal
+        visible={isYearModalOpen}
+        onClose={() => setIsYearModalOpen(false)}
+        selectedYear={selectedYear}
+        onSelectYear={(name, id) => {
+          setSelectedYear(name);
+          setSelectedYearId(id);
+        }}
+      />
     </OfficerPageWrapper>
   );
 }

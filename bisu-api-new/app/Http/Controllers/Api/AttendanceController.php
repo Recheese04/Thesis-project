@@ -144,6 +144,8 @@ class AttendanceController extends Controller
                 $userPayload = $user ? [
                     'id'             => $user->id,
                     'name'           => trim($user->first_name . ' ' . $user->last_name),
+                    'first_name'     => $user->first_name,
+                    'last_name'      => $user->last_name,
                     'student_id'     => $user->student_number,
                     'student_number' => $user->student_number,
                     'year_level'     => $user->year_level,
@@ -193,15 +195,21 @@ class AttendanceController extends Controller
         }
     }
 
-    public function getMyAttendance()
+    public function getMyAttendance(\Illuminate\Http\Request $request)
     {
         try {
             $user = auth()->user();
 
-            $attendance = Attendance::with(['event.organization', 'user'])
-                ->where('user_id', $user->id)
-                ->orderBy('time_in', 'desc')
-                ->get();
+            $query = Attendance::with(['event.organization', 'user'])
+                ->where('user_id', $user->id);
+
+            if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+                $query->whereHas('event', function ($q) use ($request) {
+                    $q->where('school_year_id', $request->school_year_id);
+                });
+            }
+
+            $attendance = $query->orderBy('time_in', 'desc')->get();
 
             return response()->json($attendance);
 

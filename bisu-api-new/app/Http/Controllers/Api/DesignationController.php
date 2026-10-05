@@ -20,7 +20,7 @@ class DesignationController extends Controller
         try {
             Organization::findOrFail($orgId);
 
-            $query = Designation::with(['user.college', 'user.course'])
+            $query = Designation::with(['user.college', 'user.course', 'schoolYear'])
                 ->join('users', 'users.id', '=', 'designations.user_id')
                 ->where('designations.organization_id', $orgId)
                 ->select('designations.*');
@@ -34,6 +34,10 @@ class DesignationController extends Controller
                 $query->where('designations.designation', $request->query('designation'));
             }
 
+            if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+                $query->where('designations.school_year_id', $request->school_year_id);
+            }
+
             if ($request->filled('search')) {
                 $s = $request->search;
                 $query->whereRaw('(users.first_name LIKE ? OR users.last_name LIKE ? OR users.student_number LIKE ?)', ["%{$s}%", "%{$s}%", "%{$s}%"]);
@@ -45,9 +49,12 @@ class DesignationController extends Controller
                 ->get();
 
             // ── Attendance rate ──────────────────────────────────────────────────
-            $eventIds    = Event::where('organization_id', $orgId)
-                ->whereIn('status', ['completed', 'ongoing'])
-                ->pluck('id');
+            $eventQuery = Event::where('organization_id', $orgId)
+                ->whereIn('status', ['completed', 'ongoing']);
+            if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+                $eventQuery->where('school_year_id', $request->school_year_id);
+            }
+            $eventIds = $eventQuery->pluck('id');
             $totalEvents = $eventIds->count();
 
             if ($totalEvents > 0) {
@@ -67,24 +74,26 @@ class DesignationController extends Controller
 
             // ── Map response ─────────────────────────────────────────────
             $mapped = $members->map(fn($m) => [
-                'id'              => $m->id,
-                'user_id'         => $m->user_id,
-                'designation'     => $m->designation,
-                'status'          => $m->status,
-                'joined_date'     => $m->joined_date,
+                'id' => $m->id,
+                'user_id' => $m->user_id,
+                'school_year_id' => $m->school_year_id,
+                'school_year' => $m->schoolYear?->name,
+                'designation' => $m->designation,
+                'status' => $m->status,
+                'joined_date' => $m->joined_date,
                 'attendance_rate' => $m->attendance_rate,
-                'user'            => [
-                    'id'                  => $m->user->id ?? null,
-                    'first_name'          => $m->user->first_name ?? '',
-                    'last_name'           => $m->user->last_name ?? '',
-                    'middle_name'         => $m->user->middle_name ?? '',
-                    'student_number'      => $m->user->student_number ?? '',
-                    'email'               => $m->user->email ?? null,
-                    'contact_number'      => $m->user->contact_number ?? null,
-                    'course'              => $m->user->course?->name ?? null,
-                    'year_level'          => $m->user->year_level ?? null,
-                    'college'             => $m->user->college?->name ?? null,
-                    'rfid_uid'            => $m->user->rfid_uid ?? null,
+                'user' => [
+                    'id' => $m->user->id ?? null,
+                    'first_name' => $m->user->first_name ?? '',
+                    'last_name' => $m->user->last_name ?? '',
+                    'middle_name' => $m->user->middle_name ?? '',
+                    'student_number' => $m->user->student_number ?? '',
+                    'email' => $m->user->email ?? null,
+                    'contact_number' => $m->user->contact_number ?? null,
+                    'course' => $m->user->course?->name ?? null,
+                    'year_level' => $m->user->year_level ?? null,
+                    'college' => $m->user->college?->name ?? null,
+                    'rfid_uid' => $m->user->rfid_uid ?? null,
                     'profile_picture_url' => $m->user->profile_picture_url ?? null,
                 ],
             ]);
@@ -106,51 +115,60 @@ class DesignationController extends Controller
             Organization::findOrFail($orgId);
 
             $data = $request->validate([
-                'user_id'     => 'required|exists:users,id',
+                'user_id' => 'required|exists:users,id',
                 'designation' => 'required|string|max:100',
                 'joined_date' => 'nullable|date',
+                'school_year_id' => 'nullable|exists:school_years,id',
             ]);
+
+            $activeYear = \App\Models\SchoolYear::where('is_active', true)->first();
+            $schoolYearId = $data['school_year_id'] ?? $activeYear?->id;
 
             $existing = Designation::where('organization_id', $orgId)
                 ->where('user_id', $data['user_id'])
+                ->where('school_year_id', $schoolYearId)
                 ->where('status', 'active')
                 ->first();
 
             if ($existing) {
-                return response()->json(['message' => 'User is already an active member of this organization.'], 422);
+                return response()->json(['message' => 'User is already an active member of this organization for this school year.'], 422);
             }
 
             $designation = Designation::updateOrCreate(
-                ['organization_id' => $orgId, 'user_id' => $data['user_id']],
                 [
-                    'designation'  => $data['designation'],
-                    'status'       => 'active',
-                    'joined_date'  => $data['joined_date'] ?? now()->toDateString(),
+                    'organization_id' => $orgId,
+                    'user_id' => $data['user_id'],
+                    'school_year_id' => $schoolYearId,
+                ],
+                [
+                    'designation' => $data['designation'],
+                    'status' => 'active',
+                    'joined_date' => $data['joined_date'] ?? now()->toDateString(),
                 ]
             );
 
-            $designation->load(['user.college', 'user.course']);
+            $designation->load(['user.college', 'user.course', 'schoolYear']);
 
             return response()->json([
-                'message'     => 'Member added successfully.',
+                'message' => 'Member added successfully.',
                 'designation' => [
-                    'id'          => $designation->id,
-                    'user_id'     => $designation->user_id,
+                    'id' => $designation->id,
+                    'user_id' => $designation->user_id,
                     'designation' => $designation->designation,
-                    'status'      => $designation->status,
+                    'status' => $designation->status,
                     'joined_date' => $designation->joined_date,
-                    'user'        => [
-                        'id'                  => $designation->user->id ?? null,
-                        'first_name'          => $designation->user->first_name ?? '',
-                        'last_name'           => $designation->user->last_name ?? '',
-                        'middle_name'         => $designation->user->middle_name ?? '',
-                        'student_number'      => $designation->user->student_number ?? '',
-                        'email'               => $designation->user->email ?? null,
-                        'contact_number'      => $designation->user->contact_number ?? null,
-                        'course'              => $designation->user->course?->name ?? null,
-                        'year_level'          => $designation->user->year_level ?? null,
-                        'college'             => $designation->user->college?->name ?? null,
-                        'rfid_uid'            => $designation->user->rfid_uid ?? null,
+                    'user' => [
+                        'id' => $designation->user->id ?? null,
+                        'first_name' => $designation->user->first_name ?? '',
+                        'last_name' => $designation->user->last_name ?? '',
+                        'middle_name' => $designation->user->middle_name ?? '',
+                        'student_number' => $designation->user->student_number ?? '',
+                        'email' => $designation->user->email ?? null,
+                        'contact_number' => $designation->user->contact_number ?? null,
+                        'course' => $designation->user->course?->name ?? null,
+                        'year_level' => $designation->user->year_level ?? null,
+                        'college' => $designation->user->college?->name ?? null,
+                        'rfid_uid' => $designation->user->rfid_uid ?? null,
                         'profile_picture_url' => $designation->user->profile_picture_url ?? null,
                     ],
                 ],
@@ -182,7 +200,7 @@ class DesignationController extends Controller
             $record->load(['user.college', 'user.course']);
 
             return response()->json([
-                'message'     => 'Designation updated successfully.',
+                'message' => 'Designation updated successfully.',
                 'designation' => $record,
             ]);
 
@@ -229,12 +247,12 @@ class DesignationController extends Controller
                 ->limit(20)
                 ->get()
                 ->map(fn($s) => [
-                    'id'             => $s->id,
+                    'id' => $s->id,
                     'student_number' => $s->student_number,
-                    'full_name'      => trim("{$s->first_name} " . ($s->middle_name ? "{$s->middle_name} " : '') . $s->last_name),
-                    'course'         => $s->course?->name,
-                    'year_level'     => $s->year_level,
-                    'college'        => $s->college?->name,
+                    'full_name' => trim("{$s->first_name} " . ($s->middle_name ? "{$s->middle_name} " : '') . $s->last_name),
+                    'course' => $s->course?->name,
+                    'year_level' => $s->year_level,
+                    'college' => $s->college?->name,
                 ]);
 
             return response()->json($users);
@@ -261,12 +279,12 @@ class DesignationController extends Controller
             $history = $events->map(function ($event) use ($attendances) {
                 $att = $attendances->get($event->id);
                 return [
-                    'event_title'  => $event->title,
-                    'event_date'   => $event->event_date ? \Carbon\Carbon::parse($event->event_date)->format('M d, Y') : null,
+                    'event_title' => $event->title,
+                    'event_date' => $event->event_date ? \Carbon\Carbon::parse($event->event_date)->format('M d, Y') : null,
                     'event_status' => $event->status,
-                    'attended'     => $att !== null,
-                    'time_in'      => $att && $att->time_in ? $att->time_in->format('h:i A') : null,
-                    'time_out'     => $att && $att->time_out ? $att->time_out->format('h:i A') : null,
+                    'attended' => $att !== null,
+                    'time_in' => $att && $att->time_in ? $att->time_in->format('h:i A') : null,
+                    'time_out' => $att && $att->time_out ? $att->time_out->format('h:i A') : null,
                 ];
             });
 

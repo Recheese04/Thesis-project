@@ -16,17 +16,21 @@ class DocumentController extends Controller
     /**
      * Get documents for an organization (Officer view)
      */
-    public function index($orgId): JsonResponse
+    public function index(Request $request, $orgId): JsonResponse
     {
         $user = Auth::user();
         if (!$user->isAdmin() && !$user->isOfficerOf($orgId)) {
             return response()->json(['message' => 'Unauthorized access to organization documents.'], 403);
         }
 
-        $documents = Document::where('organization_id', $orgId)
-            ->with('uploader:id,first_name,last_name')
-            ->orderByDesc('created_at')
-            ->get();
+        $query = Document::where('organization_id', $orgId)
+            ->with(['uploader:id,first_name,last_name', 'schoolYear']);
+
+        if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+            $query->where('school_year_id', $request->school_year_id);
+        }
+
+        $documents = $query->orderByDesc('created_at')->get();
 
         return response()->json($documents);
     }
@@ -44,6 +48,7 @@ class DocumentController extends Controller
         $request->validate([
             'title' => 'required|string|max:255',
             'category' => 'required|string|max:100',
+            'school_year_id' => 'nullable|exists:school_years,id',
             'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png,webp|max:10240', // max 10MB
         ]);
 
@@ -52,8 +57,12 @@ class DocumentController extends Controller
         // Store the file securely in storage/app/documents
         $path = $file->store('documents/' . $orgId);
 
+        $activeYear = \App\Models\SchoolYear::where('is_active', true)->first();
+        $schoolYearId = $request->input('school_year_id') ?: $activeYear?->id;
+
         $document = Document::create([
             'organization_id' => $orgId,
+            'school_year_id' => $schoolYearId,
             'uploaded_by' => $user->id,
             'title' => $request->title,
             'category' => $request->category,
@@ -62,7 +71,7 @@ class DocumentController extends Controller
             'file_type' => $file->getMimeType(),
         ]);
 
-        $document->load('uploader:id,first_name,last_name');
+        $document->load(['uploader:id,first_name,last_name', 'schoolYear']);
 
         return response()->json($document, 201);
     }
@@ -121,7 +130,7 @@ class DocumentController extends Controller
     /**
      * Get documents for all organizations a student is part of
      */
-    public function studentIndex(): JsonResponse
+    public function studentIndex(Request $request): JsonResponse
     {
         $user = Auth::user();
 
@@ -130,10 +139,14 @@ class DocumentController extends Controller
             ->where('status', 'active')
             ->pluck('organization_id');
 
-        $documents = Document::whereIn('organization_id', $orgIds)
-            ->with(['organization:id,name', 'uploader:id,first_name,last_name'])
-            ->orderByDesc('created_at')
-            ->get();
+        $query = Document::whereIn('organization_id', $orgIds)
+            ->with(['organization:id,name', 'uploader:id,first_name,last_name', 'schoolYear']);
+
+        if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+            $query->where('school_year_id', $request->school_year_id);
+        }
+
+        $documents = $query->orderByDesc('created_at')->get();
 
         return response()->json($documents);
     }

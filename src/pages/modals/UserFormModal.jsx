@@ -19,7 +19,7 @@ const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year"]
 const COURSES_BY_COLLEGE = {};
 
 const EMPTY_FORM = {
-  email: "", password: "", user_type_id: "", is_active: "1",
+  email: "", password: "", user_type_id: "3", is_active: "1",
   student_number: "", first_name: "", middle_name: "",
   last_name: "", college_id: "", year_level: "", contact_number: "",
   course_id: "", rfid_uid: "",
@@ -72,6 +72,19 @@ function PwdInput({ value, onChange, required, hint }) {
   );
 }
 
+const DESIGNATION_OPTIONS = [
+  "Member",
+  "President",
+  "Vice President",
+  "Secretary",
+  "Treasurer",
+  "Auditor",
+  "P.R.O.",
+  "PIO",
+  "Adviser",
+  "Officer",
+];
+
 // ── Add Org Row ────────────────────────────────────────────────────────────
 function AddOrgRow({ organizations, existingIds, onAdd, isOfficer }) {
   const [orgId, setOrgId]  = useState("");
@@ -88,7 +101,7 @@ function AddOrgRow({ organizations, existingIds, onAdd, isOfficer }) {
 
   return (
     <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2 overflow-hidden">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-[#0f2d5e]/50">Add Organization</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[#0f2d5e]/50">Add Organization & Designation</p>
       <div className="flex items-end gap-2 min-w-0">
 
         <div className="flex-1 min-w-0 space-y-1">
@@ -110,19 +123,23 @@ function AddOrgRow({ organizations, existingIds, onAdd, isOfficer }) {
           </Select>
         </div>
 
-        {isOfficer && (
-          <div className="flex-1 min-w-0 space-y-1">
-            <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">
-              Designation <span className="normal-case font-normal text-slate-400">(optional)</span>
-            </Label>
-            <Input
-              value={designation}
-              onChange={e => setDesignation(e.target.value)}
-              placeholder="e.g. President, Secretary, Adviser"
-              className="h-8 text-xs border-slate-200 bg-white w-full"
-            />
-          </div>
-        )}
+        <div className="w-36 shrink-0 space-y-1">
+          <Label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">
+            Designation
+          </Label>
+          <Select value={designation} onValueChange={setDesignation}>
+            <SelectTrigger className="h-8 text-xs border-slate-200 bg-white w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-lg max-h-52">
+              {DESIGNATION_OPTIONS.map(d => (
+                <SelectItem key={d} value={d} className="text-xs font-medium">
+                  {d}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <Button type="button" onClick={handleAdd} disabled={!orgId || available.length === 0}
           className="h-8 px-3 bg-[#0f2d5e] hover:bg-[#1e4db7] text-white text-xs shrink-0 self-end">
@@ -134,7 +151,7 @@ function AddOrgRow({ organizations, existingIds, onAdd, isOfficer }) {
 }
 
 // ── Org Membership List ────────────────────────────────────────────────────
-function OrgMembershipList({ memberships, organizations, onRemove, isOfficer }) {
+function OrgMembershipList({ memberships, organizations, onRemove, onUpdateDesignation, isOfficer }) {
   if (memberships.length === 0) {
     return (
       <div className="flex flex-col items-center gap-1.5 py-4 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
@@ -147,27 +164,33 @@ function OrgMembershipList({ memberships, organizations, onRemove, isOfficer }) 
   return (
     <div className="space-y-2">
       {memberships.map((m, i) => {
-        const orgName   = organizations.find(o => String(o.id) === m.organization_id)?.name ?? "—";
-        const isOfficerRole = m.designation && m.designation !== 'Member';
-        const roleBadge = isOfficerRole
-          ? m.designation === "Adviser"
-            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-            : "bg-[#1e4db7]/10 text-[#1e4db7] border-[#1e4db7]/20"
-          : "bg-blue-50 text-blue-600 border-blue-200";
+        const orgName = organizations.find(o => String(o.id) === m.organization_id)?.name ?? "—";
+        const currentDesig = m.designation || 'Member';
 
         return (
-          <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm min-w-0 overflow-hidden">
+          <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm min-w-0">
             <div className="w-7 h-7 rounded-lg bg-[#0f2d5e]/10 flex items-center justify-center shrink-0">
               <Users className="w-3.5 h-3.5 text-[#0f2d5e]" />
             </div>
             <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="text-xs font-semibold text-slate-700 truncate">{orgName}</p>
+              <p className="text-xs font-semibold text-slate-700 truncate" title={orgName}>{orgName}</p>
             </div>
-            <Badge className={`${roleBadge} border text-[10px] font-semibold px-2 shrink-0`}>
-              {m.designation || 'Member'}
-            </Badge>
-            <button type="button" onClick={() => onRemove(i)}
-              className="text-slate-300 hover:text-red-500 shrink-0 ml-1 transition-colors">
+            <div className="w-36 shrink-0">
+              <Select value={currentDesig} onValueChange={(val) => onUpdateDesignation(i, val)}>
+                <SelectTrigger className="h-8 text-xs border-slate-200 bg-slate-50/50 font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl max-h-52">
+                  {DESIGNATION_OPTIONS.map(d => (
+                    <SelectItem key={d} value={d} className="text-xs font-medium">
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <button type="button" onClick={() => onRemove(i)} title="Remove organization"
+              className="text-slate-300 hover:text-red-500 shrink-0 ml-1 transition-colors p-1 rounded-md hover:bg-red-50">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -231,9 +254,52 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, colleg
   }, [open, editUser]);
 
   const set            = (f) => (e) => setForm(p => ({ ...p, [f]: e?.target?.value ?? e }));
-  const resetRole      = (val) => setForm(p => ({ ...p, user_type_id: val, org_memberships: [] }));
-  const addMembership  = (entry) => setForm(p => ({ ...p, org_memberships: [...p.org_memberships, entry] }));
-  const removeMembership = (idx) => setForm(p => ({ ...p, org_memberships: p.org_memberships.filter((_, i) => i !== idx) }));
+  const resetRole      = (val) => {
+    setForm(p => {
+      let updatedMemberships = p.org_memberships;
+      if (val === "3") {
+        // If switched to Student, align designations to Member
+        updatedMemberships = p.org_memberships.map(m => ({ ...m, designation: "Member" }));
+      }
+      return { ...p, user_type_id: val, org_memberships: updatedMemberships };
+    });
+  };
+  const addMembership  = (entry) => {
+    setForm(p => {
+      const updated = [...p.org_memberships, entry];
+      const hasOfficer = updated.some(m => m.designation && m.designation !== 'Member');
+      let newTypeId = p.user_type_id;
+      if (hasOfficer && p.user_type_id === '3') {
+        newTypeId = '2'; // Auto-upgrade role to Officer
+      }
+      return { ...p, org_memberships: updated, user_type_id: newTypeId };
+    });
+  };
+  const updateMembershipDesignation = (idx, newDesignation) => {
+    setForm(p => {
+      const updated = p.org_memberships.map((m, i) => i === idx ? { ...m, designation: newDesignation } : m);
+      const hasOfficer = updated.some(m => m.designation && m.designation !== 'Member');
+      let newTypeId = p.user_type_id;
+      if (hasOfficer && p.user_type_id === '3') {
+        newTypeId = '2'; // Auto-upgrade role to Officer
+      } else if (!hasOfficer && p.user_type_id === '2' && updated.length > 0) {
+        // If all are Member now, demote to Student
+        newTypeId = '3';
+      }
+      return { ...p, org_memberships: updated, user_type_id: newTypeId };
+    });
+  };
+  const removeMembership = (idx) => {
+    setForm(p => {
+      const updated = p.org_memberships.filter((_, i) => i !== idx);
+      const hasOfficer = updated.some(m => m.designation && m.designation !== 'Member');
+      let newTypeId = p.user_type_id;
+      if (!hasOfficer && p.user_type_id === '2' && updated.length > 0) {
+        newTypeId = '3';
+      }
+      return { ...p, org_memberships: updated, user_type_id: newTypeId };
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -624,6 +690,7 @@ export default function UserFormModal({ open, onClose, onSaved, editUser, colleg
                   memberships={form.org_memberships}
                   organizations={organizations}
                   onRemove={removeMembership}
+                  onUpdateDesignation={updateMembershipDesignation}
                   isOfficer={isOfficer}
                 />
 

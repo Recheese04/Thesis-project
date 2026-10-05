@@ -42,6 +42,10 @@ class EvaluationController extends Controller
                 }
             }
 
+            if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+                $query->whereHas('event', fn($q) => $q->where('school_year_id', $request->school_year_id));
+            }
+
             return response()->json($query->get());
         } catch (\Exception $e) {
             Log::error('Evaluation index error: ' . $e->getMessage());
@@ -242,7 +246,13 @@ class EvaluationController extends Controller
                 return response()->json(['message' => 'You are not an active officer of any organization.'], 403);
             }
 
-            $events = Event::whereIn('organization_id', $orgIds)
+            $eventsQuery = Event::whereIn('organization_id', $orgIds);
+
+            if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+                $eventsQuery->where('school_year_id', $request->school_year_id);
+            }
+
+            $events = $eventsQuery
                 ->with(['evaluation:id,event_id,status'])
                 ->orderBy('event_date', 'desc')
                 ->get()
@@ -617,16 +627,23 @@ class EvaluationController extends Controller
             // 2. Fetch evaluations that are OPEN
             // AND belong to the student's organizations
             // AND the student has personally checked out
-            $evaluations = EventEvaluation::with(['event:id,title,status', 'questions:id,evaluation_id'])
+            $query = EventEvaluation::with(['event:id,title,status', 'questions:id,evaluation_id'])
                 ->where('status', 'open')
-                ->whereHas('event', function ($query) use ($orgIds, $userId) {
-                    $query->whereIn('organization_id', $orgIds)
+                ->whereHas('event', function ($q) use ($orgIds, $userId) {
+                    $q->whereIn('organization_id', $orgIds)
                         ->whereHas('attendances', function ($aq) use ($userId) {
                             $aq->where('user_id', $userId)
                                 ->whereNotNull('time_out');
                         });
-                })
-                ->orderBy('created_at', 'desc')
+                });
+
+            if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+                $query->whereHas('event', function ($eq) use ($request) {
+                    $eq->where('school_year_id', $request->school_year_id);
+                });
+            }
+
+            $evaluations = $query->orderBy('created_at', 'desc')
                 ->get()
                 ->map(function ($evaluation) use ($userId) {
                     $hasResponded = EvaluationResponse::where('evaluation_id', $evaluation->id)

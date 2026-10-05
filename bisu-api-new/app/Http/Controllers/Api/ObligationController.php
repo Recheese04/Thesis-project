@@ -104,7 +104,7 @@ class ObligationController extends Controller
      * GET /api/student/obligations
      * Student view: all my consequence obligations across orgs
      */
-    public function myObligations()
+    public function myObligations(Request $request)
     {
         try {
             $userId = Auth::id();
@@ -119,9 +119,16 @@ class ObligationController extends Controller
             }
 
             // Fetch fees from student_fees table
-            $fees = \App\Models\StudentFee::with(['organization', 'feeType'])
-                ->where('user_id', $userId)
-                ->get()
+            $feesQuery = \App\Models\StudentFee::with(['organization', 'feeType'])
+                ->where('user_id', $userId);
+
+            if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+                $feesQuery->whereHas('feeType', function ($q) use ($request) {
+                    $q->where('school_year_id', $request->school_year_id);
+                });
+            }
+
+            $fees = $feesQuery->get()
                 ->map(fn($f) => [
                     'id'               => $f->id,
                     'type'             => 'fee',
@@ -139,8 +146,20 @@ class ObligationController extends Controller
                 ]);
 
             // Consequences assigned to me (Tasks, etc.)
-            $consequences = StudentConsequence::with(['consequenceRule.organization', 'rule.organization', 'event'])
-                ->where('user_id', $userId)
+            $consequencesQuery = StudentConsequence::with(['consequenceRule.organization', 'rule.organization', 'event'])
+                ->where('user_id', $userId);
+
+            if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+                $consequencesQuery->where(function ($sq) use ($request) {
+                    $sq->whereHas('event', function ($eq) use ($request) {
+                        $eq->where('school_year_id', $request->school_year_id);
+                    })->orWhereHas('consequenceRule', function ($rq) use ($request) {
+                        $rq->where('school_year_id', $request->school_year_id);
+                    });
+                });
+            }
+
+            $consequences = $consequencesQuery
                 ->orderByRaw("FIELD(status, 'pending', 'completed')")
                 ->orderBy('due_date', 'asc')
                 ->get()
@@ -176,15 +195,27 @@ class ObligationController extends Controller
      * GET /api/organizations/{orgId}/obligations
      * Officer view: all obligations for this org's members
      */
-    public function index($orgId)
+    public function index(Request $request, $orgId)
     {
         try {
             // Auto-assign any missing absent consequences for this org's completed events
             $this->autoAssignConsequencesForOrg($orgId);
 
-            $consequences = StudentConsequence::with(['consequenceRule', 'rule', 'user', 'event'])
-                ->whereHas('consequenceRule', fn($q) => $q->where('organization_id', $orgId))
-                ->orWhereHas('rule', fn($q) => $q->where('organization_id', $orgId))
+            $query = StudentConsequence::with(['consequenceRule', 'rule', 'user', 'event'])
+                ->where(function ($q) use ($orgId) {
+                    $q->whereHas('consequenceRule', fn($cr) => $cr->where('organization_id', $orgId))
+                      ->orWhereHas('rule', fn($r) => $r->where('organization_id', $orgId));
+                });
+
+            if ($request->filled('school_year_id') && $request->school_year_id !== 'all') {
+                $yearId = $request->school_year_id;
+                $query->where(function ($q) use ($yearId) {
+                    $q->whereHas('event', fn($eq) => $eq->where('school_year_id', $yearId))
+                      ->orWhereHas('consequenceRule', fn($cr) => $cr->where('school_year_id', $yearId));
+                });
+            }
+
+            $consequences = $query
                 ->orderByRaw("FIELD(status, 'pending', 'completed')")
                 ->orderBy('due_date', 'asc')
                 ->get()

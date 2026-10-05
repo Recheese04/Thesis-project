@@ -8,6 +8,7 @@ import OfficerPageWrapper from '../../components/ui/OfficerPageWrapper';
 import TarsiChatBubble from '../../components/ui/TarsiChatBubble';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import SchoolYearFilterModal from '../../components/ui/SchoolYearFilterModal';
 
 export default function OfficerConsequences() {
   const { isDark, colors } = useTheme();
@@ -32,6 +33,11 @@ export default function OfficerConsequences() {
   const alertBorder = isDark ? 'rgba(37,99,235,0.3)' : '#bfdbfe';
   const alertText = isDark ? '#93c5fd' : '#1e40af';
   const alertIconColor = isDark ? '#60a5fa' : '#2563eb';
+
+  // School Year Filter state
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedYearId, setSelectedYearId] = useState<number | string>('all');
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
 
   const [rules, setRules] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -59,10 +65,14 @@ export default function OfficerConsequences() {
   const fetchData = async () => {
     if (!orgId) return;
     try {
+      const params: any = {};
+      if (selectedYearId && selectedYearId !== 'all') {
+        params.school_year_id = selectedYearId;
+      }
       const [rulesRes, eventsRes, feeTypesRes] = await Promise.all([
-        api.get(`/organizations/${orgId}/consequence-rules`),
-        api.get(`/events?role=officer`),
-        api.get(`/fee-types`)
+        api.get(`/organizations/${orgId}/consequence-rules`, { params }),
+        api.get(`/events?role=officer`, { params }),
+        api.get(`/fee-types`, { params })
       ]);
       setRules(Array.isArray(rulesRes.data) ? rulesRes.data : []);
       setEvents(Array.isArray(eventsRes.data) ? eventsRes.data : []);
@@ -72,7 +82,7 @@ export default function OfficerConsequences() {
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchData(); }, [orgId]);
+  useEffect(() => { fetchData(); }, [orgId, selectedYearId]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -108,7 +118,7 @@ export default function OfficerConsequences() {
 
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: any = {
         event_id: eventId || null,
         consequence_title: title,
         consequence_description: description,
@@ -116,6 +126,10 @@ export default function OfficerConsequences() {
         type,
         fee_type_id: type === 'financial' ? feeTypeId : null,
       };
+
+      if (!editingId && selectedYearId && selectedYearId !== 'all') {
+        payload.school_year_id = selectedYearId;
+      }
 
       if (editingId) {
         await api.put(`/consequence-rules/${editingId}`, payload);
@@ -192,7 +206,17 @@ export default function OfficerConsequences() {
             </View>
 
             {/* Quick Actions moved to the right */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+               <TouchableOpacity 
+                  onPress={() => setIsYearModalOpen(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: selectedYear !== 'All' ? '#7c3aed' : border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: selectedYear !== 'All' ? (isDark ? 'rgba(124,58,237,0.15)' : '#f5f3ff') : cardBg }}
+               >
+                  <Calendar size={14} color={selectedYear !== 'All' ? '#7c3aed' : textSecondary} />
+                  <Text style={{ fontSize: 12, color: selectedYear !== 'All' ? '#7c3aed' : textPrimary, fontWeight: '600', marginLeft: 4 }}>
+                    {selectedYear === 'All' ? 'All S.Y.' : `S.Y. ${selectedYear}`}
+                  </Text>
+               </TouchableOpacity>
+
                <TouchableOpacity 
                   style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: primarySolid, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
                   onPress={openCreate}
@@ -454,6 +478,16 @@ export default function OfficerConsequences() {
           </View>
         </View>
       </Modal>
+
+      <SchoolYearFilterModal
+        visible={isYearModalOpen}
+        onClose={() => setIsYearModalOpen(false)}
+        selectedYear={selectedYear}
+        onSelectYear={(name, id) => {
+          setSelectedYear(name);
+          setSelectedYearId(id);
+        }}
+      />
 
     </OfficerPageWrapper>
   );

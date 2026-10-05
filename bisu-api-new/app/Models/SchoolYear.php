@@ -22,4 +22,24 @@ class SchoolYear extends Model
     {
         return $this->hasMany(Event::class);
     }
+
+    public function feeTypes()
+    {
+        return $this->hasMany(FeeType::class);
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(Document::class);
+    }
+
+    public function designations()
+    {
+        return $this->hasMany(Designation::class);
+    }
+
+    public function consequenceRules()
+    {
+        return $this->hasMany(ConsequenceRule::class);
+    }
 }

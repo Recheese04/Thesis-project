@@ -12,6 +12,7 @@ class Document extends Model
 
     protected $fillable = [
         'organization_id',
+        'school_year_id',
         'uploaded_by',
         'title',
         'category',
@@ -19,6 +20,11 @@ class Document extends Model
         'file_size',
         'file_type',
     ];
+
+    public function schoolYear(): BelongsTo
+    {
+        return $this->belongsTo(SchoolYear::class);
+    }
 
     public function organization(): BelongsTo
     {

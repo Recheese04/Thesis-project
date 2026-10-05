@@ -12,6 +12,7 @@ interface User {
   student_number?: string;
   user_type?: string;
   profile_picture?: string;
+  profile_picture_url?: string;
   college?: { name: string };
   course?: { name: string };
   year_level?: string;
